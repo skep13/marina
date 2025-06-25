@@ -49,7 +49,7 @@ if __name__ == "__main__":
 
     start_time = time.time()
     output_wav_pth1 = "output.wav"
-    path_to_aud = sovits_gen("if you hear this, that means the API key is set up correctly", output_wav_pth1)
+    path_to_aud = sovits_gen("if you hear this, that means it is set up correctly", output_wav_pth1)
     
     end_time = time.time()
     elapsed_time = end_time - start_time

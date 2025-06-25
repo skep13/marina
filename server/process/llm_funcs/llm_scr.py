@@ -13,7 +13,7 @@ client = OpenAI(api_key=char_config['OPENAI_API_KEY'])
 
 # Constants
 HISTORY_FILE = char_config['history_file']
-MODEL = char_config['history_file']
+MODEL = char_config['model']
 SYSTEM_PROMPT =  [
         {
             "role": "system",

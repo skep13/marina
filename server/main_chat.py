@@ -21,24 +21,9 @@ whisper_model = WhisperModel("base.en", device="cpu", compute_type="float32")
 while True:
 
     conversation_recording = output_wav_path = Path("audio") / "conversation.wav"
-
-    # record_on_speech(
-    #         output_file=conversation_recording,
-    #         samplerate=44100,
-    #         channels=1,
-    #         silence_threshold=0.02,  # Adjust based on your microphone sensitivity
-    #         silence_duration=1,     # Stop after 3 seconds of silence
-    #         device=None             # Use default device, or specify by ID or name
-    #     )
-
-    # user_spoken_text = transcribe_audio(whisper_model, aud_path=conversation_recording)
+    conversation_recording.parent.mkdir(parents=True, exist_ok=True)
 
     user_spoken_text = record_and_transcribe(whisper_model, conversation_recording)
-    # stop squence 
-
-    if user_spoken_text.lower().strip() in ["exit.", "quit."]:
-        print("Goodbye!")
-        break
 
     ### pass to LLM and get a LLM output.
 
@@ -59,6 +44,8 @@ while True:
 
 
     play_audio(output_wav_path)
+    # clean up audio files
+    [fp.unlink() for fp in Path("audio").glob("*.wav") if fp.is_file()]
     # # Example
     # duration = get_wav_duration(output_wav_path)
 
