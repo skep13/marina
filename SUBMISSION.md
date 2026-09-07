@@ -68,9 +68,12 @@ you, not for me.
 
 ## Demo URL
 
-Leave blank or record a short clip. This project does not demo well as a repo
-link — the whole point is a transparent window sitting on a desktop, lip-syncing
-and moving. Thirty seconds of screen recording says more than the README does.
+https://skep13.github.io/marina/
+
+A demo page with a render of the avatar, three audio samples of her voice, and
+the measured numbers. Worth also recording thirty seconds of the real app — a
+transparent window lip-syncing on a desktop is the one thing a static page
+cannot show.
 
 ---
 
