@@ -1,0 +1,297 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Marina — a desktop companion</title>
+<meta name="description" content="A VRM avatar that lives on your desktop. Local voice, formant-driven lip sync, spring-bone hair, long-term memory. Runs on an 8 GB M2.">
+<link rel="icon" href="icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=IBM+Plex+Mono:wght@400;500&family=Instrument+Sans:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --ink:#090b10; --panel:#0f131b; --line:rgba(255,255,255,.085);
+  --line-2:rgba(255,255,255,.16); --text:#e9ecf3; --muted:#7e8798;
+  --accent:#79cfff; --accent-dim:rgba(121,207,255,.14);
+  --serif:"Instrument Serif",Georgia,serif;
+  --mono:"IBM Plex Mono",ui-monospace,monospace;
+  --sans:"Instrument Sans",system-ui,sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{
+  background:var(--ink); color:var(--text); font-family:var(--sans);
+  font-size:16px; line-height:1.6; -webkit-font-smoothing:antialiased;
+  overflow-x:hidden;
+}
+/* grain + a cold wash bleeding from the top right, where she stands */
+body::before{
+  content:""; position:fixed; inset:0; pointer-events:none; z-index:0;
+  background:
+    radial-gradient(120% 90% at 78% -10%, rgba(121,207,255,.10), transparent 55%),
+    radial-gradient(80% 60% at 10% 105%, rgba(121,207,255,.05), transparent 60%);
+}
+body::after{
+  content:""; position:fixed; inset:0; pointer-events:none; z-index:1; opacity:.038;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+.wrap{position:relative; z-index:2; max-width:1180px; margin:0 auto; padding:0 32px}
+.hero-grid{overflow:visible}
+.figure{contain:layout}
+
+/* ---------- shared type ---------- */
+.label{
+  font-family:var(--mono); font-size:11px; letter-spacing:.16em;
+  text-transform:uppercase; color:var(--muted);
+}
+.rule{height:1px; background:var(--line); border:0}
+h2{
+  font-family:var(--serif); font-weight:400; font-size:clamp(30px,4.2vw,50px);
+  line-height:1.08; letter-spacing:-.01em;
+}
+p{color:#c3cad8; max-width:62ch}
+a{color:var(--accent)}
+
+/* ---------- hero ---------- */
+.hero{position:relative; min-height:100svh; display:flex; align-items:center; padding:96px 0 64px}
+.hero-grid{display:grid; grid-template-columns:1.05fr .95fr; gap:40px; align-items:center; width:100%}
+.eyebrow{display:flex; align-items:center; gap:12px; margin-bottom:26px}
+.eyebrow .dot{width:6px;height:6px;border-radius:50%;background:var(--accent);
+  box-shadow:0 0 0 4px var(--accent-dim)}
+h1{
+  font-family:var(--serif); font-weight:400; letter-spacing:-.02em;
+  font-size:clamp(58px,9.5vw,132px); line-height:.9; margin-bottom:8px;
+}
+h1 em{font-style:italic; color:var(--accent)}
+.tag{font-family:var(--mono); font-size:13px; color:var(--muted); margin-bottom:30px}
+.lede{font-size:clamp(17px,1.5vw,20px); color:#ccd3e1; margin-bottom:38px; max-width:44ch}
+.cta{display:flex; gap:12px; flex-wrap:wrap}
+.btn{
+  display:inline-flex; align-items:center; gap:9px; padding:12px 20px;
+  border:1px solid var(--line-2); border-radius:2px; text-decoration:none;
+  font-family:var(--mono); font-size:12.5px; letter-spacing:.04em; color:var(--text);
+  transition:background .18s, border-color .18s, transform .18s;
+}
+.btn:hover{background:rgba(255,255,255,.05); border-color:var(--accent); transform:translateY(-1px)}
+.btn.primary{background:var(--accent); color:#05080d; border-color:var(--accent); font-weight:500}
+.btn.primary:hover{background:#9adcff}
+
+/* her, bleeding off the right edge, with spec callouts */
+.figure{position:relative; justify-self:end; width:100%; max-width:452px; margin-right:12px}
+.figure img{
+  display:block; width:100%; height:auto;
+  filter:drop-shadow(0 40px 90px rgba(0,0,0,.75));
+  animation:breathe 9s ease-in-out infinite;
+}
+@keyframes breathe{0%,100%{transform:translateY(0)}50%{transform:translateY(-11px)}}
+.figure::before{ /* measurement grid behind her */
+  content:""; position:absolute; inset:-8% -12% -4% -12%; z-index:-1;
+  background-image:linear-gradient(var(--line) 1px,transparent 1px),
+                   linear-gradient(90deg,var(--line) 1px,transparent 1px);
+  background-size:44px 44px;
+  mask-image:radial-gradient(70% 60% at 50% 45%,#000 30%,transparent 78%);
+}
+.callout{position:absolute; font-family:var(--mono); font-size:10.5px; color:var(--muted); letter-spacing:.05em; white-space:nowrap}
+.callout span{color:var(--accent)}
+.callout::before{content:""; position:absolute; top:50%; height:1px; background:var(--line-2)}
+/* One annotation column on the left. Anything hanging off the right edge
+   overflows the viewport at this width and forces horizontal scroll. */
+.c1{top:22%; left:-34%}  .c1::before{right:-42px; width:36px}
+.c2{top:45%; left:-40%}  .c2::before{right:-42px; width:36px}
+.c3{top:68%; left:-31%}  .c3::before{right:-42px; width:36px}
+
+/* ---------- sections ---------- */
+section{padding:104px 0}
+.sec-head{display:flex; align-items:baseline; gap:18px; margin-bottom:14px}
+.sec-num{font-family:var(--mono); font-size:11px; color:var(--accent); letter-spacing:.14em}
+.sec-lede{margin:22px 0 46px}
+
+.cards{display:grid; grid-template-columns:repeat(3,1fr); gap:1px; background:var(--line); border:1px solid var(--line)}
+.card{background:var(--panel); padding:30px 26px 32px}
+.card h3{font-family:var(--serif); font-weight:400; font-size:25px; margin:14px 0 12px}
+.card p{font-size:14.5px; color:#aeb7c7}
+.metric{font-family:var(--mono); font-size:11px; color:var(--accent); letter-spacing:.08em}
+.card .foot{margin-top:20px; padding-top:16px; border-top:1px dashed var(--line);
+  font-family:var(--mono); font-size:11px; color:var(--muted)}
+
+/* audio */
+.tracks{display:grid; gap:1px; background:var(--line); border:1px solid var(--line)}
+.track{background:var(--panel); padding:22px 26px; display:grid;
+  grid-template-columns:minmax(0,1fr) 300px; gap:26px; align-items:center}
+.track q{font-family:var(--serif); font-size:20px; font-style:italic; color:#dbe2ee; quotes:none}
+.track .who{font-family:var(--mono); font-size:10.5px; color:var(--muted); letter-spacing:.12em; text-transform:uppercase; margin-bottom:8px}
+audio{width:100%; height:34px}
+
+/* spec table */
+.spec{width:100%; border-collapse:collapse; font-size:14.5px}
+.spec tr{border-bottom:1px solid var(--line)}
+.spec tr:first-child{border-top:1px solid var(--line)}
+.spec td{padding:15px 4px; vertical-align:top}
+.spec td:first-child{font-family:var(--mono); font-size:11.5px; letter-spacing:.08em;
+  text-transform:uppercase; color:var(--muted); width:230px}
+.spec td:last-child{color:#c8cfdd}
+.spec b{color:var(--accent); font-weight:500; font-family:var(--mono); font-size:13.5px}
+
+footer{padding:70px 0 90px; border-top:1px solid var(--line)}
+.foot-row{display:flex; justify-content:space-between; gap:24px; flex-wrap:wrap; align-items:center}
+.credit{font-family:var(--mono); font-size:11.5px; color:var(--muted); line-height:2}
+.credit a{color:#9aa4b6; text-decoration:none; border-bottom:1px solid var(--line-2)}
+.credit a:hover{color:var(--accent)}
+
+/* entrance */
+.rise{opacity:0; transform:translateY(18px); animation:rise .85s cubic-bezier(.2,.7,.3,1) forwards}
+@keyframes rise{to{opacity:1; transform:none}}
+.d1{animation-delay:.05s}.d2{animation-delay:.15s}.d3{animation-delay:.25s}
+.d4{animation-delay:.35s}.d5{animation-delay:.5s}
+
+@media (max-width:900px){
+  .hero{min-height:auto; padding:72px 0 40px}
+  .hero-grid{grid-template-columns:1fr; gap:52px}
+  .figure{justify-self:center; max-width:380px}
+  .callout{display:none}
+  .cards{grid-template-columns:1fr}
+  .track{grid-template-columns:1fr; gap:14px}
+  .spec td:first-child{width:auto; display:block; padding-bottom:2px}
+  .spec td:last-child{display:block; padding-top:0}
+}
+@media (prefers-reduced-motion:reduce){
+  *{animation:none!important; transition:none!important}
+  .rise{opacity:1; transform:none}
+}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+
+  <header class="hero">
+    <div class="hero-grid">
+      <div>
+        <div class="eyebrow rise d1"><span class="dot"></span><span class="label">Desktop companion · macOS</span></div>
+        <h1 class="rise d2">Mar<em>i</em>na</h1>
+        <div class="tag rise d2">VRM avatar · local voice · 8&nbsp;GB of RAM</div>
+        <p class="lede rise d3">She sits on your desktop in a transparent window. You talk, she talks back —
+          lip-syncing to her own voice and acting out what she writes.</p>
+        <div class="cta rise d4">
+          <a class="btn primary" href="https://github.com/skep13/marina">View the source</a>
+          <a class="btn" href="#listen">Hear her</a>
+        </div>
+      </div>
+
+      <figure class="figure rise d5">
+        <img src="hero.png" alt="Marina, a grey-haired anime character in a dark jacket, rendered against a transparent background">
+        <div class="callout c1">blink · saccade · <span>gaze</span></div>
+        <div class="callout c2"><span>5 visemes</span> · formant-driven</div>
+        <div class="callout c3"><span>140</span> spring joints</div>
+      </figure>
+    </div>
+  </header>
+
+  <section id="what">
+    <div class="sec-head"><span class="sec-num">01</span><h2>Not a chat window</h2></div>
+    <p class="sec-lede">Marina runs in a frameless, always-on-top window with no background — she stands on
+      your desktop, not inside an app. You reach her by typing or by holding a key and speaking.
+      Speech recognition, voice synthesis and rendering all happen locally; only the language model
+      sits behind an OpenAI-compatible endpoint, so it can be Ollama on the same laptop, a box on
+      your LAN, or a hosted API without anything else changing.</p>
+    <p>She is written as a friend rather than an assistant. She has opinions, a TikTok account she
+      complains about, and permission to be busy, unimpressed, or simply unhelpful.</p>
+  </section>
+
+  <section id="how">
+    <div class="sec-head"><span class="sec-num">02</span><h2>How she moves</h2></div>
+    <p class="sec-lede">Three problems worth solving properly rather than faking.</p>
+
+    <div class="cards">
+      <article class="card">
+        <div class="metric">−46 dB → −14 dB</div>
+        <h3>A mouth, not a hinge</h3>
+        <p>Loudness in decibels sets how far the jaw opens. The balance between the first two formant
+          bands picks between five visemes, so the mouth changes <em>shape</em> rather than just size.
+          Sibilants are detected and damped — otherwise every "s" reads as a shout.</p>
+        <div class="foot">aa · ih · ou · ee · oh</div>
+      </article>
+
+      <article class="card">
+        <div class="metric">140 joints · 49 mm travel</div>
+        <h3>Hair with real physics</h3>
+        <p>The VRM already carries spring-bone simulation; it just has nothing to react to when she
+          stands still. Instead of animating strands, a simulated breeze leans the gravity direction
+          each joint falls toward — so the solver does the work, and long strands swing further than
+          short ones for free.</p>
+        <div class="foot">non-harmonic gusts, so it never loops audibly</div>
+      </article>
+
+      <article class="card">
+        <div class="metric">19 cues</div>
+        <h3>Performed, not narrated</h3>
+        <p>When the model writes <span style="font-family:var(--mono);color:var(--accent)">*tilts head*</span>,
+          that is stripped from the speech and played as an animation instead of read aloud as
+          "asterisk tilts head asterisk". Each cue fires at the point in the audio where it was
+          written, not dumped at the start.</p>
+        <div class="foot">nod · shake · shrug · eyeroll · wink · sigh · …</div>
+      </article>
+    </div>
+  </section>
+
+  <section id="listen">
+    <div class="sec-head"><span class="sec-num">03</span><h2>Her voice</h2></div>
+    <p class="sec-lede">Kokoro, 82M parameters, running on the laptop's CPU at roughly three times
+      realtime. Two voicepacks blended for timbre, then pitched up a semitone without changing
+      duration — generation is slowed by the same ratio the resample speeds it back up by.</p>
+
+    <div class="tracks">
+      <div class="track">
+        <div><div class="who">Greeting</div><q>Oh, you're back. I was just about to give up on that transition.</q></div>
+        <audio controls preload="none" src="greeting.wav"></audio>
+      </div>
+      <div class="track">
+        <div><div class="who">Declining to help</div><q>Yeah no, I'm busy losing a fight with the borrow checker.</q></div>
+        <audio controls preload="none" src="snark.wav"></audio>
+      </div>
+      <div class="track">
+        <div><div class="who">Her own problems</div><q>Forty takes on one transition. Forty. The algorithm better appreciate this.</q></div>
+        <audio controls preload="none" src="tiktok.wav"></audio>
+      </div>
+    </div>
+  </section>
+
+  <section id="specs">
+    <div class="sec-head"><span class="sec-num">04</span><h2>Measured, on the machine it was built for</h2></div>
+    <p class="sec-lede">A MacBook Air with 8&nbsp;GB of RAM. Every number below was taken on it, and the
+      constraint shaped the whole design — nothing here is sized for a workstation.</p>
+
+    <table class="spec">
+      <tr><td>Speech → text</td><td><b>0.98 s</b> for 8.5 s of audio · Faster-Whisper <span style="color:var(--muted)">base.en</span>, int8, CPU</td></tr>
+      <tr><td>Text → speech</td><td><b>3.2×</b> realtime · Kokoro 82M, ONNX, CPU</td></tr>
+      <tr><td>Language model</td><td><b>37–44 tok/s</b> · llama3.2:3b on Metal, or any OpenAI-compatible endpoint</td></tr>
+      <tr><td>Full turn, warm</td><td><b>~1.5 s</b> from message to speech</td></tr>
+      <tr><td>Avatar</td><td>53k triangles · MToon · 140 spring joints, drawn at display refresh</td></tr>
+      <tr><td>Memory footprint</td><td><b>~1.5 GB</b> for the bridge, renderer and avatar together</td></tr>
+      <tr><td>Long-term memory</td><td>Durable facts distilled from conversation, plus a pattern-matched
+        "remember that…" path that doesn't depend on a small model noticing</td></tr>
+    </table>
+  </section>
+
+  <footer>
+    <div class="foot-row">
+      <div>
+        <div class="label" style="margin-bottom:14px">Built on</div>
+        <div class="credit">
+          <a href="https://github.com/rayenfeng/riko_project">riko_project</a> ·
+          <a href="https://github.com/pixiv/three-vrm">three-vrm</a> ·
+          <a href="https://github.com/SYSTRAN/faster-whisper">faster-whisper</a> ·
+          <a href="https://huggingface.co/hexgrad/Kokoro-82M">Kokoro-82M</a> ·
+          <a href="https://ollama.com">Ollama</a> ·
+          <a href="https://www.electronjs.org">Electron</a><br>
+          Character made in <a href="https://vroid.com/en/studio">VRoid Studio</a>.
+        </div>
+      </div>
+      <a class="btn primary" href="https://github.com/skep13/marina">github.com/skep13/marina</a>
+    </div>
+  </footer>
+
+</div>
+</body>
+</html>
