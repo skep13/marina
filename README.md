@@ -258,9 +258,27 @@ Interactive docs at `http://127.0.0.1:8765/docs` while the bridge is running.
 
 ## Credits
 
-- [rayenfeng/riko_project](https://github.com/rayenfeng/riko_project) — the original
-- [GPT-SoVITS](https://github.com/RVC-Boss/GPT-SoVITS) — voice synthesis
-- [Faster-Whisper](https://github.com/SYSTRAN/faster-whisper) — speech recognition
-- [three-vrm](https://github.com/pixiv/three-vrm) — VRM rendering
+Built on **[rayenfeng/riko_project](https://github.com/rayenfeng/riko_project)**,
+which provided the original terminal voice-chat pipeline. Its `client/` directory
+was a placeholder and "VRM model frontend" an unchecked TODO — that frontend, and
+everything below it, is what this repo adds.
 
-MIT.
+**Avatar and rendering**
+- [three-vrm](https://github.com/pixiv/three-vrm) — VRM rig, expressions, spring bones
+- [three.js](https://threejs.org) · [Electron](https://www.electronjs.org)
+- [VRoid Studio](https://vroid.com/en/studio) — character creation
+
+**Speech**
+- [Faster-Whisper](https://github.com/SYSTRAN/faster-whisper) — speech recognition
+- [Kokoro-82M](https://huggingface.co/hexgrad/Kokoro-82M) via
+  [kokoro-onnx](https://github.com/thewh1teagle/kokoro-onnx) — voice
+- [soxr](https://pypi.org/project/soxr/) — duration-preserving pitch shift
+
+**Language model**
+- [Ollama](https://ollama.com), or any OpenAI-compatible endpoint
+
+**Alternative backends, wired and documented**
+- [GPT-SoVITS](https://github.com/RVC-Boss/GPT-SoVITS) — voice cloning
+  ([docs](docs/GPT-SOVITS.md))
+- [Piper](https://github.com/OHF-voice/piper1-gpl) — training your own voice
+  ([docs](docs/PIPER-TRAINING.md))
