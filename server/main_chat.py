@@ -1,53 +1,47 @@
-from faster_whisper import WhisperModel
-from process.asr_func.asr_push_to_talk import record_and_transcribe
-from process.llm_funcs.llm_scr import llm_response
-from process.tts_func.sovits_ping import sovits_gen, play_audio
-from pathlib import Path
-import os
-import time
-### transcribe audio 
+"""Terminal-only client (no avatar). Run from the repo root:
+
+    python server/main_chat.py
+"""
+import sys
 import uuid
-import soundfile as sf
+from pathlib import Path
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(REPO_ROOT / "server"))
+
+from process.asr_func.asr_push_to_talk import build_model, record_and_transcribe
+from process.llm_funcs.llm_scr import llm_response
+from process.tts_func.sovits_ping import play_audio, sovits_gen
+
+AUDIO_DIR = REPO_ROOT / "audio"
 
 
-def get_wav_duration(path):
-    with sf.SoundFile(path) as f:
-        return len(f) / f.samplerate
+def main():
+    print("\n========= Starting Chat... =========\n")
+    whisper_model = build_model()
+
+    AUDIO_DIR.mkdir(parents=True, exist_ok=True)
+    conversation_recording = AUDIO_DIR / "conversation.wav"
+
+    while True:
+        user_spoken_text = record_and_transcribe(whisper_model, conversation_recording)
+        if not user_spoken_text:
+            continue
+
+        llm_output = llm_response(user_spoken_text)
+        print(f"Marina: {llm_output}")
+
+        output_wav_path = AUDIO_DIR / f"output_{uuid.uuid4().hex}.wav"
+        if sovits_gen(llm_output, output_wav_path):
+            play_audio(output_wav_path)
+
+        # Clean up generated clips, but keep the in-progress recording.
+        for fp in AUDIO_DIR.glob("output_*.wav"):
+            fp.unlink(missing_ok=True)
 
 
-print(' \n ========= Starting Chat... ================ \n')
-whisper_model = WhisperModel("base.en", device="cpu", compute_type="float32")
-
-while True:
-
-    conversation_recording = output_wav_path = Path("audio") / "conversation.wav"
-    conversation_recording.parent.mkdir(parents=True, exist_ok=True)
-
-    user_spoken_text = record_and_transcribe(whisper_model, conversation_recording)
-
-    ### pass to LLM and get a LLM output.
-
-    llm_output = llm_response(user_spoken_text)
-
-    tts_read_text = llm_output
-
-    ### file organization 
-
-    # 1. Generate a unique filename
-    uid = uuid.uuid4().hex
-    filename = f"output_{uid}.wav"
-    output_wav_path = Path("audio") / filename
-    output_wav_path.parent.mkdir(parents=True, exist_ok=True)
-
-    # generate audio and save it to client/audio 
-    gen_aud_path = sovits_gen(tts_read_text,output_wav_path)
-
-
-    play_audio(output_wav_path)
-    # clean up audio files
-    [fp.unlink() for fp in Path("audio").glob("*.wav") if fp.is_file()]
-    # # Example
-    # duration = get_wav_duration(output_wav_path)
-
-    # print("waiting for audio to finish...")
-    # time.sleep(duration)
+if __name__ == "__main__":
+    try:
+        main()
+    except KeyboardInterrupt:
+        print("\nBye.")

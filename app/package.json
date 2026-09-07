@@ -1,0 +1,66 @@
+{
+  "name": "marina",
+  "version": "1.0.0",
+  "description": "Transparent desktop VRM avatar assistant",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder --mac --dir",
+    "dmg": "electron-builder --mac"
+  },
+  "license": "MIT",
+  "dependencies": {},
+  "devDependencies": {
+    "@pixiv/three-vrm": "^3.5.5",
+    "electron": "^44.2.0",
+    "electron-builder": "^26.15.3",
+    "esbuild": "^0.28.2",
+    "three": "^0.185.1"
+  },
+  "productName": "Marina",
+  "build": {
+    "appId": "com.jacobmatthews.marina",
+    "productName": "Marina",
+    "directories": {
+      "buildResources": "build",
+      "output": "dist"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "renderer/**/*",
+      "models/**/*",
+      "assets/**/*",
+      "!test/**",
+      "!src/**",
+      "!build/**"
+    ],
+    "extraResources": [
+      {
+        "from": "build/project-root.txt",
+        "to": "project-root.txt"
+      }
+    ],
+    "mac": {
+      "category": "public.app-category.productivity",
+      "icon": "build/icon.icns",
+      "target": [
+        {
+          "target": "dir",
+          "arch": [
+            "arm64"
+          ]
+        }
+      ],
+      "identity": null,
+      "extendInfo": {
+        "NSMicrophoneUsageDescription": "Marina uses the microphone so you can talk to her.",
+        "LSUIElement": false,
+        "NSDesktopFolderUsageDescription": "Marina needs to read her Python backend and avatar model from this folder.",
+        "NSDocumentsFolderUsageDescription": "Marina needs to read her Python backend and avatar model from this folder.",
+        "NSDownloadsFolderUsageDescription": "Marina needs to read her Python backend and avatar model from this folder."
+      }
+    }
+  },
+  "author": "Jacob Matthews"
+}

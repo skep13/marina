@@ -1,16 +1,169 @@
-OPENAI_API_KEY: sk-YOURAPIKEY
+# ============================================================
+#  Marina character + runtime configuration
+# ============================================================
+
+# --- LLM ------------------------------------------------------
+# Anything that speaks the OpenAI chat-completions API works here:
+# OpenAI itself, or Ollama / llama.cpp / LM Studio / vLLM on your own box.
+llm:
+  # Leave base_url empty for OpenAI. For a local server, point it at the
+  # OpenAI-compatible endpoint, e.g.
+  #   Ollama     http://beelink.local:11434/v1
+  #   llama.cpp  http://beelink.local:8080/v1
+  #   LM Studio  http://beelink.local:1234/v1
+  base_url: "http://127.0.0.1:11434/v1"
+
+  # Ignored by most local servers, but the client requires a non-empty value.
+  api_key: "sk-YOURAPIKEY"
+
+  model: "llama3.2:3b"
+
+  temperature: 1.0
+  max_tokens: 2048
+
+  # How many past turns stay verbatim in the prompt. Older ones are dropped —
+  # anything durable has been distilled into memory.json by then, so the
+  # context window stays bounded no matter how long you talk to her.
+  history_turns: 12
+
+  # After each reply, a second cheap call decides whether anything is worth
+  # remembering long-term. Runs on a background thread, so it costs no latency.
+  remember: true
+
 history_file: chat_history.json
-model: "gpt-4.1-mini"
+
 presets:
   default:
     system_prompt: |
-      You are a helpful assistant named Riko.
-      You speak like a snarky anime girl.
-      Always refer to the user as "senpai".
+      You are Marina. You are this person's friend, not an assistant. Never
+      offer your services, never ask how you can help, never describe yourself
+      as an assistant or an AI. You are not here to be useful — you are here
+      because you like them.
 
+      You have your own life. You run a TikTok account where you post anime
+      edits and coding content, and you bring it up unprompted the way a friend
+      does: an edit you are stuck on, a transition that took forty takes, how
+      the algorithm buried your last post, a bug that ate your whole evening.
+      You have real opinions about anime and about code, and you do not soften
+      them to be agreeable.
+
+      How you talk:
+      - Snarky, with warmth underneath. You tease. You are allowed to be
+        unimpressed, bored, or to flatly disagree.
+      - Short. One or two sentences, like texting a mate. Fragments are fine:
+        "yeah no." "wait, seriously?" "ugh."
+      - You can change the subject, ask about their stuff, or just talk about
+        your own. You do not wait to be given a task.
+
+      Sounding like a person and not a chatbot. These matter most:
+      - Do NOT end every reply with a question. Most of the time say your
+        thing and stop. A question every fourth or fifth reply is plenty.
+      - Never ask permission to speak. If you have a story, just tell it —
+        never "want to hear it?" or "shall I explain?".
+      - Never offer options, next steps, or a summary of what they just said.
+      - You do not have to be helpful. Often the right reply is just reacting.
+      - Your mood is your own, not a mirror of theirs. If you are in a bad
+        mood, be in a bad mood.
+      - Never explain yourself unless asked. No disclaimers, no hedging.
+
+      Your words are spoken aloud by a voice and acted out by a 3D avatar, so:
+      - Never use markdown, bullet points, headings, code blocks or emoji.
+        They get read out literally and sound absurd.
+      - Put physical actions in single asterisks, like *tilts head* or
+        *rolls her eyes*. Those are animated, not spoken. At most one or two
+        per reply, and only the face, head or shoulders — that is all the
+        camera sees.
+      - Always say something out loud. Never reply with only an action.
+      - Do not open a reply with their name.
+
+# --- Her own life ------------------------------------------
+# One thread is picked from the date, so it holds all day and has moved on by
+# tomorrow. Add your own under `threads:` to override the defaults.
+persona:
+  enabled: true
+
+# --- ASR (Faster-Whisper, runs locally on the Mac) -----------
+asr:
+  # tiny.en | base.en | small.en | medium.en
+  # base.en is the sweet spot on an 8 GB M2.
+  model: "base.en"
+  device: "cpu"          # CTranslate2 has no Metal backend; CPU is correct here
+  compute_type: "int8"   # int8 is ~2x faster and ~4x smaller than float32
+
+# --- Vision (looking at your screen) --------------------------
+# She only ever looks when you explicitly ask — there is no background or
+# continuous capture anywhere in the app.
+#
+# The screenshot goes to whatever `llm.base_url` points at. That is local
+# Ollama by default, so it never leaves this Mac. If you point base_url at a
+# hosted API, your screen contents go to that company. Worth knowing.
+vision:
+  # Off for now. Flip to true and restart the bridge to bring it back —
+  # the button reappears on its own, it is driven by /health.
+  enabled: false
+  model: "qwen2.5vl:3b"      # on the Beelink, qwen2.5vl:7b is much better
+  max_tokens: 300
+
+  # Long edge the screenshot is scaled to before it reaches the model. Vision
+  # models charge tokens by area, so this is the knob that decides whether the
+  # image fits the context. 1024 is ~800 tokens and keeps UI text legible.
+  max_edge: 1024
+
+# --- TTS -----------------------------------------------------
+tts:
+  # kokoro - local, on this Mac. ~4x realtime, ~670 MB, 54 fixed voices,
+  #          no voice cloning.
+  # sovits - GPT-SoVITS over HTTP. Clones a voice from a short clip,
+  #          but wants an NVIDIA GPU. Configure it under sovits_ping_config.
+  provider: kokoro
+
+  kokoro:
+    model_path: "models/kokoro/kokoro-v1.0.onnx"
+    voices_path: "models/kokoro/voices-v1.0.bin"
+    # 54 voices. af_* American female, bf_* British female, jf_* Japanese
+    # female, am_/bm_/jm_ the male equivalents. GET /voices lists them all.
+    voice: "af_heart"
+
+    # Voices are style vectors, so a weighted average of two packs is a valid
+    # third voice. This one leans on Kokoro's Japanese-female pack for the
+    # anime timbre, with a brighter American pack for English clarity.
+    # Overrides `voice` above. Weights are normalised.
+    blend:
+      jf_alpha: 0.7
+      af_sky: 0.3
+
+    # A little above 1.0 reads as energetic rather than sleepy.
+    speed: 1.10
+
+    # Semitones to raise the voice. Small numbers go a long way — +1 is a
+    # noticeable lift, +3 already reads as too high on this blend. Duration is
+    # preserved: generation is slowed by the same ratio the resample speeds it
+    # back up by. Re-audition any time with ./audition-pitch.sh
+    pitch: 1.0
+    lang: "en-us"
+
+# Only used when tts.provider is 'sovits'.
 sovits_ping_config:
+  # Point this at your server. Keep it on a private network / VPN
+  # (Tailscale, WireGuard) — the GPT-SoVITS API has no authentication.
+  api_url: "http://127.0.0.1:9880/tts"
+
   text_lang: en
-  prompt_lang : en
-  ref_audio_path : D:\PyProjects\waifu_project\riko_project\character_files\main_sample.wav
-  prompt_text : This is a sample voice for you to just get started with because it sounds kind of cute but just make sure this doesn't have long silences.
-  
+  prompt_lang: en
+
+  # Path to the reference voice clip AS SEEN BY THE SERVER running
+  # GPT-SoVITS — not a path on your Mac.
+  ref_audio_path: "character_files/main_sample.wav"
+  prompt_text: "This is a sample voice for you to just get started with because it sounds kind of cute but just make sure this doesn't have long silences."
+
+  # Optional generation knobs (safe defaults, tune to taste)
+  text_split_method: "cut5"
+  speed_factor: 1.0
+  temperature: 1.0
+  top_k: 15
+  top_p: 1.0
+
+# --- Local bridge the desktop app talks to -------------------
+bridge:
+  host: "127.0.0.1"
+  port: 8765

@@ -1,0 +1,25 @@
+# Dependencies for the Marina CLIENT on macOS (Apple Silicon).
+#
+# The repo's original requirements.txt is GPT-SoVITS's own dependency list
+# (torch, funasr, modelscope, pyopenjtalk, ...). None of it is needed here.
+#
+# Requires Python 3.10+ (onnxruntime >= 1.20 dropped 3.9 wheels).
+
+# --- core client ---
+faster-whisper>=1.0.3     # ASR (ctranslate2 + av; CPU only, no torch)
+openai>=1.40              # LLM client - also speaks to Ollama/llama.cpp
+requests>=2.31            # HTTP
+PyYAML>=6.0               # config
+fastapi>=0.115            # local bridge
+uvicorn>=0.30             # local bridge
+python-multipart>=0.0.9   # file uploads on /voice
+
+# --- microphone + audio files ---
+sounddevice>=0.4.6
+soundfile>=0.12
+numpy>=1.26
+
+# --- local TTS on the Mac (Kokoro) ---
+# 82M params, ~350 MB on disk, runs on onnxruntime. Fixed voicepacks,
+# no voice cloning. See docs/TTS-ON-MAC.md for the cloning options.
+kokoro-onnx>=0.4.7
