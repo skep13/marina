@@ -5,6 +5,7 @@ contextBridge.exposeInMainWorld('marina', {
   pickVRM: () => ipcRenderer.invoke('pick-vrm'),
   quit: () => ipcRenderer.send('quit'),
   minimize: () => ipcRenderer.send('minimize'),
+  clickThrough: (ignore) => ipcRenderer.send('click-through', ignore),
   onToggleListen: (cb) => ipcRenderer.on('toggle-listen', () => cb()),
   onPickModel: (cb) => ipcRenderer.on('pick-model', () => cb()),
   captureScreen: () => ipcRenderer.invoke('capture-screen'),

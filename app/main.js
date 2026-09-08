@@ -132,6 +132,15 @@ function writeState() {
   } catch { /* not worth crashing over */ }
 }
 
+// Set by the renderer's hit test, many times a second; the no-op guard matters
+// more than the call itself. Registered once — createWindow can run again.
+let ignoring = true;
+ipcMain.on('click-through', (_e, ignore) => {
+  if (!win || win.isDestroyed() || ignore === ignoring) return;
+  ignoring = ignore;
+  win.setIgnoreMouseEvents(ignore, { forward: true });
+});
+
 function createWindow() {
   const saved = readState();
   const { workArea } = screen.getPrimaryDisplay();
@@ -167,12 +176,21 @@ function createWindow() {
     },
   });
 
+  // A transparent window is still a solid window as far as the mouse is
+  // concerned: without this, the whole rectangle swallows every click on the
+  // desktop behind it. Ignore the mouse by default and let the renderer switch
+  // it back on when the cursor is actually over her or over a control.
+  // `forward: true` keeps mousemove flowing to the renderer so it can tell.
+  win.setIgnoreMouseEvents(true, { forward: true });
+
   // Float above full-screen apps and follow you between Spaces.
   win.setAlwaysOnTop(true, 'floating');
   win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
 
   win.webContents.setBackgroundThrottling(false);
   win.loadFile(path.join(__dirname, 'renderer', 'index.html'));
+
+  ignoring = true;   // fresh window starts click-through again
 
   win.on('moved', writeState);
   win.on('resized', writeState);
