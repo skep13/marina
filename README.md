@@ -83,7 +83,11 @@ voice model, and installs the app's npm packages. Safe to re-run.
 
 ### 2. Configure
 
-Edit `character_config.yaml`:
+```bash
+cp character_config.example.yaml character_config.yaml
+```
+
+The real config is gitignored — it holds your API key. Edit it:
 
 ```yaml
 llm:
