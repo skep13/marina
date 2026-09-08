@@ -1,3 +1,8 @@
+# Copy to character_config.yaml and edit. The real file is gitignored
+# because it holds your API key and personal settings.
+#
+#   cp character_config.example.yaml character_config.yaml
+
 # ============================================================
 #  Marina character + runtime configuration
 # ============================================================
@@ -11,10 +16,10 @@ llm:
   #   Ollama     http://beelink.local:11434/v1
   #   llama.cpp  http://beelink.local:8080/v1
   #   LM Studio  http://beelink.local:1234/v1
-  base_url: "http://127.0.0.1:11434/v1"
+  base_url: ""
 
   # Ignored by most local servers, but the client requires a non-empty value.
-  api_key: "sk-YOURAPIKEY"
+  api_key: "CHANGEME-or-leave-blank-for-no-auth"
 
   model: "llama3.2:3b"
 

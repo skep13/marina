@@ -17,7 +17,7 @@ HOST="${1:-}"
 MODEL="${2:-}"
 
 HOST="$HOST" MODEL="$MODEL" "$PY" - <<'PY'
-import json, os, sys, time, urllib.request, yaml
+import json, os, sys, time, urllib.error, urllib.request, yaml
 from pathlib import Path
 
 cfg = yaml.safe_load(Path("character_config.yaml").read_text())
@@ -27,15 +27,38 @@ if not base:
     sys.exit("No endpoint. Pass one, or set llm.base_url in character_config.yaml")
 base = base.removesuffix("/v1")
 
-def call(prompt, n_predict=120):
-    body = json.dumps({"model": model, "prompt": prompt, "stream": False,
-                       "options": {"num_predict": n_predict}}).encode()
-    req = urllib.request.Request(f"{base}/api/generate", body,
+def _post(url, payload):
+    req = urllib.request.Request(url, json.dumps(payload).encode(),
                                  {"Content-Type": "application/json"})
-    t0 = time.time()
     with urllib.request.urlopen(req, timeout=600) as r:
-        d = json.load(r)
-    return d, time.time() - t0
+        return json.load(r)
+
+
+def call(prompt, n_predict=120):
+    """Works with Ollama (/api/generate) and llama.cpp (/completion).
+
+    They report timings differently, so normalise both onto the same keys.
+    """
+    t0 = time.time()
+    try:
+        d = _post(f"{base}/api/generate",
+                  {"model": model, "prompt": prompt, "stream": False,
+                   "options": {"num_predict": n_predict}})
+        return d, time.time() - t0
+    except urllib.error.HTTPError as e:
+        if e.code != 404:
+            raise
+
+    # llama.cpp: timings are in seconds-per-token and tokens-per-second.
+    d = _post(f"{base}/completion",
+              {"prompt": prompt, "n_predict": n_predict, "stream": False})
+    t = d.get("timings", {})
+    return {
+        "prompt_eval_count": t.get("prompt_n", 0),
+        "prompt_eval_duration": t.get("prompt_ms", 0) * 1e6,
+        "eval_count": t.get("predicted_n", 0),
+        "eval_duration": t.get("predicted_ms", 0) * 1e6,
+    }, time.time() - t0
 
 print(f"endpoint : {base}")
 print(f"model    : {model}\n")
