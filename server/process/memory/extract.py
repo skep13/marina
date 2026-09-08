@@ -97,8 +97,8 @@ def _parse(raw):
 def extract(client, model, user_text, assistant_text):
     """Return a list of new fact strings. Never raises."""
     try:
-        completion = client.chat.completions.create(
-            model=model,
+        from process.llm_funcs.llm_scr import chat_completion
+        completion = chat_completion(
             messages=[
                 {"role": "system", "content": PROMPT},
                 {"role": "user",
