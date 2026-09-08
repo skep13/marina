@@ -21,6 +21,9 @@ const renderer = new THREE.WebGLRenderer({
   canvas,
   alpha: true,             // transparent framebuffer -> transparent desktop window
   antialias: true,
+  // The click-through hit test reads a pixel back after the frame is drawn,
+  // which is only valid if the buffer survives the composite.
+  preserveDrawingBuffer: true,
 });
 renderer.setClearColor(0x000000, 0);
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -844,7 +847,80 @@ function tick() {
   }
 
   renderer.render(scene, camera);
+  updateClickThrough();          // after render: the hit test reads the frame
 }
+
+// ============================================================
+//  Click-through
+//
+//  The window is a big transparent rectangle and, to the mouse, entirely
+//  solid — so it swallows every click on the desktop behind it. Main keeps it
+//  ignoring the mouse; this decides when to hand it back, by testing what is
+//  actually under the cursor: a visible control, or a non-transparent pixel
+//  of her. Everything else clicks through to whatever is behind.
+// ============================================================
+
+const gl = renderer.getContext();
+const probe = new Uint8Array(4);
+const UI = ['#bar', '#chrome', '#status', '#bubble', '#picker', '#notice', '#drag-strip'];
+
+function overUI(x, y) {
+  const hit = document.elementFromPoint(x, y);
+  if (!hit) return false;
+  for (const sel of UI) {
+    const box = hit.closest(sel);
+    if (!box) continue;
+    // The bar and chrome are opacity:0 until hovered, but still hit-testable —
+    // without this check their invisible footprints would block clicks.
+    if (sel === '#drag-strip') return true;
+    return parseFloat(getComputedStyle(box).opacity) > 0.05;
+  }
+  return false;
+}
+
+function overAvatar(x, y) {
+  const r = renderer.getPixelRatio();
+  const px = Math.round(x * r);
+  const py = Math.round((window.innerHeight - y) * r);   // GL origin is bottom-left
+  if (px < 0 || py < 0 || px >= gl.drawingBufferWidth || py >= gl.drawingBufferHeight) return false;
+  gl.readPixels(px, py, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, probe);
+  return probe[3] > 12;      // ignore antialiased fringes and faint hair tips
+}
+
+let solid = null;
+let cursor = null;
+
+window.addEventListener('mousemove', (e) => {
+  cursor = [e.clientX, e.clientY];
+  // :hover is not dependable while the window is ignoring the mouse, and the
+  // controls only become clickable once they are visible — so reveal them from
+  // the forwarded move instead of relying on it.
+  document.body.classList.add('near');
+});
+window.addEventListener('mouseleave', () => {
+  cursor = null;
+  document.body.classList.remove('near');
+  setSolid(false);
+});
+
+function setSolid(next) {
+  if (next === solid) return;
+  solid = next;
+  window.marina.clickThrough(!next);
+}
+
+function updateClickThrough() {
+  if (!cursor) return;
+  const [x, y] = cursor;
+  setSolid(overUI(x, y) || overAvatar(x, y));
+}
+
+// The module scope is invisible to executeJavaScript, so the coverage test
+// cannot reach the hit test without a deliberate handle on it.
+window.__hitTest = (x, y) => overUI(x, y) || overAvatar(x, y);
+
+// Started here, not at the render loop: the first frame calls
+// updateClickThrough(), which would hit `cursor` in its temporal dead zone.
 tick();
 
 // ============================================================
@@ -1008,6 +1084,97 @@ window.marina.onLookAtScreen(lookAtScreen);
 btnMic.addEventListener('click', toggleListen);
 window.marina.onToggleListen(toggleListen);
 
+// Brain picker. Lists what each backend can actually serve and lets you
+// choose explicitly — no guessing which model you're talking to.
+let brainMode = 'auto';
+
+function paintBrain(mode, current, model) {
+  brainMode = mode;
+  const b = el('btn-brain');
+  if (!b) return;
+  const where = mode === 'auto' ? `auto → ${current || '?'}` : mode;
+  b.title = `${where}${model ? ` · ${model}` : ''} — click to change`;
+  b.classList.toggle('on', mode === 'local');
+}
+
+function pickItem(label, sub, selected, onClick, dim) {
+  const d = document.createElement('div');
+  d.className = 'pick-item' + (selected ? ' on' : '') + (dim ? ' dim' : '');
+  d.innerHTML = `<span class="tick">${selected ? '✓' : ''}</span><span>${label}</span>`;
+  if (sub) d.title = sub;
+  if (!dim) d.addEventListener('click', onClick);
+  return d;
+}
+
+async function openPicker() {
+  const panel = el('picker');
+  const list = el('pick-list');
+  list.textContent = 'loading…';
+  panel.classList.remove('hidden');
+
+  let data;
+  try {
+    data = await (await fetch(`${BRIDGE}/models`)).json();
+  } catch {
+    list.textContent = 'bridge unreachable';
+    return;
+  }
+
+  list.innerHTML = '';
+
+  // Automatic first — it's the sensible default.
+  list.appendChild(pickItem(
+    'Automatic', 'Prefer the server, fall back to this Mac',
+    data.mode === 'auto',
+    async () => { await post('/backend', { mode: 'auto' }); await refreshBrain(); closePicker(); },
+  ));
+
+  for (const which of ['server', 'local']) {
+    const models = data[which] || [];
+    const head = document.createElement('div');
+    head.className = 'pick-group';
+    head.textContent = which === 'server' ? 'GPU server' : 'This Mac';
+    list.appendChild(head);
+
+    if (!models.length) {
+      list.appendChild(pickItem(
+        which === 'server' ? 'unreachable' : 'no models found', '', false, null, true));
+      continue;
+    }
+    for (const m of models) {
+      const on = data.mode === which && data.selected[which] === m;
+      list.appendChild(pickItem(m, `Run ${m} on the ${which}`, on, async () => {
+        await post('/model', { backend: which, model: m });
+        await refreshBrain();
+        say(which === 'local' ? `Running ${m} here.` : `Using ${m} on the server.`);
+        closePicker();
+      }));
+    }
+  }
+}
+
+function closePicker() { el('picker').classList.add('hidden'); }
+
+async function refreshBrain() {
+  try {
+    const h = await (await fetch(`${BRIDGE}/health`)).json();
+    paintBrain(h.llm_mode, h.llm_using, h.model);
+    setStatus('ok', `${h.llm_using} · ${h.model}`);
+  } catch { /* status dot already reflects trouble */ }
+}
+
+function togglePicker() {
+  el('picker').classList.contains('hidden') ? openPicker() : closePicker();
+}
+el('status').addEventListener('click', togglePicker);
+el('status').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); togglePicker(); }
+});
+el('btn-brain').addEventListener('click', () => {
+  togglePicker();
+});
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closePicker(); });
+
 el('btn-quit').addEventListener('click', () => window.marina.quit());
 el('btn-hide').addEventListener('click', () => window.marina.minimize());
 
@@ -1079,6 +1246,7 @@ while (true) {
         // The screen-look button only exists when the bridge says vision is on.
         const see = el('btn-see');
         if (see) see.hidden = !info.vision;
+        paintBrain(info.llm_mode || 'auto', info.llm_using, info.model);
         setStatus('ok', `ready · ${info.model}`);
         hideNotice('bridge');
         post('/warmup').catch(() => {});
