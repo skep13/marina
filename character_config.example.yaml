@@ -23,6 +23,12 @@ llm:
 
   model: "llama3.2:3b"
 
+  # Qwen3 and similar hybrid reasoning models emit a <think> block before the
+  # answer. She replies in a sentence or two and speaks them aloud, so that is
+  # pure latency — a short request can spend its whole budget thinking and
+  # return nothing. Turn this on only if you want the reasoning.
+  thinking: false
+
   temperature: 1.0
   max_tokens: 2048
 

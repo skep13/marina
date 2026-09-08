@@ -27,7 +27,8 @@ from process.asr_func.asr_push_to_talk import build_model, transcribe_file  # no
 from process.asr_func.recorder import Recorder  # noqa: E402
 from process.config import load_config  # noqa: E402
 from process.llm_funcs.llm_scr import (  # noqa: E402
-    MODEL,
+    active_endpoint,
+    active_model,
     describe_endpoint,
     llm_response,
     note_exchange,
@@ -41,6 +42,7 @@ from process.tts_func.engine import (  # noqa: E402
 )
 from process.tts_func.engine import warmup as warmup_tts  # noqa: E402
 from process.text_func.speech import split_reply  # noqa: E402
+from process import backend  # noqa: E402
 from process.memory import store as memory  # noqa: E402
 from process.vision.look import (  # noqa: E402
     ENABLED as VISION_ENABLED,
@@ -129,8 +131,10 @@ def _respond(user_text, speak, transcript=None):
 def health():
     return {
         "ok": True,
-        "model": MODEL,
+        "model": active_model(),
         "llm_endpoint": describe_endpoint(),
+        "llm_using": active_endpoint(),
+        "llm_mode": backend.mode(),
         "tts": describe_tts(),
         "whisper_loaded": _whisper is not None,
         "recording": recorder.is_recording,
@@ -268,6 +272,77 @@ def see(body: SeeIn):
             out["error"] = str(e)
 
     return out
+
+
+def _list_models(base_url, api_key):
+    """Ask an OpenAI-compatible endpoint what it can serve."""
+    if not base_url:
+        return []
+    try:
+        from openai import OpenAI
+        c = OpenAI(api_key=api_key or "not-needed", base_url=base_url,
+                   timeout=4.0, max_retries=0)
+        return sorted(m.id for m in c.models.list().data)
+    except Exception:
+        return []
+
+
+@app.get("/models")
+def models_list():
+    """Everything selectable, grouped by backend. Unreachable backends come
+    back empty rather than erroring, so the picker still renders."""
+    from process.llm_funcs.llm_scr import (
+        API_KEY, BASE_URL, FALLBACK_BASE, FALLBACK_KEY,
+    )
+    return {
+        "server": _list_models(BASE_URL, API_KEY),
+        "local": _list_models(FALLBACK_BASE, FALLBACK_KEY),
+        "selected": backend.models(),
+        "mode": backend.mode(),
+        "current": backend.current(),
+    }
+
+
+class ModelIn(BaseModel):
+    backend: str
+    model: str
+
+
+@app.post("/model")
+def model_set(body: ModelIn):
+    """Pick a model, and switch to that backend at the same time."""
+    try:
+        backend.set_model(body.backend, body.model)
+        backend.set_mode(body.backend)
+    except ValueError as e:
+        return {"ok": False, "error": str(e)}
+    print(f"[llm] using {body.model} on {body.backend}", flush=True)
+    return {"ok": True, "backend": body.backend, "model": body.model,
+            "mode": backend.mode()}
+
+
+class BackendIn(BaseModel):
+    mode: str
+
+
+@app.get("/backend")
+def backend_get():
+    return {
+        "mode": backend.mode(),
+        "current": backend.current(),
+        "choices": list(backend.VALID),
+    }
+
+
+@app.post("/backend")
+def backend_set(body: BackendIn):
+    """Switch brains. History and memory stay on this Mac either way."""
+    try:
+        backend.set_mode(body.mode)
+    except ValueError as e:
+        return {"ok": False, "error": str(e), "mode": backend.mode()}
+    print(f"[llm] backend switched to {backend.mode()}", flush=True)
+    return {"ok": True, "mode": backend.mode(), "current": backend.current()}
 
 
 class MemoryIn(BaseModel):

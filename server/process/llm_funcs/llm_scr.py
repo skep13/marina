@@ -6,9 +6,15 @@ character_config.yaml to point at a local server instead of OpenAI.
 """
 import json
 import os
+import random
+import time
 
 from openai import OpenAI
 
+from process.backend import current as backend_current
+from process.backend import mode as backend_mode
+from process.backend import model_for
+from process.backend import note_used
 from process.config import load_config, resolve
 from process.memory import extract as memory_extract
 from process.memory import persona
@@ -45,11 +51,120 @@ def system_message():
         + memory.as_prompt_block(),
     }
 
-client = OpenAI(api_key=API_KEY, base_url=BASE_URL)
+# Failover: the GPU box is only reachable on the home network. Off it, she
+# falls back to a model on this Mac rather than simply failing.
+FALLBACK_BASE = (_llm.get("fallback_base_url") or "").strip() or None
+FALLBACK_MODEL = _llm.get("fallback_model") or MODEL
+FALLBACK_KEY = _llm.get("fallback_api_key") or "not-needed"
+STICKY = float(_llm.get("fallback_sticky_seconds", 30))
+
+# Qwen3 and friends are hybrid reasoning models: left alone they emit a long
+# <think> block, which llama.cpp returns as reasoning_content — so a short
+# request can burn its whole token budget and hand back empty content. She
+# talks in one or two sentences and speaks them aloud, so thinking is pure
+# latency here. Sent per-request rather than set on the server, which is
+# shared with other people who may well want it on.
+THINKING = bool(_llm.get("thinking", False))
+
+# llama-server keeps a fixed seed when a request does not carry one, so the
+# same question gets a byte-identical answer every time — she repeated herself
+# verbatim with the previous exchange sitting in her own context. Set an
+# integer here to make runs reproducible; leave it null for a live-feeling
+# companion.
+SEED = _llm.get("seed")
+
+client = OpenAI(api_key=API_KEY, base_url=BASE_URL, timeout=20.0, max_retries=0)
+fallback_client = (
+    OpenAI(api_key=FALLBACK_KEY, base_url=FALLBACK_BASE, timeout=60.0, max_retries=0)
+    if FALLBACK_BASE else None
+)
+
+# When the primary fails, stop hammering it for a while — otherwise every turn
+# pays the connection timeout before falling back.
+_primary_down_until = 0.0
+_active = "server"
 
 
 def describe_endpoint():
+    """The base URL actually being used, for /health."""
+    if backend_current() == "local" and FALLBACK_BASE:
+        return FALLBACK_BASE
     return BASE_URL or "https://api.openai.com/v1"
+
+
+def active_model():
+    """The model name of whichever backend is currently in use."""
+    return model_for()
+
+
+def active_endpoint():
+    """Which backend is currently in use, for /health."""
+    return backend_current()
+
+
+def _pick():
+    """Honour the selected mode; 'auto' also respects the failover cooldown."""
+    m = backend_mode()
+    if m == "local":
+        if not fallback_client:
+            raise RuntimeError("Local mode selected but no fallback_base_url configured.")
+        return fallback_client, model_for("local"), "local"
+    if m == "server":
+        return client, model_for("server"), "server"
+    # auto
+    if fallback_client and time.time() < _primary_down_until:
+        return fallback_client, model_for("local"), "local"
+    return client, model_for("server"), "server"
+
+
+def _request_extras(kw):
+    """Per-request options the shared server should not be forced to set.
+
+    Other people use the same llama-server, so anything opinionated belongs on
+    the request rather than the daemon. Unknown keys are ignored by servers
+    that do not use a chat template, so this is safe for Ollama too.
+    """
+    kw = dict(kw)
+    if not THINKING:
+        extra = dict(kw.get("extra_body") or {})
+        tmpl = dict(extra.get("chat_template_kwargs") or {})
+        tmpl.setdefault("enable_thinking", False)
+        extra["chat_template_kwargs"] = tmpl
+        kw["extra_body"] = extra
+    if "seed" not in kw:
+        kw["seed"] = SEED if SEED is not None else random.randrange(2**31)
+    return kw
+
+
+def chat_completion(messages, **kw):
+    """Call the selected backend.
+
+    In 'auto' this falls back to the Mac when the server is unreachable. In
+    'server' it does not — a failure is reported, so you always know where
+    your words went.
+    """
+    global _primary_down_until, _active
+    from openai import APIConnectionError, APITimeoutError
+
+    c, model, which = _pick()
+    kw = _request_extras(kw)
+    try:
+        out = c.chat.completions.create(model=model, messages=messages, **kw)
+        if which == "server" and _active != "server":
+            print("[llm] server is back", flush=True)
+        _active = which
+        note_used(which)
+        return out
+    except (APIConnectionError, APITimeoutError):
+        if which != "server" or backend_mode() != "auto" or not fallback_client:
+            raise
+        _primary_down_until = time.time() + STICKY
+        _active = "local"
+        note_used("local")
+        print(f"[llm] server unreachable — using {FALLBACK_MODEL} on this Mac",
+              flush=True)
+        return fallback_client.chat.completions.create(
+            model=model_for("local"), messages=messages, **kw)
 
 
 def _flatten(message):
@@ -74,6 +189,8 @@ def _flatten(message):
 
 
 def load_history():
+    """History lives on this Mac only, and is shared across backends —
+    switching brains does not give you a different conversation."""
     if os.path.exists(HISTORY_FILE):
         with open(HISTORY_FILE, "r", encoding="utf-8") as f:
             try:
@@ -103,9 +220,8 @@ def reset_history():
 
 
 def get_reply(messages):
-    return client.chat.completions.create(
-        model=MODEL,
-        messages=messages,
+    return chat_completion(
+        messages,
         temperature=TEMPERATURE,
         max_tokens=MAX_TOKENS,
         stream=False,
