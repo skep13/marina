@@ -118,7 +118,9 @@ def _respond(user_text, speak, transcript=None):
 
     try:
         if out["speech"]:
-            out["audio"] = base64.b64encode(synthesize(out["speech"])).decode("ascii")
+            wav, visemes = synthesize(out["speech"])
+            out["audio"] = base64.b64encode(wav).decode("ascii")
+            out["visemes"] = visemes
     except TTSError as e:
         # Still show the text — a dead TTS box shouldn't kill the conversation.
         out["error"] = str(e)
@@ -267,7 +269,9 @@ def see(body: SeeIn):
 
     if body.speak and out["speech"]:
         try:
-            out["audio"] = _b64.b64encode(synthesize(out["speech"])).decode("ascii")
+            wav, visemes = synthesize(out["speech"])
+            out["audio"] = _b64.b64encode(wav).decode("ascii")
+            out["visemes"] = visemes
         except TTSError as e:
             out["error"] = str(e)
 

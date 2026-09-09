@@ -73,6 +73,14 @@ THINKING = bool(_llm.get("thinking", False))
 # companion.
 SEED = _llm.get("seed")
 
+# The GPU box runs --repeat-penalty 1.0, i.e. off, which is the right default
+# for a server other people share. For her it is not: she loops on the same
+# turn of phrase, and with a persona thread in the prompt she returns to the
+# same anecdote in reply after reply. Applied per-request, like everything
+# else opinionated here.
+REPEAT_PENALTY = float(_llm.get("repeat_penalty", 1.12))
+FREQUENCY_PENALTY = float(_llm.get("frequency_penalty", 0.35))
+
 client = OpenAI(api_key=API_KEY, base_url=BASE_URL, timeout=20.0, max_retries=0)
 fallback_client = (
     OpenAI(api_key=FALLBACK_KEY, base_url=FALLBACK_BASE, timeout=60.0, max_retries=0)
@@ -133,6 +141,12 @@ def _request_extras(kw):
         kw["extra_body"] = extra
     if "seed" not in kw:
         kw["seed"] = SEED if SEED is not None else random.randrange(2**31)
+    if FREQUENCY_PENALTY and "frequency_penalty" not in kw:
+        kw["frequency_penalty"] = FREQUENCY_PENALTY
+    if REPEAT_PENALTY and REPEAT_PENALTY != 1.0:
+        extra = dict(kw.get("extra_body") or {})
+        extra.setdefault("repeat_penalty", REPEAT_PENALTY)   # llama.cpp's own
+        kw["extra_body"] = extra
     return kw
 
 

@@ -29,6 +29,12 @@ llm:
   # return nothing. Turn this on only if you want the reasoning.
   thinking: false
 
+  # She loops on the same phrase and returns to the same anecdote otherwise.
+  # The GPU box runs with repetition penalties off, which is right for a shared
+  # server and wrong for her, so they are sent per request.
+  repeat_penalty: 1.12
+  frequency_penalty: 0.35
+
   temperature: 1.0
   max_tokens: 2048
 

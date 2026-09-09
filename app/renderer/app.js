@@ -465,6 +465,9 @@ const AVERSIONS = [
   { x:  0.46, y: -0.02, hold: [1.6, 3.4] },
 ];
 
+// She is talking if there is audio coming out, not merely if a reply exists.
+const speaking = () => mouthOpen > 0.02 || !!currentSource;
+
 let gazeTimer = 0;
 let gazeAway = false;
 const gaze = { x: 0, y: 0 };
@@ -478,6 +481,8 @@ const headV = { x: 0, y: 0, z: 0 };
 // The torso trails the head down the same chain.
 const torsoS = { x: 0, y: 0 };
 const torsoV = { x: 0, y: 0 };
+// Fast and slow followers on the speech envelope; their difference is stress.
+let envFast = 0, envSlow = 0;
 let browFlash = 0;          // brief raise on re-engaging
 
 /** Smooth value noise. Sines at fixed frequencies visibly loop; this doesn't. */
@@ -674,6 +679,16 @@ const TAU = Math.PI * 2;
  *  the spring bones something to react to.
  */
 function updateBody(t, dtBody) {
+  // ---- prosody ------------------------------------------------------
+  // The talking nod was a fixed 7.1 Hz sine: the same metronome whatever she
+  // said, running at the same rate through a shouted word and a mumbled one.
+  // Two followers on the mouth envelope — one quick, one slow — and the gap
+  // between them marks the stressed syllables, which is what a head actually
+  // moves on.
+  envFast += (mouthOpen - envFast) * Math.min(1, dtBody * 14);
+  envSlow += (mouthOpen - envSlow) * Math.min(1, dtBody * 2.2);
+  const stress = Math.max(0, envFast - envSlow);
+
   // Breathing is not a sine. The in-breath is quicker than the out-breath,
   // and the period wanders — a metronome is the giveaway.
   const bphase = t * 0.21 + 0.07 * noise1(t * 0.05);
@@ -726,8 +741,10 @@ function updateBody(t, dtBody) {
     shift * 0.005);
 
   const lift = cueOut.shoulder;
-  poseBone('leftShoulder', -0.010 * breath - lift, 0, 0.006 * breath + lift * 0.5);
-  poseBone('rightShoulder', -0.010 * breath - lift, 0, -0.006 * breath - lift * 0.5);
+  poseBone('leftShoulder',
+    -0.010 * breath - lift - stress * 0.06, 0, 0.006 * breath + lift * 0.5);
+  poseBone('rightShoulder',
+    -0.010 * breath - lift - stress * 0.06, 0, -0.006 * breath - lift * 0.5);
 
   // ---- arms ----------------------------------------------------------
   // Mostly passive: they hang off a torso that is moving, so they swing a
@@ -753,7 +770,6 @@ function updateBody(t, dtBody) {
   // Head motion is what actually swings the hair, so it carries most of the
   // life in this framing. Split across neck and head so the skull isn't
   // pivoting on a stick.
-  const talk = mouthOpen;
 
   // Noise rather than sines: fixed frequencies beat against each other into a
   // pattern you start to recognise after a minute of watching her.
@@ -789,8 +805,8 @@ function updateBody(t, dtBody) {
   headS.y += headV.y * dtBody;
   headS.z += headV.z * dtBody;
 
-  const x = headS.x + followX + talk * 0.045 * Math.sin(t * 7.1) + cueOut.hx;
-  const y = headS.y + followY + talk * 0.030 * Math.sin(t * 3.1) + cueOut.hy;
+  const x = headS.x + followX + stress * 0.60 + envSlow * 0.012 + cueOut.hx;
+  const y = headS.y + followY + envSlow * 0.06 * fbm(t * 0.9 + 5) + cueOut.hy;
   const z = headS.z - followY * 0.13 + cueOut.hz;
 
   poseBone('neck', x * 0.40, y * 0.40, z * 0.5);
@@ -1030,14 +1046,19 @@ function updateGaze(dt, t) {
       gazeAway = false;
       gazeTarget.x = (Math.random() - 0.5) * 0.10;
       gazeTarget.y = (Math.random() - 0.5) * 0.07;
-      gazeTimer = 1.6 + Math.random() * 3.4;
+      // Holds your eye for longer while she is the one talking.
+      gazeTimer = (speaking() ? 2.6 : 1.6) + Math.random() * 3.4;
       browFlash = 1;                     // brows lift a touch on re-engaging
-    } else if (Math.random() < 0.45) {
+    } else if (Math.random() < (speaking() ? 0.16 : 0.45)) {
       gazeAway = true;
       const a = AVERSIONS[(Math.random() * AVERSIONS.length) | 0];
-      gazeTarget.x = a.x + (Math.random() - 0.5) * 0.10;
-      gazeTarget.y = a.y + (Math.random() - 0.5) * 0.08;
-      gazeTimer = a.hold[0] + Math.random() * (a.hold[1] - a.hold[0]);
+      // Speaking pulls the aversion in and cuts it short — mid-sentence you
+      // flick away and come straight back, you don't go and stare at a wall.
+      const near = speaking() ? 0.55 : 1;
+      gazeTarget.x = (a.x + (Math.random() - 0.5) * 0.10) * near;
+      gazeTarget.y = (a.y + (Math.random() - 0.5) * 0.08) * near;
+      gazeTimer = (a.hold[0] + Math.random() * (a.hold[1] - a.hold[0]))
+                * (speaking() ? 0.45 : 1);
     } else {
       // Still on you, just not frozen: a small shift within the face.
       gazeTarget.x = (Math.random() - 0.5) * 0.14;
@@ -1268,6 +1289,17 @@ function setStatus(kind, text) {
 }
 
 let noticeKind = null;
+// Main supervises the bridge; say so on screen rather than letting her just
+// go quiet, which is indistinguishable from her ignoring you.
+window.marina.onBridgeDown?.((msg) => {
+  setStatus('bad', 'backend restarting');
+  showNotice(msg || 'Backend stopped. Restarting\u2026', 'bridge');
+});
+window.marina.onBridgeUp?.(() => {
+  hideNotice('bridge');
+  setStatus('ok', 'ready');
+});
+
 function showNotice(msg, kind = 'general') {
   noticeKind = kind;
   notice.textContent = msg;

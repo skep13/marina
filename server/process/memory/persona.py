@@ -8,6 +8,7 @@ consistent all day and has moved on by tomorrow. No LLM call, no state file to
 corrupt, and it survives restarts for free.
 """
 import hashlib
+import random
 from datetime import date
 
 from process.config import load_config
@@ -54,14 +55,25 @@ def current_thread(when=None):
     return pool[seed % len(pool)]
 
 
-def as_prompt_block(when=None):
+# How often the thread is in the prompt at all. Told to bring it up "if it
+# fits" on every single turn, a small model fits it in every single time — the
+# same edit and the same view count in reply after reply. The instruction was
+# never the problem; being asked at all is a nudge it cannot ignore, so most
+# turns should not ask.
+MENTION_RATE = float(_persona.get("mention_rate", 0.34))
+
+
+def as_prompt_block(when=None, roll=None):
     if not ENABLED:
         return ""
     thread = current_thread(when)
     if not thread:
         return ""
+    # `roll` is injectable so the behaviour is testable without patching random.
+    if (roll if roll is not None else random.random()) > MENTION_RATE:
+        return ""
     return (
         "\n\nWhat is going on in your life right now: "
         f"{thread} "
-        "Bring it up if it fits. Do not force it into every reply."
+        "Mention it only if it genuinely fits what they just said."
     )
