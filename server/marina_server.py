@@ -111,6 +111,11 @@ def _respond(user_text, speak, transcript=None):
     parts = split_reply(reply)
     out["reply"] = parts["display"]
     out["speech"] = parts["speech"]
+    # Which brain actually answered. /health reports intent; a failover happens
+    # mid-request, and without this the UI keeps claiming the GPU box while she
+    # is quietly running on the 3B here.
+    out["backend"] = active_endpoint()
+    out["model"] = active_model()
     out["cues"] = parts["cues"]
 
     if not speak:
@@ -260,6 +265,11 @@ def see(body: SeeIn):
     parts = split_reply(answer)
     out["reply"] = parts["display"]
     out["speech"] = parts["speech"]
+    # Which brain actually answered. /health reports intent; a failover happens
+    # mid-request, and without this the UI keeps claiming the GPU box while she
+    # is quietly running on the 3B here.
+    out["backend"] = active_endpoint()
+    out["model"] = active_model()
     out["cues"] = parts["cues"]
     print(f"[marina] {parts['speech']}", flush=True)
 
