@@ -27,6 +27,11 @@ app.whenReady().then(async () => {
     window.__sampler = setInterval(() => {
       const v = window.__marina.vrm; if (!v) return;
       const head = v.humanoid.getNormalizedBoneNode('head');
+      const body = {};
+      for (const n of ['hips','spine','chest','upperChest','leftUpperArm','rightUpperArm','leftLowerArm','leftHand']) {
+        const b = v.humanoid.getNormalizedBoneNode(n);
+        if (b) body[n] = [b.rotation.x, b.rotation.y, b.rotation.z];
+      }
       const look = v.lookAt;
       let brow = 0;
       v.scene.traverse(o => {
@@ -41,6 +46,7 @@ app.whenReady().then(async () => {
         gy: look.target ? look.target.position.y : 0,
         blink: em ? em.getValue('blink') : 0,
         cues: window.__marina.activeCues,
+        body,
         hair: (() => {
           const sp = window.__marina.springs || [];
           const out = []; const step = Math.max(1, Math.floor(sp.length / 6));
@@ -98,6 +104,20 @@ app.whenReady().then(async () => {
       // What the eye actually notices: the largest single-frame jump.
       stepYaw: step('hy'), stepPitch: step('hx'), stepRoll: step('hz'),
       driftYaw: jerk('hy', true), driftPitch: jerk('hx', true),
+      body: (() => {
+        const names = Object.keys(s[0].body || {});
+        const out = {};
+        for (const n of names) {
+          let mx = 0, step = 0;
+          for (let k = 0; k < 3; k++) {
+            const a = s.map(o => o.body[n][k]);
+            mx = Math.max(mx, Math.max(...a) - Math.min(...a));
+            for (let i = 1; i < a.length; i++) step = Math.max(step, Math.abs(a[i]-a[i-1]));
+          }
+          out[n] = { range: mx, step: step * 180 / Math.PI / 3 };
+        }
+        return out;
+      })(),
       hairJoints: (s[0].hair || []).length,
       hairMoving: (() => {
         const h = s.map(o => o.hair || []); let moving = 0;
@@ -149,6 +169,11 @@ app.whenReady().then(async () => {
   console.log(`  smoothness (all) yaw ${r.jerkYaw.peak.toFixed(1)}x  pitch ${r.jerkPitch.peak.toFixed(1)}x   peak/mean accel`);
   console.log(`  drift only       yaw ${r.driftYaw.peak.toFixed(1)}x  pitch ${r.driftPitch.peak.toFixed(1)}x   (${r.driftYaw.n} gesture-free samples)`);
   console.log(`  per-frame step   yaw max ${r.stepYaw.max.toFixed(3)}deg  pitch max ${r.stepPitch.max.toFixed(3)}deg  roll max ${r.stepRoll.max.toFixed(3)}deg`);
+  console.log('  body bones       range (rad) / max per-frame step (deg)');
+  for (const [n, b] of Object.entries(r.body)) {
+    const flag = b.range < 0.0015 ? ' STATIC' : (b.step > 0.5 ? ' JUMPY' : '');
+    console.log(`    ${n.padEnd(15)} ${b.range.toFixed(4)}   ${b.step.toFixed(3)}${flag}`);
+  }
   console.log(`  hair             ${r.hairMoving} of ${r.hairJoints} sampled joints swaying (max ${r.hairMax.toFixed(4)}m)`);
   if (errors.length) console.log('  renderer errors  ' + errors.length + '\n    ' + errors.slice(0,4).join('\n    '));
   else console.log('  renderer errors  none');

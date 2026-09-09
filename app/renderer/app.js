@@ -475,6 +475,9 @@ const gazeHeadV = { x: 0, y: 0 };
 // Smoothed ambient head pose, and its velocity.
 const headS = { x: 0, y: 0, z: 0 };
 const headV = { x: 0, y: 0, z: 0 };
+// The torso trails the head down the same chain.
+const torsoS = { x: 0, y: 0 };
+const torsoV = { x: 0, y: 0 };
 let browFlash = 0;          // brief raise on re-engaging
 
 /** Smooth value noise. Sines at fixed frequencies visibly loop; this doesn't. */
@@ -684,12 +687,68 @@ function updateBody(t, dtBody) {
   // level, which is the other half of what reads as mechanical.
   const energy = 0.68 + 0.42 * noise1(t * 0.035 + 3);
 
-  poseBone('chest', -0.013 * breath, 0, 0);
-  poseBone('upperChest', -0.008 * breath, 0, 0);
+  // ---- weight shift -------------------------------------------------
+  // Nobody stands evenly on both feet for long. A very slow lateral shift
+  // through the hips, with the spine leaning back the other way so she stays
+  // over her own centre rather than toppling.
+  const shift = fbm(t * 0.031 + 61) * energy;
+
+  // ---- the torso follows the head -----------------------------------
+  // Later and less than the head, which is itself later and less than the
+  // eyes. That descending chain is what makes a turn read as one movement
+  // through a body instead of three parts moving independently.
+  const TK = 2.6, TC = 2.9;
+  torsoV.y += (TK * (gazeHead.x - torsoS.y) - TC * torsoV.y) * dtBody;
+  torsoV.x += (TK * (-gazeHead.y - torsoS.x) - TC * torsoV.x) * dtBody;
+  torsoS.y += torsoV.y * dtBody;
+  torsoS.x += torsoV.x * dtBody;
+
+  const twist = torsoS.y * 0.30;      // yaw carried by the torso
+  const lean  = torsoS.x * 0.10;
+
+  // Each bone gets one call: poseBone sets from rest rather than accumulating,
+  // so every contribution for a bone has to be summed here.
+  poseBone('hips',
+    lean * 0.4,
+    twist * 0.30 + shift * 0.020,
+    shift * -0.016);
+  poseBone('spine',
+    -0.004 * breath + lean * 0.5,
+    twist * 0.34 + shift * 0.014,
+    shift * 0.010);
+  poseBone('chest',
+    -0.013 * breath + lean * 0.7,
+    twist * 0.22,
+    shift * 0.008);
+  poseBone('upperChest',
+    -0.008 * breath,
+    twist * 0.14,
+    shift * 0.005);
 
   const lift = cueOut.shoulder;
   poseBone('leftShoulder', -0.010 * breath - lift, 0, 0.006 * breath + lift * 0.5);
   poseBone('rightShoulder', -0.010 * breath - lift, 0, -0.006 * breath - lift * 0.5);
+
+  // ---- arms ----------------------------------------------------------
+  // Mostly passive: they hang off a torso that is moving, so they swing a
+  // little against it and settle a beat later. A touch of independent drift
+  // on top, out of phase left to right, so they aren't a mirrored pair.
+  const armL = fbm(t * 0.077 + 11) * energy;
+  const armR = fbm(t * 0.071 + 29) * energy;
+  const swing = twist * 0.55;         // arms lag the twist, so they trail it
+
+  poseBone('leftUpperArm',
+    0.012 * armL - 0.010 * breath,
+    swing * 0.5,
+    -0.030 * armL - swing * 0.35 - lift * 0.35);
+  poseBone('rightUpperArm',
+    0.012 * armR - 0.010 * breath,
+    swing * 0.5,
+    0.028 * armR - swing * 0.35 + lift * 0.35);
+  poseBone('leftLowerArm', 0, 0.030 * armL + swing * 0.25, -0.014 * armL);
+  poseBone('rightLowerArm', 0, -0.028 * armR + swing * 0.25, 0.013 * armR);
+  poseBone('leftHand', 0.018 * armR, 0, -0.014 * armL);
+  poseBone('rightHand', 0.017 * armL, 0, 0.013 * armR);
 
   // Head motion is what actually swings the hair, so it carries most of the
   // life in this framing. Split across neck and head so the skull isn't
