@@ -106,6 +106,9 @@ asr:
   model: "base.en"
   device: "cpu"          # CTranslate2 has no Metal backend; CPU is correct here
   compute_type: "int8"   # int8 is ~2x faster and ~4x smaller than float32
+  # Load the cached model without checking Hugging Face for updates.
+  # Set false only if you want it to look for a newer copy.
+  offline: true
 
 # --- Vision (looking at your screen) --------------------------
 # She only ever looks when you explicitly ask — there is no background or
@@ -184,3 +187,65 @@ sovits_ping_config:
 bridge:
   host: "127.0.0.1"
   port: 8765
+
+# ---------------------------------------------------------------------------
+#  Being interrupted
+#
+#  While she is talking the microphone stays open, so cutting her off is just
+#  talking over her. Her own voice comes back into the mic from the speakers,
+#  so the detector works on how far above the *current* room level a sound is,
+#  not on an absolute threshold. See server/process/asr_func/vad.py.
+#
+#  Measured here: talking over her adds about +10 dB at a normal speaker
+#  volume and +3.6 dB at a very loud one. If she will not stop for you, lower
+#  margin_db — or wear headphones, which removes the problem entirely.
+# ---------------------------------------------------------------------------
+barge_in:
+  enabled: true
+  margin_db: 8.0        # how far above the room a sound must be to count
+  speech_ms: 300        # evidence needed before she stops
+  silence_ms: 800       # trailing quiet that ends your sentence
+
+# ---------------------------------------------------------------------------
+#  Speaking first
+#
+#  She has a life of her own; this lets her mention it unprompted. Every
+#  number here exists to stop her being annoying — the defaults are timid on
+#  purpose. The tray has a switch, and it wins over all of this.
+# ---------------------------------------------------------------------------
+idle:
+  enabled: true
+  min_gap_minutes: 25   # nothing until the room has been quiet this long
+  max_per_hour: 2       # hard ceiling
+  probability: 0.5      # not every eligible moment, so it isn't a metronome
+  quiet_from_hour: 23   # no opening the conversation overnight
+  quiet_until_hour: 9
+
+# ---------------------------------------------------------------------------
+#  What she notices without being asked
+#
+#  Cheap local reads folded into the prompt so she isn't context-blind. The
+#  frontmost app is its *name* only — macOS gives that up without a permission
+#  prompt, and window titles and screen contents are deliberately not read.
+#  Anything on the screen still requires the explicit screenshot button.
+# ---------------------------------------------------------------------------
+context:
+  enabled: true
+  time: true
+  frontmost_app: true   # "they are in Firefox" — never which page
+  battery: true         # only mentioned when it is actually notable
+
+# ---------------------------------------------------------------------------
+#  What she can do
+#
+#  Deliberately few and deliberately dull. Nothing here spends money, deletes
+#  anything, or reaches off this machine; open_url is restricted to http(s).
+#  Every definition is sent on every turn, so a longer list would cost tokens
+#  and make her worse at talking, which is the main job.
+# ---------------------------------------------------------------------------
+tools:
+  enabled: true
+  timers: true
+  clipboard: true
+  open_url: true
+  clipboard_chars: 2000

@@ -268,6 +268,10 @@ function createWindow() {
   });
 }
 
+// Whether she is allowed to speak first. Mirrored here so the tray can show
+// the right label without asking the renderer.
+let openersOn = true;
+
 function buildTray() {
   const icon = nativeImage.createFromPath(path.join(__dirname, 'assets', 'trayTemplate.png'));
   icon.setTemplateImage(true);
@@ -281,6 +285,16 @@ function buildTray() {
         click: () => {
           if (!win || win.isDestroyed()) return createWindow();
           win.isVisible() ? win.hide() : win.show();
+        },
+      },
+      { type: 'separator' },
+      {
+        label: 'Let her speak first',
+        type: 'checkbox',
+        checked: openersOn,
+        click: (item) => {
+          openersOn = item.checked;
+          win?.webContents.send('set-openers', openersOn);
         },
       },
       { type: 'separator' },
@@ -312,6 +326,10 @@ app.whenReady().then(() => {
     win.isVisible() ? win.hide() : win.show();
   });
   // Push to talk works even when the window is hidden.
+  // Cut her off from anywhere, without having to find the window first.
+  globalShortcut.register('CommandOrControl+Shift+.', () => {
+    win?.webContents.send('interrupt');
+  });
   globalShortcut.register('CommandOrControl+Shift+Space', () => {
     win?.webContents.send('toggle-listen');
   });
@@ -416,5 +434,6 @@ ipcMain.handle('capture-screen', async () => {
   }
 });
 
+ipcMain.on('openers-changed', (_e, on) => { openersOn = !!on; });
 ipcMain.on('quit', () => app.quit());
 ipcMain.on('minimize', () => win?.hide());

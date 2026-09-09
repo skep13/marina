@@ -204,3 +204,136 @@ def split_reply(text):
         shown = _WS.sub(" ", display.translate(_RESIDUAL)).strip()
 
     return {"display": shown, "speech": speech, "cues": cues}
+
+
+# ---------------------------------------------------------------------------
+#  Streaming segmentation
+#
+#  Streaming exists to get the first word out early, and the only way to do
+#  that is to synthesize a sentence at a time instead of waiting for the whole
+#  reply. Cutting a token stream into sentences is where that gets awkward:
+#
+#    - A cut inside *tilts her head* leaves a lone asterisk on each side, so
+#      both halves get read out loud as emphasis instead of performed.
+#    - "3.5" and "Mr." are not sentence ends.
+#    - A three-character first segment technically streams sooner, but Kokoro
+#      gives every segment its own intonation contour, so a run of fragments
+#      reads as someone reading a list.
+#
+#  So: never cut inside an open delimiter, never cut a decimal, and hold a
+#  minimum length — a short one for the opening segment, where latency is the
+#  whole point, and a longer one after, where prosody is.
+# ---------------------------------------------------------------------------
+
+# The opening segment is what the user is waiting on, so it goes out small.
+FIRST_MIN_CHARS = 12
+# After that, nothing is waiting: prefer whole thoughts over more round trips.
+LATER_MIN_CHARS = 70
+# Beyond this, cut at the next comma or space rather than hold the audio back
+# for a model that has forgotten how to end a sentence.
+MAX_CHARS = 320
+
+_SENTENCE_END = re.compile(r"[.!?…]['\")\]]*(\s|$)|[\n]+")
+_SOFT_BREAK = re.compile(r"[,;:—–]\s|\s")
+
+# Openers whose closer we must wait for before cutting.
+_PAIRS = {"(": ")", "[": "]"}
+
+
+def _open_spans(text):
+    """True while a delimiter is open, so a cut here would orphan a marker."""
+    if text.count("```") % 2:
+        return True
+    # Asterisks: an odd count means a span is still open. Bold is two of them,
+    # which stays even, so a single counter handles both.
+    if text.count("*") % 2:
+        return True
+    for opener, closer in _PAIRS.items():
+        if text.count(opener) > text.count(closer):
+            return True
+    return False
+
+
+def _decimal_point(text, index):
+    """A '.' between two digits ends a number, not a sentence."""
+    if text[index] != ".":
+        return False
+    before = text[index - 1] if index else ""
+    after = text[index + 1] if index + 1 < len(text) else ""
+    return before.isdigit() and after.isdigit()
+
+
+class SentenceSplitter:
+    """Accumulates streamed deltas and hands back speakable segments.
+
+    `feed` returns zero or more complete segments; `flush` returns whatever is
+    left at the end of the stream. Segments are raw reply text — run each one
+    through `split_reply` to get its speech and cues.
+    """
+
+    def __init__(self, first_min=FIRST_MIN_CHARS, later_min=LATER_MIN_CHARS):
+        self._buf = ""
+        self._first_min = first_min
+        self._later_min = later_min
+        self._emitted = 0
+
+    @property
+    def minimum(self):
+        return self._first_min if self._emitted == 0 else self._later_min
+
+    def feed(self, delta):
+        self._buf += delta or ""
+        out = []
+        while True:
+            cut = self._find_cut()
+            if cut is None:
+                break
+            segment, self._buf = self._buf[:cut].strip(), self._buf[cut:].lstrip()
+            if segment:
+                out.append(segment)
+                self._emitted += 1
+        return out
+
+    def _find_cut(self):
+        buf = self._buf
+        minimum = self.minimum
+
+        for match in _SENTENCE_END.finditer(buf):
+            end = match.end()
+            if end < minimum:
+                continue
+            # A match that runs to the end of the buffer has not been read in
+            # full yet. Deltas can be a single character, and "3." looks
+            # exactly like the end of a sentence right up until the "5"
+            # arrives. One more character settles it, and there is always
+            # another one coming — or `flush` takes it.
+            if end >= len(buf):
+                continue
+            if _decimal_point(buf, match.start()):
+                continue
+            if _open_spans(buf[:end]):
+                continue
+            return end
+
+        # A model that runs on without punctuation would otherwise hold the
+        # whole reply back to the end, which is the exact failure streaming is
+        # here to fix. Past MAX_CHARS, take the last safe soft break instead.
+        if len(buf) >= MAX_CHARS:
+            last = None
+            for match in _SOFT_BREAK.finditer(buf):
+                if match.end() < minimum:
+                    continue
+                if match.end() > MAX_CHARS:
+                    break
+                if _open_spans(buf[:match.end()]):
+                    continue
+                last = match.end()
+            if last:
+                return last
+        return None
+
+    def flush(self):
+        segment, self._buf = self._buf.strip(), ""
+        if segment:
+            self._emitted += 1
+        return segment or None

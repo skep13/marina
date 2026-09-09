@@ -263,6 +263,18 @@ def synthesize(text):
 
 
 def warmup():
-    """Preload whichever backend is local, so the first reply isn't slow."""
+    """Preload whichever backend is local, so the first reply isn't slow.
+
+    Loading the model is not enough. ONNX builds its execution plan on the
+    first inference, and that first call runs at roughly half the speed of
+    every one after it — measured at 1.6x realtime against 3.3x warm. With
+    replies streamed a sentence at a time, that penalty lands squarely on the
+    opening segment, which is the one thing the user is actually waiting for.
+    So burn a throwaway utterance here instead.
+    """
     if PROVIDER == "kokoro":
         _load_kokoro()
+        try:
+            _kokoro_gen("Ready.")
+        except Exception as e:                      # noqa: BLE001
+            print(f"[tts] warmup inference failed: {e}", flush=True)

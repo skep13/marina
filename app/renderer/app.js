@@ -466,7 +466,7 @@ const AVERSIONS = [
 ];
 
 // She is talking if there is audio coming out, not merely if a reply exists.
-const speaking = () => mouthOpen > 0.02 || !!currentSource;
+const speaking = () => mouthOpen > 0.02 || playing > 0;
 
 let gazeTimer = 0;
 let gazeAway = false;
@@ -508,7 +508,6 @@ let audioCtx = null;
 let analyser = null;
 let freqData = null;
 let timeData = null;
-let currentSource = null;
 let mouthOpen = 0;
 
 function ensureAudio() {
@@ -525,33 +524,138 @@ function ensureAudio() {
   return audioCtx;
 }
 
-/** Play base64 WAV from the bridge and drive the mouth from its envelope. */
-async function speak(base64, onStart) {
-  const ctx = ensureAudio();
-
+function decodeBase64Wav(base64) {
   const bin = atob(base64);
   const bytes = new Uint8Array(bin.length);
   for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return ensureAudio().decodeAudioData(bytes.buffer);
+}
 
-  const buffer = await ctx.decodeAudioData(bytes.buffer);
+/** The reply currently being spoken, one sentence-sized chunk at a time.
+ *
+ *  The bridge streams a reply as it is written, so the audio arrives in
+ *  pieces. Playing each piece the moment it decodes would leave an audible
+ *  seam at every sentence — the gap is however long the next synthesis took.
+ *  Instead each chunk is scheduled against the audio clock at the exact
+ *  instant the previous one ends, which is sample-accurate and free.
+ *
+ *  Kokoro runs at 3-4x realtime once warm and sentences are seconds long, so
+ *  after the first chunk synthesis stays comfortably ahead of playback. When
+ *  it does not — a slow first load, a long pause from the model — `nextStart`
+ *  has already gone by, and the chunk starts immediately instead of being
+ *  scheduled into the past.
+ */
+const utterance = {
+  epoch: -1,        // audio-clock time chunk 0 began, or -1 between replies
+  nextStart: 0,     // where the next chunk goes
+  chunks: [],       // { index, start, end, src }
+  ended: false,     // no more chunks are coming
+};
 
-  if (currentSource) {
-    try { currentSource.stop(); } catch { /* already ended */ }
+let playing = 0;
+
+/** How many chunks she has fully finished saying, right now. */
+function chunksSpoken() {
+  if (utterance.epoch < 0) return 0;
+  const now = audioCtx.currentTime;
+  let n = 0;
+  for (const c of utterance.chunks) if (c.end <= now) n = Math.max(n, c.index + 1);
+  return n;
+}
+
+/** Queue one chunk of a streamed reply. Returns when it is scheduled, not
+ *  when it has played — the caller must not block the stream reader. */
+async function enqueueChunk(base64, cues) {
+  const ctx = ensureAudio();
+  const buffer = await decodeBase64Wav(base64);
+
+  // A small lead so the first chunk is scheduled rather than raced.
+  const LEAD = 0.06;
+  if (utterance.epoch < 0) {
+    utterance.epoch = ctx.currentTime + LEAD;
+    utterance.nextStart = utterance.epoch;
+    cueEpoch = utterance.epoch;
+    pendingCues = [];
+  } else if (utterance.nextStart < ctx.currentTime) {
+    utterance.nextStart = ctx.currentTime;
   }
+
+  const start = utterance.nextStart;
+  const index = utterance.chunks.length;
 
   const src = ctx.createBufferSource();
   src.buffer = buffer;
   src.connect(analyser);
-  currentSource = src;
+  playing++;
+  src.onended = () => { playing = Math.max(0, playing - 1); };
+  src.start(start);
+
+  utterance.chunks.push({ index, start, end: start + buffer.duration, src });
+  utterance.nextStart = start + buffer.duration;
+
+  appendCues(cues, start - utterance.epoch, buffer.duration);
+}
+
+/** Silence her immediately. Returns how many chunks she got through, which
+ *  is what the bridge needs to trim the transcript back to what was heard. */
+function stopSpeaking() {
+  if (utterance.epoch < 0) return 0;
+  const spoken = chunksSpoken();
+  for (const c of utterance.chunks) {
+    try { c.src.stop(); } catch { /* already ended */ }
+  }
+  utterance.chunks = [];
+  utterance.epoch = -1;
+  utterance.ended = true;
+  playing = 0;
+  cueEpoch = -1;
+  pendingCues = [];
+  return spoken;
+}
+
+/** Resolves when everything queued has finished playing. */
+function untilSpoken() {
+  if (utterance.epoch < 0 || !utterance.chunks.length) return Promise.resolve();
+  const last = utterance.chunks[utterance.chunks.length - 1];
+  const remaining = Math.max(0, last.end - audioCtx.currentTime);
+  return new Promise((r) => setTimeout(r, remaining * 1000 + 40));
+}
+
+function endUtterance() {
+  utterance.epoch = -1;
+  utterance.chunks = [];
+  utterance.ended = true;
+  cueEpoch = -1;
+}
+
+/** One-shot playback, for replies that don't stream (screen looks, openers). */
+async function speak(base64, onStart) {
+  stopSpeaking();
+  utterance.ended = false;
+  const ctx = ensureAudio();
+  const buffer = await decodeBase64Wav(base64);
+  utterance.epoch = ctx.currentTime + 0.06;
+  utterance.nextStart = utterance.epoch;
+  cueEpoch = utterance.epoch;
+  pendingCues = [];
+
+  const src = ctx.createBufferSource();
+  src.buffer = buffer;
+  src.connect(analyser);
+  playing++;
+  utterance.chunks.push({ index: 0, start: utterance.epoch,
+                          end: utterance.epoch + buffer.duration, src });
+  utterance.nextStart = utterance.epoch + buffer.duration;
 
   onStart?.(buffer.duration);
 
   return new Promise((resolve) => {
     src.onended = () => {
-      if (currentSource === src) currentSource = null;
+      playing = Math.max(0, playing - 1);
+      endUtterance();
       resolve();
     };
-    src.start();
+    src.start(utterance.epoch);
   });
 }
 
@@ -602,7 +706,7 @@ function updateMouth(dt) {
 
   for (const v of VISEMES) visemeTarget[v] = 0;
 
-  if (currentSource && analyser) {
+  if (playing > 0 && analyser) {
     if (!bandBins) resolveBands();
 
     analyser.getByteTimeDomainData(timeData);
@@ -891,11 +995,16 @@ const CUE_EXPRESSIONS = ['happy', 'sad', 'angry', 'relaxed', 'surprised'];
 let pendingCues = [];   // { animation, at } seconds from cue-clock start
 let activeCues = [];    // { animation, elapsed, dur }
 let cueClock = -1;      // seconds since the reply started, or -1 when idle
+// Audio-clock time the current reply began, or -1 when she isn't speaking.
+// A streamed reply arrives in pieces over several seconds, so the cue clock
+// is read off the audio clock rather than accumulated from frame times —
+// otherwise a dropped frame shifts every remaining gesture in the reply.
+let cueEpoch = -1;
 
 const cueOut = { hx: 0, hy: 0, hz: 0, shoulder: 0, gazeX: 0, gazeY: 0, blinkLeft: 0, expr: {} };
 const cueScratch = { hx: 0, hy: 0, hz: 0, shoulder: 0, gazeX: 0, gazeY: 0, blinkLeft: 0, expr: {} };
 
-/** Queue a reply's cues against the real audio duration. */
+/** Queue a whole reply's cues against the real audio duration. */
 function scheduleCues(cues, duration) {
   pendingCues = (cues || []).map((c) => ({
     animation: c.animation,
@@ -903,6 +1012,21 @@ function scheduleCues(cues, duration) {
   }));
   activeCues = [];
   cueClock = pendingCues.length ? 0 : -1;
+}
+
+/** Add one streamed chunk's cues, positioned within the whole reply.
+ *
+ *  `offset` is where this chunk starts relative to the first one, so a shrug
+ *  written in the third sentence still lands in the third sentence.
+ */
+function appendCues(cues, offset, duration) {
+  for (const c of cues || []) {
+    pendingCues.push({
+      animation: c.animation,
+      at: Math.max(0, offset + (c.fraction ?? 0) * duration - 0.15),
+    });
+  }
+  pendingCues.sort((a, b) => a.at - b.at);
 }
 
 // ---------------------------------------------------------------------------
@@ -962,14 +1086,24 @@ function updateCues(dt) {
   cueOut.shoulder = cueOut.gazeX = cueOut.gazeY = cueOut.blinkLeft = 0;
   for (const name of CUE_EXPRESSIONS) cueOut.expr[name] = 0;
 
-  if (cueClock >= 0) {
+  // While audio is playing the cue clock is the audio clock; without it (TTS
+  // down, or a reply that was nothing but actions) it falls back to counting
+  // frames against an assumed reading pace.
+  if (cueEpoch >= 0 && audioCtx) {
+    cueClock = audioCtx.currentTime - cueEpoch;
+  } else if (cueClock >= 0) {
     cueClock += dt;
+  }
+
+  if (cueClock >= 0) {
     while (pendingCues.length && pendingCues[0].at <= cueClock) {
       const next = pendingCues.shift();
       const def = CUES[next.animation] || CUES.emote;
       activeCues.push({ run: def.run, elapsed: 0, dur: def.dur });
     }
-    if (!pendingCues.length && !activeCues.length) cueClock = -1;
+    // A streamed reply is still being written, so an empty queue does not mean
+    // the reply is over — only a finished utterance releases the clock.
+    if (cueEpoch < 0 && !pendingCues.length && !activeCues.length) cueClock = -1;
   }
 
   for (let i = activeCues.length - 1; i >= 0; i--) {
@@ -1349,7 +1483,12 @@ async function handleResult(result) {
 
   if (result.audio) {
     setStatus('busy', 'speaking');
+    utterance.ended = false;
+    const req = newRequest();
+    armBargeIn(req);
     await speak(result.audio, (duration) => scheduleCues(result.cues, duration));
+    disarmBargeIn(req);
+    if (inflight === req) inflight = null;
   } else if (result.cues && result.cues.length) {
     // No audio (TTS down, or a reply that was nothing but actions) — still
     // perform, timed off a rough reading pace of ~14 characters/second.
@@ -1358,16 +1497,266 @@ async function handleResult(result) {
   setBusy(false);
 }
 
+/** Read an NDJSON stream from the bridge, one event per line. */
+async function* readEvents(response) {
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buf = '';
+  for (;;) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    buf += decoder.decode(value, { stream: true });
+    let nl;
+    while ((nl = buf.indexOf('\n')) >= 0) {
+      const line = buf.slice(0, nl).trim();
+      buf = buf.slice(nl + 1);
+      if (line) yield JSON.parse(line);
+    }
+  }
+  if (buf.trim()) yield JSON.parse(buf.trim());
+}
+
+// The reply in flight, so it can be cut off from anywhere.
+let inflight = null;
+
+/** Say one streamed chunk: bubble text, audio, and the cues written into it. */
+async function playChunk(ev, req) {
+  noteBackendUsed(ev);
+  if (ev.error) showNotice(ev.error, 'bridge');
+  // The bubble fills in as she speaks rather than appearing whole, which is
+  // the visible half of the same effect the audio gives.
+  req.text = (req.text ? req.text + ' ' : '') + ev.reply;
+  say(req.text);
+  if (ev.audio) {
+    if (!req.chunks) setStatus('busy', 'speaking');
+    await enqueueChunk(ev.audio, ev.cues);
+  } else if (ev.cues && ev.cues.length) {
+    // No audio for this chunk — still perform, at a reading pace.
+    appendCues(ev.cues, 0, Math.max(1.5, (ev.speech || '').length / 14));
+    if (cueEpoch < 0 && cueClock < 0) cueClock = 0;
+  }
+  req.chunks++;
+  // She is talking now, so arm the microphone to hear you talk over her.
+  if (req.chunks === 1) armBargeIn(req);
+}
+
+/** Drain a reply stream. Shared by asking her something and by cutting in. */
+async function consumeReply(res, req) {
+  if (!res.ok) throw new Error(`bridge returned ${res.status}`);
+  for await (const ev of readEvents(res)) {
+    // Interrupting tells the bridge to stop generating, but a sentence or two
+    // may already be on the wire. Keep reading so the connection closes
+    // cleanly — just don't say any of it.
+    if (req.cancelled) continue;
+    if (ev.type === 'chunk') await playChunk(ev, req);
+    else if (ev.type === 'error') showNotice(ev.message, 'bridge');
+  }
+  if (!req.cancelled) {
+    hideNotice('bridge');
+    await untilSpoken();
+    endUtterance();
+  }
+}
+
+function newRequest() {
+  const req = { cancelled: false, text: '', chunks: 0, barge: null };
+  utterance.ended = false;
+  inflight = req;
+  return req;
+}
+
+/** Ask, and speak the answer as it is written.
+ *
+ *  The bridge sends one event per sentence — text, cues and its own audio —
+ *  so the first words are out while the model is still writing the rest.
+ */
 async function send(text) {
   if (busy || !text.trim()) return;
   setBusy(true, 'thinking');
   say('…');
+  const req = newRequest();
+
   try {
-    await handleResult(await post('/chat', { text }));
+    await consumeReply(await fetch(BRIDGE + '/chat/stream', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text }),
+    }), req);
   } catch {
+    if (!req.cancelled) bridgeLost();
+  } finally {
+    disarmBargeIn(req);
+    if (inflight === req) inflight = null;
     setBusy(false);
-    bridgeLost();
   }
+}
+
+// ---------------------------------------------------------------------------
+//  Barge-in
+//
+//  A friend you cannot cut off is a cutscene. While she talks, the bridge
+//  keeps the microphone open and watches it; talking over her stops her
+//  mid-word, and what you said becomes the next thing you said — no button.
+//
+//  The reply to it comes back down the same stream, so from here an
+//  interruption is just the conversation carrying on.
+// ---------------------------------------------------------------------------
+
+let bargeEnabled = true;
+
+async function armBargeIn(req) {
+  if (!bargeEnabled || req.barge || req.cancelled) return;
+  const controller = new AbortController();
+  req.barge = controller;
+
+  try {
+    const res = await fetch(`${BRIDGE}/barge/listen?timeout=45`,
+                            { signal: controller.signal });
+    if (!res.ok) return;
+    const next = { cancelled: false, text: '', chunks: 0, barge: null };
+
+    for await (const ev of readEvents(res)) {
+      if (ev.type === 'disabled') { bargeEnabled = false; return; }
+      if (ev.type === 'speech') {
+        // She stops before anything else happens — the whole point is that it
+        // feels immediate, and transcription takes a second.
+        req.tookOver = true;
+        await interrupt();
+        inflight = next;
+        setBusy(true, 'listening…');
+      } else if (ev.type === 'transcript') {
+        setBusy(true, 'thinking');
+        say('…');
+      } else if (ev.type === 'chunk') {
+        await playChunk(ev, next);
+      } else if (ev.type === 'cancelled') {
+        setBusy(false);
+        return;
+      } else if (ev.type === 'error') {
+        showNotice(ev.message, 'bridge');
+      }
+    }
+
+    if (next.chunks) {
+      await untilSpoken();
+      endUtterance();
+      setBusy(false);
+    }
+    // Her answer armed a monitor of its own, so you can cut in again. Once
+    // she has finished, close it — otherwise the microphone stays open until
+    // it times out, minutes after anyone is talking.
+    disarmBargeIn(next);
+    if (inflight === next) inflight = null;
+  } catch {
+    /* Aborted because she finished talking, or the bridge went away. Neither
+       is worth a notice: barge-in is an affordance, not a feature you invoked. */
+  } finally {
+    if (req.barge === controller) req.barge = null;
+  }
+}
+
+/** Close the monitor when she finishes a reply uninterrupted.
+ *
+ *  Not when she was interrupted: the monitor stream is carrying the reply to
+ *  what you said, so aborting it there would cut her off a second time.
+ */
+// ---------------------------------------------------------------------------
+//  Speaking first
+//
+//  She has a life of her own — a thread she is stuck on for the day — and
+//  until now the only way to hear about it was to talk to her first.
+//
+//  A long poll rather than a push: one request is held open until the bridge
+//  decides it is time, and reopened when it returns. That needs no second
+//  channel and reconnects on its own when the bridge restarts.
+// ---------------------------------------------------------------------------
+
+let idleMuted = false;
+let idlePoll = null;
+
+async function waitForOpener() {
+  if (idleMuted) return;
+  const controller = new AbortController();
+  idlePoll = controller;
+  const req = { cancelled: false, text: '', chunks: 0, barge: null };
+
+  try {
+    const res = await fetch(`${BRIDGE}/idle/listen?timeout=120`,
+                            { signal: controller.signal });
+    if (!res.ok) throw new Error('idle poll failed');
+
+    for await (const ev of readEvents(res)) {
+      if (ev.type === 'disabled') { idleMuted = true; return; }
+      // Never talk over the user, and never on top of a reply she is already
+      // giving. The poll simply comes back around.
+      if (busy || recording) return;
+      if (ev.type === 'chunk') {
+        if (!req.chunks) { inflight = req; setBusy(true, 'speaking'); }
+        await playChunk(ev, req);
+      }
+    }
+    if (req.chunks) {
+      await untilSpoken();
+      endUtterance();
+    }
+  } catch {
+    /* Bridge restarting, or the window closed. The retry below covers it. */
+  } finally {
+    if (idlePoll === controller) idlePoll = null;
+    // Only clean up if this poll actually took the floor. It usually does
+    // not — it bows out the moment the user is mid-conversation, and clearing
+    // the busy state there would re-enable the UI on top of a live reply.
+    if (req.chunks) {
+      disarmBargeIn(req);
+      if (inflight === req) inflight = null;
+      setBusy(false);
+    }
+  }
+}
+
+let openerLoopRunning = false;
+
+/** Keep one poll open forever, backing off while the bridge is down. */
+async function startOpenerPoll() {
+  if (openerLoopRunning) return;
+  openerLoopRunning = true;
+  for (;;) {
+    await waitForOpener();
+    await new Promise((r) => setTimeout(r, idleMuted ? 30000 : 1500));
+  }
+}
+
+function setIdleMuted(value) {
+  idleMuted = !!value;
+  post('/idle/mute', { muted: idleMuted }).catch(() => {});
+  if (idleMuted && idlePoll) {
+    try { idlePoll.abort(); } catch { /* already closed */ }
+  }
+}
+
+function disarmBargeIn(req) {
+  if (req?.barge && !req.tookOver) {
+    try { req.barge.abort(); } catch { /* already closed */ }
+    req.barge = null;
+  }
+}
+
+/** Cut her off mid-sentence.
+ *
+ *  Silences the speakers immediately, then tells the bridge how many sentences
+ *  were actually heard. The bridge stops generating and records only those, so
+ *  the next thing she says follows from what you heard rather than from a
+ *  paragraph that only ever existed on the server.
+ */
+async function interrupt() {
+  if (!inflight && utterance.epoch < 0) return 0;
+  const heard = stopSpeaking();
+  if (inflight) inflight.cancelled = true;
+  setBusy(false);
+  try {
+    await post('/interrupt', { chunks: heard });
+  } catch { /* she has already stopped talking, which is the urgent part */ }
+  return heard;
 }
 
 async function toggleListen() {
@@ -1389,11 +1778,18 @@ async function toggleListen() {
   recording = false;
   btnMic.classList.remove('recording');
   setBusy(true, 'transcribing');
+  const req = newRequest();
   try {
-    await handleResult(await post('/listen/stop'));
+    const res = await fetch(BRIDGE + '/listen/stop/stream', { method: 'POST' });
+    // The transcript comes back before the first sentence does, so it can go
+    // in the bubble while she is still thinking.
+    await consumeReply(res, req);
   } catch (e) {
+    if (!req.cancelled) showNotice(`Voice failed: ${e.message}`);
+  } finally {
+    disarmBargeIn(req);
+    if (inflight === req) inflight = null;
     setBusy(false);
-    showNotice(`Voice failed: ${e.message}`);
   }
 }
 
@@ -1448,6 +1844,14 @@ window.marina.onLookAtScreen(lookAtScreen);
 
 btnMic.addEventListener('click', toggleListen);
 window.marina.onToggleListen(toggleListen);
+
+// Cut her off with the keyboard, from anywhere.
+window.marina.onInterrupt?.(() => { interrupt(); });
+
+window.marina.onSetOpeners?.((on) => {
+  setIdleMuted(!on);
+  if (!idleMuted) startOpenerPoll();
+});
 
 // Brain picker. Lists what each backend can actually serve and lets you
 // choose explicitly — no guessing which model you're talking to.
@@ -1594,7 +1998,19 @@ window.__marina = {
   hitTest: (x, y) => overUI(x, y) || overAvatar(x, y),
   scheduleCues,
   speak,
-  isSpeaking: () => !!currentSource,
+  send,
+  interrupt,
+  isSpeaking: () => playing > 0,
+  // The scheduled start/end of every chunk in the reply being spoken, so a
+  // test can prove the queue is gapless rather than taking it on trust.
+  get utterance() {
+    return {
+      epoch: utterance.epoch,
+      now: audioCtx ? audioCtx.currentTime : 0,
+      chunks: utterance.chunks.map((c) => ({ index: c.index, start: c.start, end: c.end })),
+    };
+  },
+  get pendingCues() { return pendingCues.slice(); },
   audioState: () => (audioCtx ? audioCtx.state : 'none'),
   THREE,
 };
@@ -1629,7 +2045,13 @@ while (true) {
         paintBrain(info.llm_mode || 'auto', info.llm_using, info.model);
         setStatus('ok', `ready · ${info.model}`);
         hideNotice('bridge');
+        // Warming up matters more than it used to: with replies streamed a
+        // sentence at a time, the first synthesis of the session is on the
+        // critical path for the first word she says.
         post('/warmup').catch(() => {});
+        bargeEnabled = info.barge_in !== false;
+        if (info.idle) idleMuted = !!info.idle.muted || info.idle.enabled === false;
+        startOpenerPoll();
         return;
       }
     } catch {

@@ -28,6 +28,20 @@ implies, and [docs/LLM-ON-SERVER.md](docs/LLM-ON-SERVER.md) for the server side.
 - 🪟 **Transparent desktop avatar** — frameless, always-on-top, follows you
   across Spaces and over full-screen apps
 - ⌨️ **Type or talk** — text box plus global push-to-talk
+- 🌊 **She starts talking before she has finished thinking** — the reply is
+  streamed and spoken a sentence at a time, so the first words are out while
+  the model is still writing the rest. Chunks are scheduled against the audio
+  clock, so there is no seam between them
+- ✋ **You can cut her off** — talk over her and she stops mid-word. What she
+  actually said is what goes in the transcript, so the next thing she says
+  follows from what you heard rather than from a paragraph only the server saw
+- 💭 **She speaks first sometimes** — she has a life of her own and will
+  occasionally mention it unprompted. Rate-limited, quiet overnight, one
+  switch in the tray
+- 🔧 **She can do a few things** — set a timer, read what you just copied,
+  open a link, write something down. Deliberately few, all local
+- 🌤️ **She knows roughly what is going on** — the time, which app you are in
+  (the name, never the window title), whether the laptop is about to die
 - 👁️ **She can look at your screen** — one screenshot, only when you ask, sent
   to a local vision model. No background or continuous capture, ever
 - 👄 **Lip sync** with five visemes chosen by formant balance, not just a jaw
@@ -54,6 +68,42 @@ implies, and [docs/LLM-ON-SERVER.md](docs/LLM-ON-SERVER.md) for the server side.
 - 🔌 **Any OpenAI-compatible LLM** — Ollama, llama.cpp, LM Studio, vLLM, or OpenAI
 
 ---
+
+## What leaves this Mac
+
+Voice is entirely local, in both directions, and there is no code path that
+sends recorded audio anywhere. Speech recognition is Faster-Whisper running
+here; synthesis is Kokoro running here. Verified by watching the bridge's
+sockets through a full round trip — microphone in, reply spoken — during which
+the only connections open were the loopback ones below.
+
+| | Stays on this Mac | Leaves this Mac |
+|---|---|---|
+| Microphone audio | ✅ transcribed locally | never |
+| Her voice | ✅ synthesised locally | never |
+| Conversation + memory | ✅ on disk here | — |
+| What you said, as text | | → your LLM endpoint |
+| Clipboard, when she reads it | | → your LLM endpoint |
+| The frontmost app's name | | → your LLM endpoint |
+| Screenshots | ✅ only when you press the button | → your vision endpoint |
+
+The three text rows are the real answer to "is this private": they go wherever
+`llm.base_url` points. Pointed at Ollama on this machine, nothing leaves at
+all. Pointed at the Beelink through the SSH tunnel, they cross your own
+network encrypted and reach your own hardware. Pointed at OpenAI, they go to
+OpenAI — that is the trade you make by configuring it that way.
+
+Two things worth knowing specifically:
+
+- **Reading the clipboard sends its contents to the model.** That is what
+  makes "what do you make of this error" work, and it means the tool is only
+  as private as the endpoint behind it. Turn it off with `tools.clipboard`.
+- **`asr.offline: true`** stops Faster-Whisper contacting Hugging Face to
+  revalidate the cached model on every load. Nothing of yours was ever in that
+  request, but it was the only outbound connection in the voice path, and the
+  voice path is the part that most deserves to be provably local.
+
+The bridge listens on `127.0.0.1` only, so nothing on your network can reach it.
 
 ## Where this lives
 
@@ -144,6 +194,8 @@ For development, the two-terminal route still works:
 |---|---|
 | Type to her | Click the box at the bottom, press Enter |
 | Talk to her | Microphone button, or **⌘⇧Space** — press once to start, again to stop |
+| Cut her off | Talk over her. Or **⌘⇧.** |
+| Stop her speaking first | Tray → "Let her speak first" |
 | Show her your screen | Eye button, or tray → "Look at my screen". Type a question first to ask about something specific |
 | Move her | Drag the top strip of the window |
 | Resize her | Drag a window edge |
@@ -192,8 +244,13 @@ server/
   process/
     config.py                 shared config loader
     asr_func/                 Faster-Whisper + microphone recorder
-    llm_funcs/llm_scr.py      chat-completions client + history
-    text_func/speech.py       splits replies into speech + animation cues
+    asr_func/vad.py           hearing you over her own voice, for barge-in
+    llm_funcs/llm_scr.py      chat-completions client, streaming, tool calls
+    text_func/speech.py       splits replies into speech + animation cues,
+                              and into speakable chunks while streaming
+    idle.py                   when she says something unprompted
+    tools/context.py          time, frontmost app, battery
+    tools/registry.py         timers, clipboard, links, remembering
     vision/look.py            screenshot -> vision model
     memory/store.py           durable facts, deduped and capped
     memory/extract.py         decides what is worth remembering
@@ -218,6 +275,12 @@ app/
 | `GET /health` | Status: LLM endpoint, TTS backend, model |
 | `GET /voices` | List Kokoro voicepacks |
 | `POST /chat` | `{"text": "..."}` → display text, spoken text, cues, base64 WAV |
+| `POST /chat/stream` | The same, as NDJSON — one event per sentence, each with its own audio |
+| `POST /interrupt` | `{"chunks": n}` — stop generating; record only the n sentences heard |
+| `GET /barge/listen` | Open the mic while she talks; becomes the next exchange if you cut in |
+| `GET /idle/listen` | Held open until she has something unprompted to say |
+| `POST /idle/mute` | Stop her speaking first |
+| `GET /idle/status` | Whether she is due, and what is holding her back |
 | `POST /listen/start` | Begin recording |
 | `POST /listen/stop` | Stop, transcribe, answer, synthesize |
 | `POST /listen/cancel` | Discard the recording |
