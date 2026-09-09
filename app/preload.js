@@ -12,4 +12,7 @@ contextBridge.exposeInMainWorld('marina', {
   onLookAtScreen: (cb) => ipcRenderer.on('look-at-screen', () => cb()),
   onBridgeDown: (cb) => ipcRenderer.on('bridge-down', (_e, msg) => cb(msg)),
   onBridgeUp: (cb) => ipcRenderer.on('bridge-up', () => cb()),
+  onSetOpeners: (cb) => ipcRenderer.on('set-openers', (_e, on) => cb(on)),
+  onInterrupt: (cb) => ipcRenderer.on('interrupt', () => cb()),
+  openersChanged: (on) => ipcRenderer.send('openers-changed', on),
 });

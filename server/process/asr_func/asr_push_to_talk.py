@@ -12,12 +12,32 @@ from process.config import load_config
 
 
 def build_model():
+    """Load Whisper, preferring the copy already on disk.
+
+    faster-whisper resolves the model through the Hugging Face hub, which
+    contacts huggingface.co on every single load to check the cached copy is
+    current — even when it is. Nothing of yours is sent, but it is the only
+    outbound connection anywhere in the voice path, and voice is the part of
+    this that most deserves to be provably local.
+
+    So: try the cache first and go to the network only when there is nothing
+    cached to use, which is the first run and no other time.
+    """
     cfg = load_config().get("asr", {})
-    return WhisperModel(
-        cfg.get("model", "base.en"),
-        device=cfg.get("device", "cpu"),
-        compute_type=cfg.get("compute_type", "int8"),
-    )
+    name = cfg.get("model", "base.en")
+    kwargs = {
+        "device": cfg.get("device", "cpu"),
+        "compute_type": cfg.get("compute_type", "int8"),
+    }
+
+    if cfg.get("offline", True):
+        try:
+            return WhisperModel(name, local_files_only=True, **kwargs)
+        except Exception:                               # noqa: BLE001
+            print(f"[asr] {name} isn't cached yet; downloading it once.",
+                  flush=True)
+
+    return WhisperModel(name, **kwargs)
 
 
 def transcribe_file(model, path):

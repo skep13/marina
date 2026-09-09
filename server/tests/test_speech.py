@@ -9,7 +9,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from process.text_func.speech import split_reply      # noqa: E402
+from process.text_func.speech import SentenceSplitter, split_reply   # noqa: E402
 
 # (reply, must be spoken, must NOT be spoken, expected animation or None)
 CASES = [
@@ -39,8 +39,45 @@ CASES = [
 ]
 
 
+# Streaming cuts the reply into speakable pieces as it is written. The rules
+# that matter: never lose a word, and never cut inside a stage direction —
+# half an asterisk on each side and both halves get read out loud.
+STREAM_CASES = [
+    "*sighs* fine. i'll look at it. but you owe me, seriously.",
+    "it rendered at 3.5 fps which is, frankly, an insult. *rolls her eyes*",
+    "*tilts her head* wait. you did what?",
+    "no. absolutely not.",
+    "hi",
+    "yeah ok so the thing is i've been messing with this export all afternoon "
+    "and it keeps desyncing about four seconds in and i cannot work out why",
+]
+
+
+def check_stream(failures):
+    """Feed each reply through in small deltas, as a model would produce it."""
+    for reply in STREAM_CASES:
+        for size in (1, 4, 13):
+            splitter = SentenceSplitter()
+            segments = []
+            for i in range(0, len(reply), size):
+                segments += splitter.feed(reply[i:i + size])
+            tail = splitter.flush()
+            if tail:
+                segments.append(tail)
+
+            rejoined = " ".join(segments)
+            if rejoined.split() != reply.split():
+                failures.append(
+                    f"{reply!r} at delta={size}\n      text changed: {rejoined!r}")
+            for segment in segments:
+                if segment.count("*") % 2:
+                    failures.append(
+                        f"{reply!r} at delta={size}\n      cut inside an action: {segment!r}")
+
+
 def run():
     failures = []
+    check_stream(failures)
     for reply, must, must_not, animation in CASES:
         out = split_reply(reply)
         spoken = out["speech"].lower()
@@ -56,7 +93,8 @@ def run():
             if animation not in got:
                 failures.append(f"{reply!r}\n      expected a {animation!r} cue, got {got}")
 
-    print(f"  {len(CASES)} cases, {len(failures)} failures")
+    print(f"  {len(CASES)} split cases + {len(STREAM_CASES) * 3} streaming cases, "
+          f"{len(failures)} failures")
     for f in failures:
         print("   FAIL", f)
     return 1 if failures else 0

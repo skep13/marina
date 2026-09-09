@@ -7,6 +7,7 @@ character_config.yaml to point at a local server instead of OpenAI.
 import json
 import os
 import random
+import threading
 import time
 
 from openai import OpenAI
@@ -19,6 +20,8 @@ from process.config import load_config, resolve
 from process.memory import extract as memory_extract
 from process.memory import persona
 from process.memory import store as memory
+from process.tools import context as ambient
+from process.tools import registry as tools
 
 char_config = load_config()
 
@@ -43,13 +46,31 @@ BASE_SYSTEM_PROMPT = char_config["presets"]["default"]["system_prompt"]
 
 
 def system_message():
-    """The system prompt plus whatever she currently remembers."""
+    """The stable half of the prompt: who she is, and what she remembers.
+
+    Everything here changes rarely, which matters more than it looks. Servers
+    cache the processed prefix of a prompt, and llama.cpp reprocesses from the
+    first token that differs — so anything volatile at the front throws away
+    the cache for the whole conversation behind it. Measured on this setup
+    that is the difference between a first token in 0.2 s and one in 20 s.
+    See `volatile_message`.
+    """
     return {
         "role": "system",
-        "content": BASE_SYSTEM_PROMPT
-        + persona.as_prompt_block()
-        + memory.as_prompt_block(),
+        "content": BASE_SYSTEM_PROMPT + memory.as_prompt_block(),
     }
+
+
+def volatile_message():
+    """The half that changes every turn — the clock, and what is on her mind.
+
+    Deliberately placed last, immediately before the newest user turn, so the
+    cached prefix behind it stays intact. Putting the time of day in the
+    system prompt instead meant the cache was invalidated every single minute,
+    and every reply after the change of minute paid full prompt processing.
+    """
+    content = (persona.as_prompt_block() + ambient.as_prompt_block()).strip()
+    return {"role": "system", "content": content} if content else None
 
 # Failover: the GPU box is only reachable on the home network. Off it, she
 # falls back to a model on this Mac rather than simply failing.
@@ -81,7 +102,12 @@ SEED = _llm.get("seed")
 REPEAT_PENALTY = float(_llm.get("repeat_penalty", 1.12))
 FREQUENCY_PENALTY = float(_llm.get("frequency_penalty", 0.35))
 
-client = OpenAI(api_key=API_KEY, base_url=BASE_URL, timeout=20.0, max_retries=0)
+# With replies streamed, this is effectively the time-to-first-token budget —
+# once tokens are flowing the connection stays alive on its own. A shared GPU
+# box under load can take a while to get started, so it is configurable.
+TIMEOUT = float(_llm.get("timeout_seconds", 30.0))
+
+client = OpenAI(api_key=API_KEY, base_url=BASE_URL, timeout=TIMEOUT, max_retries=0)
 fallback_client = (
     OpenAI(api_key=FALLBACK_KEY, base_url=FALLBACK_BASE, timeout=60.0, max_retries=0)
     if FALLBACK_BASE else None
@@ -220,11 +246,46 @@ def load_history():
     return []
 
 
+# Memory extraction runs on a background thread and a streamed reply is
+# written from another, so two turns can be saved at once. Without this the
+# file ends up with one writer's JSON appended to another's — which
+# `load_history` reads as corrupt and silently starts the conversation over.
+_history_lock = threading.RLock()
+
+
 def save_history(history):
     # Only the recent window is persisted, so the file cannot grow without end.
     trimmed = [m for m in history if m["role"] != "system"][-(HISTORY_TURNS * 2):]
-    with open(HISTORY_FILE, "w", encoding="utf-8") as f:
-        json.dump(trimmed, f, indent=2)
+    with _history_lock:
+        # Written beside the target and moved into place: a reader either sees
+        # the whole previous file or the whole new one, never a half-written
+        # array. os.replace is atomic within a filesystem.
+        tmp = f"{HISTORY_FILE}.tmp"
+        with open(tmp, "w", encoding="utf-8") as f:
+            json.dump(trimmed, f, indent=2)
+        os.replace(tmp, HISTORY_FILE)
+
+
+def save_turn(user_text, assistant_text):
+    """Append one exchange, and distil anything worth keeping out of it.
+
+    Every path that produces a reply ends here, including an interrupted one —
+    which passes only the part she actually said out loud.
+    """
+    assistant_text = (assistant_text or "").strip()
+    if not assistant_text:
+        return
+    with _history_lock:
+        history = load_history()[-(HISTORY_TURNS * 2):]
+        if user_text is not None:
+            history.append({"role": "user", "content": user_text})
+        history.append({"role": "assistant", "content": assistant_text})
+        save_history(history)
+    # Nothing was said to her, so there is nothing about the user to distil —
+    # extracting from her own unprompted line would only teach her her own
+    # opinions back.
+    if REMEMBER and user_text is not None:
+        memory_extract.remember_async(client, MODEL, user_text, assistant_text)
 
 
 def reset_history():
@@ -267,3 +328,157 @@ def llm_response(user_input):
         memory_extract.remember_async(client, MODEL, user_input, reply)
 
     return reply
+
+
+def get_reply_stream(messages, **kw):
+    return chat_completion(
+        messages,
+        temperature=TEMPERATURE,
+        max_tokens=MAX_TOKENS,
+        stream=True,
+        **kw,
+    )
+
+
+def _collect_tool_calls(delta, calls):
+    """Reassemble tool calls from stream deltas.
+
+    They arrive in pieces like everything else: the name in one event, the
+    JSON arguments a few characters at a time across the next several, keyed
+    only by position in the list.
+    """
+    for call in getattr(delta, "tool_calls", None) or []:
+        slot = calls.setdefault(call.index, {"id": "", "name": "", "arguments": ""})
+        if call.id:
+            slot["id"] = call.id
+        fn = getattr(call, "function", None)
+        if fn is not None:
+            if fn.name:
+                slot["name"] = fn.name
+            if fn.arguments:
+                slot["arguments"] += fn.arguments
+
+
+# Servers that do not implement tool calling say so in different ways. Rather
+# than maintain a list of them, the first genuine refusal disables tools for
+# the rest of the session and she carries on as she did before.
+_tools_supported = True
+
+
+def _rejects_tools(e):
+    """Did the endpoint refuse the tool definitions, or just have a bad day?
+
+    A 400 or 422 is the server reading the request and declining it, which is
+    what an endpoint without tool support does. A timeout, a dropped socket or
+    a 500 is a server that is unwell — retrying without tools would hide a
+    real failure and cost her a capability permanently.
+    """
+    from openai import APIStatusError
+
+    if not isinstance(e, APIStatusError):
+        return False
+    if e.status_code not in (400, 404, 422, 501):
+        return False
+    body = (str(getattr(e, "message", "")) or str(e)).lower()
+    # A 400 for some other reason (a bad message shape, a context overflow)
+    # must not be read as "no tools here".
+    return "tool" in body or "function" in body or e.status_code in (404, 501)
+
+
+def llm_stream(user_input=None, extra_system=None, use_tools=True):
+    """Yield the reply as it is generated.
+
+    Same conversation as `llm_response`, except the caller gets deltas and
+    can start synthesizing before the model has finished. Saving the turn is
+    deliberately not done here: being interrupted means the transcript should
+    record what she said out loud, not what the model went on to write, and
+    only the caller knows where the audio actually stopped. Call `save_turn`
+    with that.
+
+    `extra_system` is appended to the system prompt for this call only, which
+    is how an unprompted opener and a tool result both get their instructions
+    in without becoming part of her permanent character.
+    """
+    history = load_history()[-(HISTORY_TURNS * 2):]
+    # `user_input` is None when nobody said anything — an unprompted opener.
+    # She is picking the conversation up rather than answering, so there is no
+    # user turn to add and none to record afterwards.
+    if user_input is not None:
+        history.append({"role": "user", "content": user_input})
+
+    system = system_message()
+    if extra_system:
+        system = {"role": "system", "content": system["content"] + extra_system}
+
+    global _tools_supported
+
+    volatile = volatile_message()
+    # The volatile block goes after the history, not before it: everything in
+    # front of it stays byte-identical between turns and stays cached. It sits
+    # just ahead of the newest user turn so it reads as context for what they
+    # just said; with no user turn at all — an unprompted opener — it goes
+    # last, which is the same position relative to what she is answering.
+    tail = ([volatile] if volatile else [])
+    if user_input is not None and history:
+        messages = [system] + history[:-1] + tail + history[-1:]
+    else:
+        messages = [system] + history + tail
+    offer = tools.definitions() if (use_tools and _tools_supported) else None
+
+    # One round trip at most: she asks for a tool, gets the answer, and says
+    # something about it. Chains beyond that are for agents, not for someone
+    # you are talking to — and a small model given room to loop will.
+    for attempt in range(2):
+        calls = {}
+        try:
+            stream = (get_reply_stream(messages, tools=offer, tool_choice="auto")
+                      if offer else get_reply_stream(messages))
+            for event in stream:
+                if not event.choices:
+                    continue
+                delta = event.choices[0].delta
+                _collect_tool_calls(delta, calls)
+                # Hybrid reasoning models put the <think> block in
+                # reasoning_content. Thinking is off by default, but a server
+                # that ignores the flag would otherwise stream a paragraph of
+                # deliberation straight into her mouth.
+                piece = getattr(delta, "content", None)
+                if not piece:
+                    continue
+                yield piece
+        except Exception as e:                          # noqa: BLE001
+            # Only a rejected *request* means the endpoint cannot do tools. A
+            # timeout or a dropped connection says nothing about tool support,
+            # and catching those here turned a busy server into a permanent
+            # downgrade for the rest of the session — she quietly lost the
+            # ability to set a timer because one reply was slow.
+            if offer is None or not _rejects_tools(e):
+                raise
+            print(f"[llm] endpoint rejected tool definitions "
+                  f"({type(e).__name__}); continuing without them", flush=True)
+            _tools_supported = False
+            offer = None
+            continue
+
+        if not calls:
+            return
+
+        messages = messages + [{
+            "role": "assistant",
+            "content": None,
+            "tool_calls": [
+                {"id": c["id"] or f"call_{i}", "type": "function",
+                 "function": {"name": c["name"], "arguments": c["arguments"] or "{}"}}
+                for i, c in sorted(calls.items())
+            ],
+        }]
+        for i, call in sorted(calls.items()):
+            result = tools.run(call["name"], call["arguments"])
+            messages.append({
+                "role": "tool",
+                "tool_call_id": call["id"] or f"call_{i}",
+                "content": result,
+            })
+        # Second pass talks about what happened; offering the tools again
+        # invites her to call the same one on a loop.
+        offer = None
