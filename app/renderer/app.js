@@ -116,6 +116,7 @@ async function mountVRM(arrayBuffer, label) {
 
   collectSprings(next);
   collectMouthClose(next);
+  collectBrows(next);
   restyleFace(next);
 
   if (next.lookAt) {
@@ -306,6 +307,60 @@ function restyleFace(v) {
 // Find it and drive it ourselves.
 const MOUTH_CLOSE_MORPH = 'Fcl_MTH_Close';
 
+// The VRM expression presets carry no plain brow raise, but the VRoid face
+// ships the shapes — they are simply never driven outside a full expression.
+// A face with a completely static brow is the other half of looking vacant.
+const BROW_MORPHS = ['Fcl_BRW_Fun', 'Fcl_BRW_Surprised', 'Fcl_BRW_Sorrow'];
+let browTargets = {};
+
+function collectBrows(v) {
+  browTargets = {};
+  for (const name of BROW_MORPHS) browTargets[name] = [];
+  v.scene.traverse((o) => {
+    const dict = o.morphTargetDictionary;
+    if (!o.isSkinnedMesh || !dict) return;
+    for (const name of BROW_MORPHS) {
+      if (name in dict) browTargets[name].push({ mesh: o, index: dict[name] });
+    }
+  });
+}
+
+/** Idle brow life. Runs after vrm.update() for the same reason the mouth does.
+ *
+ *  This model binds no brow morph to any VRM expression, so the brows were
+ *  simply never driven — half of why a resting face reads as vacant. Nothing
+ *  else writes them, so we own them outright: an earlier version took the max
+ *  against the previous frame to avoid stepping on the expression system, but
+ *  with nothing resetting them each frame that was a ratchet the value could
+ *  never come back down from. `room` is what keeps a cue's expression clear.
+ */
+function applyIdleBrow(t) {
+  const emoting = Math.max(
+    cueOut.expr.happy || 0, cueOut.expr.sad || 0, cueOut.expr.angry || 0,
+    cueOut.expr.surprised || 0, cueOut.expr.relaxed || 0,
+  );
+  const room = Math.max(0, 1 - emoting * 2);
+
+  const values = {
+    // Slow ambient tension, plus the lift when she re-engages with you.
+    Fcl_BRW_Fun: room * (0.06 + 0.05 * noise1(t * 0.19 + 7) + browFlash * 0.22),
+    // A touch of raise while she is speaking; flat brows read as bored.
+    Fcl_BRW_Surprised: room * Math.max(0, mouthOpen * 0.14 + 0.03 * noise1(t * 0.23 + 19)),
+    // Faint inner-brow drift, the difference between resting and blank.
+    Fcl_BRW_Sorrow: room * Math.max(0, 0.05 * noise1(t * 0.14 + 55)),
+  };
+
+  for (const name of BROW_MORPHS) {
+    const list = browTargets[name];
+    if (!list) continue;
+    const v = Math.max(0, Math.min(1, values[name] || 0));
+    for (let i = 0; i < list.length; i++) {
+      const tgt = list[i];
+      tgt.mesh.morphTargetInfluences[tgt.index] = v;
+    }
+  }
+}
+
 function collectMouthClose(v) {
   mouthCloseTargets = [];
   v.scene.traverse((o) => {
@@ -380,18 +435,66 @@ window.addEventListener('mousemove', (e) => {
 });
 
 let blinkTimer = 1 + Math.random() * 3;
-let blinkValue = 0;
 let blinkPending = 0;
-let blinkSpeed = 8.5;
+let blinkT = 999;        // seconds into the current blink
+let blinkDur = 0.14;
 
 let moodTimer = 0;
 let mood = 0;
 let moodTarget = 0;
 
-// Eyes don't hold perfectly still on a target; they micro-saccade around it.
+// ---------------------------------------------------------------------------
+//  Idle gaze
+//
+//  Not a random walk around centre — that reads as staring through you. Real
+//  idle gaze is a series of *held* fixations, mostly on the person you are
+//  with, broken by aversions: a glance up while recalling, down while
+//  thinking, sideways when bored. Coming back is what makes it read as being
+//  with someone rather than looking past them.
+//
+//  Where she looks away to is not arbitrary either. Up-and-off tends to go
+//  with remembering, down with turning something over.
+// ---------------------------------------------------------------------------
+
+const AVERSIONS = [
+  { x: -0.38, y:  0.27, hold: [1.1, 2.4] },   // up-left, recalling
+  { x:  0.36, y:  0.25, hold: [1.1, 2.4] },   // up-right
+  { x: -0.27, y: -0.23, hold: [1.4, 3.0] },   // down-left, thinking
+  { x:  0.25, y: -0.21, hold: [1.4, 3.0] },
+  { x: -0.48, y:  0.04, hold: [1.6, 3.4] },   // sideways, drifting off
+  { x:  0.46, y: -0.02, hold: [1.6, 3.4] },
+];
+
 let gazeTimer = 0;
+let gazeAway = false;
 const gaze = { x: 0, y: 0 };
 const gazeTarget = { x: 0, y: 0 };
+// The head chases the eyes rather than moving with them, so it lags.
+const gazeHead = { x: 0, y: 0 };
+const gazeHeadV = { x: 0, y: 0 };
+// Smoothed ambient head pose, and its velocity.
+const headS = { x: 0, y: 0, z: 0 };
+const headV = { x: 0, y: 0, z: 0 };
+let browFlash = 0;          // brief raise on re-engaging
+
+/** Smooth value noise. Sines at fixed frequencies visibly loop; this doesn't. */
+const _hash = (i) => {
+  const s = Math.sin(i * 127.1) * 43758.5453;
+  return (s - Math.floor(s)) * 2 - 1;
+};
+function noise1(x) {
+  const i = Math.floor(x), f = x - i;
+  // Quintic rather than smoothstep: its second derivative is continuous too,
+  // so the motion has no faint kink as it crosses each control point.
+  const u = f * f * f * (f * (f * 6 - 15) + 10);
+  return _hash(i) * (1 - u) + _hash(i + 1) * u;
+}
+
+/** Two octaves. One octave drifts evenly; real movement has a fine tremor
+ *  riding on the slow wander. */
+function fbm(x) {
+  return noise1(x) * 0.72 + noise1(x * 2.7 + 13.7) * 0.28;
+}
 
 let audioCtx = null;
 let analyser = null;
@@ -567,8 +670,19 @@ const TAU = Math.PI * 2;
  *  shoulders — enough that the frame isn't a freeze-frame, and enough to give
  *  the spring bones something to react to.
  */
-function updateBody(t) {
-  const breath = Math.sin(t * TAU * 0.21);
+function updateBody(t, dtBody) {
+  // Breathing is not a sine. The in-breath is quicker than the out-breath,
+  // and the period wanders — a metronome is the giveaway.
+  const bphase = t * 0.21 + 0.07 * noise1(t * 0.05);
+  const bw = bphase - Math.floor(bphase);
+  const breath = (bw < 0.4
+    ? Math.sin((bw / 0.4) * Math.PI * 0.5)
+    : Math.cos(((bw - 0.4) / 0.6) * Math.PI * 0.5)) * 2 - 1;
+
+  // People are not equally animated minute to minute. A slow envelope gives
+  // her livelier stretches and calmer ones instead of a constant activity
+  // level, which is the other half of what reads as mechanical.
+  const energy = 0.68 + 0.42 * noise1(t * 0.035 + 3);
 
   poseBone('chest', -0.013 * breath, 0, 0);
   poseBone('upperChest', -0.008 * breath, 0, 0);
@@ -581,12 +695,44 @@ function updateBody(t) {
   // life in this framing. Split across neck and head so the skull isn't
   // pivoting on a stick.
   const talk = mouthOpen;
-  const drift = Math.sin(t * TAU * 0.043 + 1.1);
-  const x = pointer.y * 0.09 + 0.011 * Math.sin(t * 0.63)
-            + talk * 0.045 * Math.sin(t * 7.1) + cueOut.hx;
-  const y = pointer.x * 0.17 + 0.028 * drift
-            + talk * 0.030 * Math.sin(t * 3.1) + cueOut.hy;
-  const z = 0.015 * Math.sin(t * 0.44) + 0.010 * drift + cueOut.hz;
+
+  // Noise rather than sines: fixed frequencies beat against each other into a
+  // pattern you start to recognise after a minute of watching her.
+  const nx = fbm(t * 0.13);
+  const ny = fbm(t * 0.11 + 40);
+  const nz = fbm(t * 0.09 + 80);
+
+  // The head carries part of the gaze shift, a beat behind the eyes. Without
+  // this the eyes slide about in a head that is doing something unrelated,
+  // which is most of what makes an idle avatar look vacant.
+  const followX = -gazeHead.y * 0.19;
+  const followY = gazeHead.x * 0.40;
+
+  // The ambient layer — drift, gaze-following, breathing sway — goes through
+  // its own soft filter before anything else is added. Every source feeding it
+  // (a stepped saccade target, a noise field, an energy envelope) has its own
+  // character, and filtering the sum is what stops those seams showing as
+  // snap. Deliberate cues are added *after* it, so a nod stays a nod instead
+  // of being smoothed into a nod-shaped smudge.
+  // Only the raw sources go through it. The gaze-follow already came out of
+  // its own spring, and running it through a second filter in series ate the
+  // motion — head range fell to 5 degrees and the head stopped visibly
+  // tracking the eyes at all. It is added after, still smooth, undiminished.
+  const idleX = pointer.y * 0.09 + 0.016 * nx * energy;
+  const idleY = pointer.x * 0.17 + 0.034 * ny * energy;
+  const idleZ = 0.018 * nz * energy;
+
+  const HK = 5.0, HC = 4.2;          // 0.36 Hz, near-critically damped
+  headV.x += (HK * (idleX - headS.x) - HC * headV.x) * dtBody;
+  headV.y += (HK * (idleY - headS.y) - HC * headV.y) * dtBody;
+  headV.z += (HK * (idleZ - headS.z) - HC * headV.z) * dtBody;
+  headS.x += headV.x * dtBody;
+  headS.y += headV.y * dtBody;
+  headS.z += headV.z * dtBody;
+
+  const x = headS.x + followX + talk * 0.045 * Math.sin(t * 7.1) + cueOut.hx;
+  const y = headS.y + followY + talk * 0.030 * Math.sin(t * 3.1) + cueOut.hy;
+  const z = headS.z - followY * 0.13 + cueOut.hz;
 
   poseBone('neck', x * 0.40, y * 0.40, z * 0.5);
   poseBone('head', x * 0.60, y * 0.60, z * 0.5);
@@ -672,6 +818,7 @@ let activeCues = [];    // { animation, elapsed, dur }
 let cueClock = -1;      // seconds since the reply started, or -1 when idle
 
 const cueOut = { hx: 0, hy: 0, hz: 0, shoulder: 0, gazeX: 0, gazeY: 0, blinkLeft: 0, expr: {} };
+const cueScratch = { hx: 0, hy: 0, hz: 0, shoulder: 0, gazeX: 0, gazeY: 0, blinkLeft: 0, expr: {} };
 
 /** Queue a reply's cues against the real audio duration. */
 function scheduleCues(cues, duration) {
@@ -681,6 +828,58 @@ function scheduleCues(cues, duration) {
   }));
   activeCues = [];
   cueClock = pendingCues.length ? 0 : -1;
+}
+
+// ---------------------------------------------------------------------------
+//  Spontaneous gestures
+//
+//  Between replies she only drifted, which is most of what still read as
+//  robotic: a person waiting is not motionless, they shift and glance and
+//  settle. These are the same cues the model can ask for, fired on her own.
+//
+//  Drawn from a shuffled bag rather than picked at random each time. Plain
+//  random repeats itself in clumps — three tilts in a row — and a fixed list
+//  is worse, because you learn the order. A bag gives every gesture an outing
+//  before any repeats, reshuffled each pass, and never lets the reshuffle
+//  butt the same gesture against itself.
+// ---------------------------------------------------------------------------
+
+const IDLE_GESTURES = ['tilt', 'lean', 'smile', 'nod', 'shrug', 'think', 'brow', 'sigh', 'eyeroll', 'stare'];
+
+let gestureBag = [];
+let lastGesture = null;
+let gestureTimer = 6 + Math.random() * 8;
+
+function drawGesture() {
+  if (!gestureBag.length) {
+    gestureBag = IDLE_GESTURES.slice();
+    for (let i = gestureBag.length - 1; i > 0; i--) {      // Fisher-Yates
+      const j = (Math.random() * (i + 1)) | 0;
+      [gestureBag[i], gestureBag[j]] = [gestureBag[j], gestureBag[i]];
+    }
+    // Don't let a fresh shuffle hand back what just played.
+    if (gestureBag[gestureBag.length - 1] === lastGesture && gestureBag.length > 1) {
+      const swap = (Math.random() * (gestureBag.length - 1)) | 0;
+      [gestureBag[gestureBag.length - 1], gestureBag[swap]] =
+        [gestureBag[swap], gestureBag[gestureBag.length - 1]];
+    }
+  }
+  lastGesture = gestureBag.pop();
+  return lastGesture;
+}
+
+function updateIdleGestures(dt) {
+  // Never on top of a reply — those cues are timed to her words.
+  if (cueClock >= 0 || mouthOpen > 0.05) { gestureTimer = Math.max(gestureTimer, 2.5); return; }
+
+  gestureTimer -= dt;
+  if (gestureTimer > 0) return;
+  gestureTimer = 7 + Math.random() * 11;
+
+  const def = CUES[drawGesture()];
+  // Stretched and damped: the cue shapes are written for punctuating speech,
+  // and at that intensity an unprompted one lands as a jolt.
+  if (def) activeCues.push({ run: def.run, elapsed: 0, dur: def.dur * 1.8, gain: 0.5 });
 }
 
 function updateCues(dt) {
@@ -703,7 +902,26 @@ function updateCues(dt) {
     c.elapsed += dt;
     const p = c.elapsed / c.dur;
     if (p >= 1) { activeCues.splice(i, 1); continue; }
-    c.run(p, cueOut);
+
+    if (c.gain === undefined || c.gain === 1) { c.run(p, cueOut); continue; }
+
+    // A spontaneous gesture is a smaller version of the same movement. Run it
+    // into a scratch buffer and fold the result in at reduced strength, so an
+    // unprompted shrug is a shift in the seat rather than a performance.
+    cueScratch.hx = cueScratch.hy = cueScratch.hz = 0;
+    cueScratch.shoulder = cueScratch.gazeX = cueScratch.gazeY = cueScratch.blinkLeft = 0;
+    for (const name of CUE_EXPRESSIONS) cueScratch.expr[name] = 0;
+    c.run(p, cueScratch);
+    cueOut.hx += cueScratch.hx * c.gain;
+    cueOut.hy += cueScratch.hy * c.gain;
+    cueOut.hz += cueScratch.hz * c.gain;
+    cueOut.shoulder += cueScratch.shoulder * c.gain;
+    cueOut.gazeX += cueScratch.gazeX * c.gain;
+    cueOut.gazeY += cueScratch.gazeY * c.gain;
+    cueOut.blinkLeft = Math.max(cueOut.blinkLeft, cueScratch.blinkLeft * c.gain);
+    for (const name of CUE_EXPRESSIONS) {
+      cueOut.expr[name] = Math.max(cueOut.expr[name], cueScratch.expr[name] * c.gain);
+    }
   }
 }
 
@@ -742,24 +960,74 @@ function updateHair(t) {
 }
 
 /** Eyes and face — the part you actually see at this crop. */
-function updateGaze(dt) {
+function updateGaze(dt, t) {
   gazeTimer -= dt;
   if (gazeTimer <= 0) {
-    // Mostly small darts, occasionally a longer look away.
-    const bored = Math.random() < 0.22;
-    gazeTimer = bored ? 1.4 + Math.random() * 2.2 : 0.5 + Math.random() * 1.8;
-    const range = bored ? 0.55 : 0.26;
-    gazeTarget.x = (Math.random() - 0.5) * range;
-    gazeTarget.y = (Math.random() - 0.5) * range * 0.55;
+    const from = { x: gazeTarget.x, y: gazeTarget.y };
+
+    if (gazeAway) {
+      // Come back. Settling near the eyes rather than exactly on them, so it
+      // is not the identical spot every time.
+      gazeAway = false;
+      gazeTarget.x = (Math.random() - 0.5) * 0.10;
+      gazeTarget.y = (Math.random() - 0.5) * 0.07;
+      gazeTimer = 1.6 + Math.random() * 3.4;
+      browFlash = 1;                     // brows lift a touch on re-engaging
+    } else if (Math.random() < 0.45) {
+      gazeAway = true;
+      const a = AVERSIONS[(Math.random() * AVERSIONS.length) | 0];
+      gazeTarget.x = a.x + (Math.random() - 0.5) * 0.10;
+      gazeTarget.y = a.y + (Math.random() - 0.5) * 0.08;
+      gazeTimer = a.hold[0] + Math.random() * (a.hold[1] - a.hold[0]);
+    } else {
+      // Still on you, just not frozen: a small shift within the face.
+      gazeTarget.x = (Math.random() - 0.5) * 0.14;
+      gazeTarget.y = (Math.random() - 0.5) * 0.10;
+      gazeTimer = 1.3 + Math.random() * 2.2;
+    }
+
+    // People often, but not always, blink through a large gaze shift. Firing
+    // on every one of them pushed the rate to 34/min against a human resting
+    // rate of 15-20, which reads as nervous rather than alive.
+    const jump = Math.hypot(gazeTarget.x - from.x, gazeTarget.y - from.y);
+    if (jump > 0.28 && blinkTimer > 0.9 && Math.random() < 0.4) blinkTimer = 0.02;
   }
-  // Saccades snap; they don't glide.
-  const k = Math.min(1, dt * 13);
+
+  // Saccades snap; they don't glide. Larger ones take measurably longer than
+  // small ones, so the rate falls off with distance rather than every jump
+  // taking the same time regardless of how far it goes.
+  const dist = Math.hypot(gazeTarget.x - gaze.x, gazeTarget.y - gaze.y);
+  const k = Math.min(1, dt * (13 - Math.min(7, dist * 9)));
   gaze.x += (gazeTarget.x - gaze.x) * k;
   gaze.y += (gazeTarget.y - gaze.y) * k;
 
+  // Ocular drift: the eye never truly holds still on a fixation.
+  const driftX = noise1(t * 1.7) * 0.012;
+  const driftY = noise1(t * 1.4 + 31) * 0.009;
+
+  // The head follows the eyes, late and only part of the way. This coupling
+  // is what stops the head and eyes reading as two separate mechanisms.
+  //
+  // A spring rather than an exponential lag. An exponential approach eases in
+  // and never overshoots, which is precisely the motion that reads as
+  // mechanical; damping below critical (2*sqrt(K) = 10.2 here) lets the head
+  // carry slightly past the mark and settle back, the way a real one does.
+  // K=26 was a 0.81 Hz head settling in ~0.6s — brisk enough to read as a
+  // servo; a real head turn takes over a second. Softening this costs no
+  // range, because a spring still converges on its target either way; it only
+  // changes how it gets there. C sits just under critical (2*sqrt(6) = 4.9),
+  // leaving a trace of overshoot so it settles rather than arrives.
+  const K = 6, C = 4.4;
+  gazeHeadV.x += (K * (gazeTarget.x - gazeHead.x) - C * gazeHeadV.x) * dt;
+  gazeHeadV.y += (K * (gazeTarget.y - gazeHead.y) - C * gazeHeadV.y) * dt;
+  gazeHead.x += gazeHeadV.x * dt;
+  gazeHead.y += gazeHeadV.y * dt;
+
+  browFlash = Math.max(0, browFlash - dt * 2.6);
+
   lookTarget.position.set(
-    pointer.x * 0.45 + gaze.x + cueOut.gazeX,
-    -pointer.y * 0.30 + gaze.y + cueOut.gazeY,
+    pointer.x * 0.45 + gaze.x + driftX + cueOut.gazeX,
+    -pointer.y * 0.30 + gaze.y + driftY + cueOut.gazeY,
     -1,
   );
 }
@@ -767,20 +1035,27 @@ function updateGaze(dt) {
 function updateBlink(dt) {
   blinkTimer -= dt;
   if (blinkTimer <= 0) {
-    blinkValue = 1;
-    blinkSpeed = 7.5 + Math.random() * 3.5;   // no two blinks the same length
+    blinkT = 0;
+    blinkDur = 0.11 + Math.random() * 0.07;   // no two blinks the same length
     if (blinkPending > 0) {
       blinkPending -= 1;
-      blinkTimer = 2.0 + Math.random() * 4.0;
+      blinkTimer = 2.4 + Math.random() * 4.6;
     } else if (Math.random() < 0.25) {
       blinkPending = 1;        // people often blink twice in quick succession
       blinkTimer = 0.24;
     } else {
-      blinkTimer = 2.0 + Math.random() * 4.0;
+      blinkTimer = 2.4 + Math.random() * 4.6;
     }
   }
-  blinkValue = Math.max(0, blinkValue - dt * blinkSpeed);
-  const blink = Math.min(1, blinkValue * 1.6);
+  // A blink is not symmetric: the lid snaps shut in roughly a third of the
+  // time it takes to open again. Decaying one linear value did both halves at
+  // the same rate, which is a shutter, not an eyelid.
+  blinkT += dt;
+  const bp = blinkT / blinkDur;
+  const blink = bp >= 1 ? 0
+    : bp < 0.32
+      ? Math.pow(bp / 0.32, 0.62)                    // snap shut
+      : Math.pow(1 - (bp - 0.32) / 0.68, 1.7);       // ease back open
   const em = vrm.expressionManager;
   if (!em) return;
 
@@ -832,8 +1107,9 @@ function tick() {
     // Mouth first: the idle layer reads mouthOpen to add a talking nod.
     updateMouth(dt);
     updateCues(dt);
-    updateBody(t);
-    updateGaze(dt);
+    updateIdleGestures(dt);
+    updateGaze(dt, t);       // before the body: the head reads the gaze target
+    updateBody(t, dt);
     updateBlink(dt);
     updateMood(dt);
     updateHair(t);
@@ -844,6 +1120,7 @@ function tick() {
 
     // After update, so the expression system doesn't overwrite it.
     applyRestingMouth();
+    applyIdleBrow(t);
   }
 
   renderer.render(scene, camera);
@@ -914,10 +1191,6 @@ function updateClickThrough() {
   const [x, y] = cursor;
   setSolid(overUI(x, y) || overAvatar(x, y));
 }
-
-// The module scope is invisible to executeJavaScript, so the coverage test
-// cannot reach the hit test without a deliberate handle on it.
-window.__hitTest = (x, y) => overUI(x, y) || overAvatar(x, y);
 
 // Started here, not at the render loop: the first frame calls
 // updateClickThrough(), which would hit `cursor` in its temporal dead zone.
@@ -1212,6 +1485,9 @@ window.__marina = {
   get springs() { return springs; },
   get mouthCloseTargets() { return mouthCloseTargets; },
   get cueOut() { return cueOut; },
+  get activeCues() { return activeCues.length; },
+  drawGesture: () => drawGesture(),
+  hitTest: (x, y) => overUI(x, y) || overAvatar(x, y),
   scheduleCues,
   speak,
   isSpeaking: () => !!currentSource,
