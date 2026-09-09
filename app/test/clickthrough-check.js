@@ -22,7 +22,7 @@ app.whenReady().then(async () => {
     let solid = 0, total = 0; const cols = new Set();
     for (let y = 4; y < H; y += step) for (let x = 4; x < W; x += step) {
       total++;
-      if (window.__hitTest(x,y)) { solid++; cols.add(x); }
+      if (window.__marina.hitTest(x,y)) { solid++; cols.add(x); }
     }
     const xs = [...cols].sort((a,b)=>a-b);
     return { W, H, total, solid, minX: xs[0], maxX: xs[xs.length-1] };
