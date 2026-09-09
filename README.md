@@ -286,3 +286,5 @@ everything below it, is what this repo adds.
   ([docs](docs/GPT-SOVITS.md))
 - [Piper](https://github.com/OHF-voice/piper1-gpl) — training your own voice
   ([docs](docs/PIPER-TRAINING.md))
+
+MIT.

@@ -50,14 +50,24 @@ class VisionError(RuntimeError):
 _client = None
 
 
+# The vision model is a second llama-server rather than the chat one — a
+# projector has to be loaded alongside the weights, and the chat model is not
+# going to be evicted every time she glances at the screen. Falls back to the
+# chat endpoint so an Ollama setup, which swaps models itself, still works
+# with nothing configured.
+BASE_URL = (_vision.get("base_url") or _llm.get("base_url") or "").strip() or None
+API_KEY = _vision.get("api_key") or _llm.get("api_key") or "not-needed"
+
+
 def client():
     global _client
     if _client is None:
-        _client = OpenAI(
-            api_key=_llm.get("api_key") or "not-needed",
-            base_url=(_llm.get("base_url") or "").strip() or None,
-        )
+        _client = OpenAI(api_key=API_KEY, base_url=BASE_URL, timeout=90.0)
     return _client
+
+
+def describe_endpoint():
+    return BASE_URL or "https://api.openai.com/v1"
 
 
 def _shrink(image_bytes):

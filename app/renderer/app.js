@@ -1342,6 +1342,7 @@ function setBusy(on, label) {
 
 async function handleResult(result) {
   if (result.error) showNotice(result.error, 'bridge'); else hideNotice('bridge');
+  noteBackendUsed(result);
 
   // The bridge already strips the markup; `reply` is what to show.
   if (result.reply) say(result.reply);
@@ -1518,6 +1519,18 @@ async function openPicker() {
 }
 
 function closePicker() { el('picker').classList.add('hidden'); }
+
+/** Keep the pill honest after every reply, not just when the picker opens. */
+function noteBackendUsed(data) {
+  if (!data || !data.backend) return;
+  const label = data.backend === 'local' ? 'this Mac' : 'GPU server';
+  setStatus('ok', `${label} · ${data.model || ''}`.trim());
+  if (data.backend === 'local' && brainMode === 'auto') {
+    showNotice('GPU server did not answer — running on this Mac.', 'failover');
+  } else {
+    hideNotice('failover');
+  }
+}
 
 async function refreshBrain() {
   try {

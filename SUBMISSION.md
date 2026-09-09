@@ -42,6 +42,8 @@ The parts I'm most pleased with:
 Packaged as a real `.app` that starts its own Python backend, so it opens from
 the Dock like anything else.
 
+---
+
 ## Started before June 1 2026 / previously shipped
 
 **Please check with an organiser rather than taking my word for it.**
