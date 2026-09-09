@@ -131,7 +131,11 @@ def _kokoro_gen(text):
     speed = float(cfg.get("speed", 1.0)) / ratio
 
     try:
-        audio, sample_rate = kokoro.create(
+        # create_timed reports when each phoneme is spoken. That turns lip sync
+        # from an inference about the audio into a fact about it — the analyser
+        # has to guess a vowel from two formant bands, and it guesses wrong on
+        # quiet or overlapping sounds.
+        audio, sample_rate, timings = kokoro.create_timed(
             text,
             voice=voice,
             speed=speed,
@@ -152,7 +156,57 @@ def _kokoro_gen(text):
 
     buf = io.BytesIO()
     sf.write(buf, audio, sample_rate, format="WAV", subtype="PCM_16")
-    return buf.getvalue()
+    # The timings describe the pre-shift audio. _pitch_shift resamples by the
+    # same ratio the generation speed was divided by, so the result is shorter
+    # by that ratio and every timestamp has to come back with it.
+    return buf.getvalue(), visemes_from(timings, 1.0 / ratio)
+
+
+# IPA, as espeak-ng hands it to Kokoro, folded onto the five mouth shapes the
+# VRM actually has. Only the vowel decides the shape; consonants either close
+# the mouth or barely change it, so they are carried by the closures below.
+_VISEME_BY_PHONEME = {
+    # aa - open
+    "ɑ": "aa", "a": "aa", "ʌ": "aa", "æ": "aa", "ɐ": "aa", "ɒ": "aa",
+    # ee - spread
+    "i": "ee", "ɪ": "ee", "e": "ee", "ɛ": "ee", "eɪ": "ee", "ᵻ": "ee",
+    # ih - narrow
+    "ə": "ih", "ɚ": "ih", "ɜ": "ih", "ɝ": "ih", "ɹ": "ih",
+    # oh - rounded open
+    "ɔ": "oh", "o": "oh", "oʊ": "oh", "aʊ": "oh", "ɔɪ": "oh", "aɪ": "oh",
+    # ou - rounded closed
+    "u": "ou", "ʊ": "ou", "w": "ou", "uː": "ou",
+}
+
+# Lips meet: these must read as closed or she talks through a held vowel.
+_CLOSED = set("mbp")
+
+
+def visemes_from(timings, scale=1.0):
+    """Turn phoneme timings into a viseme track the renderer can play.
+
+    Returns [{t, v, w}] - time in seconds, viseme name, and how open. An empty
+    list is a valid answer: the model may not expose durations, and the
+    renderer still has its analyser to fall back on.
+    """
+    track = []
+    for timing in timings or []:
+        raw = (timing.phoneme or "").strip()
+        if not raw:
+            continue
+        base = raw[0]
+        if base in _CLOSED:
+            track.append({"t": round(timing.start * scale, 4), "v": "aa", "w": 0.0})
+            continue
+        viseme = _VISEME_BY_PHONEME.get(raw[:2]) or _VISEME_BY_PHONEME.get(base)
+        if not viseme:
+            continue        # consonant with no shape of its own; let it ride
+        track.append({
+            "t": round(timing.start * scale, 4),
+            "v": viseme,
+            "w": round(min(1.0, max(0.25, (timing.end - timing.start) * 12)), 3),
+        })
+    return track
 
 
 def kokoro_voices():
@@ -186,7 +240,11 @@ def describe():
 
 
 def synthesize(text):
-    """Return WAV bytes for `text`, or raise TTSError."""
+    """Return (WAV bytes, viseme track) for `text`, or raise TTSError.
+
+    The track is empty for engines that cannot report phoneme timings; the
+    renderer falls back to analysing the audio in that case.
+    """
     if not text or not text.strip():
         raise TTSError("Refusing to synthesize empty text.")
 
@@ -197,7 +255,7 @@ def synthesize(text):
         from process.tts_func.sovits_ping import SovitsError, sovits_gen_bytes
 
         try:
-            return sovits_gen_bytes(text)
+            return sovits_gen_bytes(text), []      # no phoneme timings from sovits
         except SovitsError as e:
             raise TTSError(str(e)) from e
 

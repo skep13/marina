@@ -10,4 +10,6 @@ contextBridge.exposeInMainWorld('marina', {
   onPickModel: (cb) => ipcRenderer.on('pick-model', () => cb()),
   captureScreen: () => ipcRenderer.invoke('capture-screen'),
   onLookAtScreen: (cb) => ipcRenderer.on('look-at-screen', () => cb()),
+  onBridgeDown: (cb) => ipcRenderer.on('bridge-down', (_e, msg) => cb(msg)),
+  onBridgeUp: (cb) => ipcRenderer.on('bridge-up', () => cb()),
 });

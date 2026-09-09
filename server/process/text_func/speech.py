@@ -41,6 +41,8 @@ CUE_PATTERNS = [
     ("brow",      r"\b(rais|arch|quirk|lift)(e[sd]|ing)?\s+(an?\s+|her\s+|his\s+|their\s+)?(eye)?brow"),
     ("stare",     r"\bstar(e|es|ing)\b|\bglanc(e|es|ing)\b|\bpeer(s|ing)?\b|\bsquint(s|ing)?\b"),
     ("yawn",      r"\byawn(s|ing)?\b|\bstretch(es|ing)?\b"),
+    ("think",     r"\bpaus(e|es|ing)\b|\btrails?\s+off\b"),
+    ("emote",     r"\bsnap(s|ping)?\b|\bwav(e|es|ing)\b|\bgestur(e|es|ing)\b"),
 ]
 
 _COMPILED = [(name, re.compile(pat, re.I)) for name, pat in CUE_PATTERNS]
@@ -91,12 +93,31 @@ def classify(action):
     return "emote"
 
 
+# Words that look like verbs but are almost always emphasis, not action.
+# The -ing ones matter most: *nothing*, *everything* would otherwise be read
+# as stage directions and silently dropped from her speech.
+_NOT_ACTION = {
+    "yes", "no", "this", "that", "these", "those", "his", "hers", "theirs",
+    "its", "us", "was", "is", "as", "less", "plus", "always", "perhaps",
+    "nothing", "everything", "anything", "something", "everyone", "anyone",
+    "someone", "please", "really", "actually", "very", "just", "never",
+    "ever", "all", "none", "obviously", "literally", "definitely",
+}
+
+# Third person, gerund or past tense — what a stage direction opens with.
+_VERBISH = re.compile(r"^[a-z]+(?:s|es|ing|ed)$", re.I)
+
+
 def _is_action(inner, kind):
     """Decide whether a delimited span is a stage direction or just emphasis.
 
-    A cue match settles it. Otherwise the tell is length: stage directions are
-    phrases ("walks off slowly"), emphasis is usually a single word ("*that*"),
-    and removing an emphasised word would put a hole in the sentence.
+    A cue match settles it. Otherwise the tell is grammatical, not length: a
+    stage direction opens with a verb ("snaps", "walks off slowly"), emphasis
+    does not ("so annoying", "that").
+
+    Length was the old rule and it failed both ways — it spoke a one-word
+    "*snaps*" out loud as if it were emphasis, and swallowed a two-word
+    "*so annoying*" as if it were an action.
     """
     if classify(inner) != "emote":
         return True
@@ -104,7 +125,14 @@ def _is_action(inner, kind):
         return True            # brackets are never dialogue
     if kind == "paren":
         return False           # parentheses usually are dialogue
-    return len(inner.split()) >= 2
+
+    words = inner.split()
+    if not words:
+        return False
+    first = words[0].strip(".,!?;:'\"").lower()
+    if first in _NOT_ACTION:
+        return False
+    return bool(_VERBISH.match(first))
 
 
 def split_reply(text):

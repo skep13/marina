@@ -101,7 +101,72 @@ async function startBridge() {
   bridge.on('exit', (code) => {
     console.log(`Bridge exited (${code})`);
     bridge = null;
+    if (!quitting) scheduleRestart(code);
   });
+}
+
+// ---------------------------------------------------------------------------
+//  Supervision
+//
+//  Nothing watched the bridge before: if it died she simply went quiet, with
+//  no restart and nothing on screen to say why. It is the process that does
+//  all the actual work, so it is the one thing here worth supervising.
+//
+//  Backing off matters as much as restarting. A bridge that dies immediately
+//  and forever — a broken venv, a missing model — would otherwise respawn in a
+//  tight loop, and the failure it is looping on is exactly the kind you want
+//  to be told about rather than have hidden by a retry.
+// ---------------------------------------------------------------------------
+
+let quitting = false;      // a deliberate quit must not look like a crash
+const RESTART_DELAYS = [1000, 2000, 5000, 10000, 30000];
+let restartCount = 0;
+let restartTimer = null;
+let lastHealthy = Date.now();
+
+function scheduleRestart(code) {
+  if (restartTimer) return;
+
+  // A bridge that ran fine for a while and then died is a fresh incident, not
+  // a continuation of an old one.
+  if (Date.now() - lastHealthy > 60000) restartCount = 0;
+
+  if (restartCount >= RESTART_DELAYS.length) {
+    notifyRenderer('bridge-down',
+      'Marina\u2019s backend keeps failing to start. See the bridge log.');
+    return;
+  }
+
+  const wait = RESTART_DELAYS[restartCount++];
+  notifyRenderer('bridge-down', `Backend stopped (${code}). Restarting\u2026`);
+  restartTimer = setTimeout(async () => {
+    restartTimer = null;
+    await startBridge();
+  }, wait);
+}
+
+function notifyRenderer(channel, message) {
+  if (win && !win.isDestroyed()) win.webContents.send(channel, message);
+}
+
+/** Poll health so a *hung* bridge is caught too, not only one that exited. */
+function watchBridge() {
+  setInterval(async () => {
+    if (quitting) return;
+    if (await bridgeAlive()) {
+      if (restartCount) notifyRenderer('bridge-up', '');
+      restartCount = 0;
+      lastHealthy = Date.now();
+      return;
+    }
+    // Alive as a process but not answering: kill it so the exit handler
+    // restarts it through the same path as any other death.
+    if (bridge && Date.now() - lastHealthy > 45000) {
+      console.log('Bridge is up but not responding; restarting it.');
+      lastHealthy = Date.now();
+      try { bridge.kill('SIGKILL'); } catch { /* already gone */ }
+    }
+  }, 5000);
 }
 
 function stopBridge() {
@@ -235,6 +300,7 @@ function buildTray() {
 
 app.whenReady().then(() => {
   startBridge();
+  watchBridge();
   createWindow();
   buildTray();
 
@@ -255,8 +321,10 @@ app.whenReady().then(() => {
   });
 });
 
+app.on('before-quit', () => { quitting = true; });
 app.on('will-quit', () => {
   globalShortcut.unregisterAll();
+  if (restartTimer) clearTimeout(restartTimer);
   stopBridge();
 });
 app.on('window-all-closed', () => app.quit());
