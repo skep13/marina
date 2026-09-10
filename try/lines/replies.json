@@ -1,0 +1,268 @@
+{
+ "greeting": [
+  {
+   "reply": "Oh, you're back.",
+   "speech": "Oh, you're back.",
+   "cues": [
+    {
+     "action": "looks up",
+     "animation": "emote",
+     "at": 0,
+     "fraction": 0.0
+    }
+   ],
+   "audio": "greeting-0.wav"
+  },
+  {
+   "reply": "I was just about to give up on that transition.",
+   "speech": "I was just about to give up on that transition.",
+   "cues": [
+    {
+     "action": "sighs",
+     "animation": "sigh",
+     "at": 48,
+     "fraction": 1.0
+    }
+   ],
+   "audio": "greeting-1.wav"
+  }
+ ],
+ "doing": [
+  {
+   "reply": "Editing. Forty takes on one transition.",
+   "speech": "Editing. Forty takes on one transition.",
+   "cues": [],
+   "audio": "doing-0.wav"
+  },
+  {
+   "reply": "The algorithm better appreciate this.",
+   "speech": "The algorithm better appreciate this.",
+   "cues": [
+    {
+     "action": "rolls eyes",
+     "animation": "eyeroll",
+     "at": 0,
+     "fraction": 0.0
+    }
+   ],
+   "audio": "doing-1.wav"
+  }
+ ],
+ "who": [
+  {
+   "reply": "I'm Marina.",
+   "speech": "I'm Marina.",
+   "cues": [],
+   "audio": "who-0.wav"
+  },
+  {
+   "reply": "I live on your desktop and I talk back. I'm not your assistant though, I'm more like a friend who is very online.",
+   "speech": "I live on your desktop and I talk back. I'm not your assistant though, I'm more like a friend who is very online.",
+   "cues": [
+    {
+     "action": "tilts head",
+     "animation": "tilt",
+     "at": 40,
+     "fraction": 0.35398230088495575
+    }
+   ],
+   "audio": "who-1.wav"
+  }
+ ],
+ "help": [
+  {
+   "reply": "Maybe.",
+   "speech": "Maybe.",
+   "cues": [
+    {
+     "action": "shrugs",
+     "animation": "shrug",
+     "at": 0,
+     "fraction": 0.0
+    }
+   ],
+   "audio": "help-0.wav"
+  },
+  {
+   "reply": "In the real app I can set timers and read what you copied. On this page I'm running on recordings, so don't push it.",
+   "speech": "In the real app I can set timers and read what you copied. On this page I'm running on recordings, so don't push it.",
+   "cues": [],
+   "audio": "help-1.wav"
+  }
+ ],
+ "how": [
+  {
+   "reply": "Tired. I've watched my own video about sixty times today.",
+   "speech": "Tired. I've watched my own video about sixty times today.",
+   "cues": [],
+   "audio": "how-0.wav"
+  },
+  {
+   "reply": "That's a normal amount, right?",
+   "speech": "That's a normal amount, right?",
+   "cues": [
+    {
+     "action": "laughs",
+     "animation": "laugh",
+     "at": 0,
+     "fraction": 0.0
+    }
+   ],
+   "audio": "how-1.wav"
+  }
+ ],
+ "joke": [
+  {
+   "reply": "No.",
+   "speech": "No.",
+   "cues": [
+    {
+     "action": "thinks",
+     "animation": "think",
+     "at": 0,
+     "fraction": 0.0
+    }
+   ],
+   "audio": "joke-0.wav"
+  },
+  {
+   "reply": "I'm busy losing a fight with the borrow checker.",
+   "speech": "I'm busy losing a fight with the borrow checker.",
+   "cues": [],
+   "audio": "joke-1.wav"
+  }
+ ],
+ "nice": [
+  {
+   "reply": "Okay, stop.",
+   "speech": "Okay, stop.",
+   "cues": [
+    {
+     "action": "blushes",
+     "animation": "blush",
+     "at": 0,
+     "fraction": 0.0
+    }
+   ],
+   "audio": "nice-0.wav"
+  },
+  {
+   "reply": "You're making it weird.",
+   "speech": "You're making it weird.",
+   "cues": [
+    {
+     "action": "smiles",
+     "animation": "smile",
+     "at": 0,
+     "fraction": 0.0
+    }
+   ],
+   "audio": "nice-1.wav"
+  }
+ ],
+ "bye": [
+  {
+   "reply": "See you.",
+   "speech": "See you.",
+   "cues": [
+    {
+     "action": "nods",
+     "animation": "nod",
+     "at": 0,
+     "fraction": 0.0
+    }
+   ],
+   "audio": "bye-0.wav"
+  },
+  {
+   "reply": "Don't do forty takes of anything.",
+   "speech": "Don't do forty takes of anything.",
+   "cues": [],
+   "audio": "bye-1.wav"
+  }
+ ],
+ "fallback1": [
+  {
+   "reply": "I only know a few lines on this page.",
+   "speech": "I only know a few lines on this page.",
+   "cues": [
+    {
+     "action": "tilts head",
+     "animation": "tilt",
+     "at": 0,
+     "fraction": 0.0
+    }
+   ],
+   "audio": "fallback1-0.wav"
+  },
+  {
+   "reply": "Download me and I'll actually have opinions about that.",
+   "speech": "Download me and I'll actually have opinions about that.",
+   "cues": [],
+   "audio": "fallback1-1.wav"
+  }
+ ],
+ "fallback2": [
+  {
+   "reply": "That's a real question, and right now I'm a recording.",
+   "speech": "That's a real question, and right now I'm a recording.",
+   "cues": [],
+   "audio": "fallback2-0.wav"
+  },
+  {
+   "reply": "Run the app and ask me again.",
+   "speech": "Run the app and ask me again.",
+   "cues": [
+    {
+     "action": "shrugs",
+     "animation": "shrug",
+     "at": 0,
+     "fraction": 0.0
+    }
+   ],
+   "audio": "fallback2-1.wav"
+  }
+ ],
+ "mic": [
+  {
+   "reply": "I can't hear you in a browser.",
+   "speech": "I can't hear you in a browser.",
+   "cues": [],
+   "audio": "mic-0.wav"
+  },
+  {
+   "reply": "Type it instead, or run me on your Mac.",
+   "speech": "Type it instead, or run me on your Mac.",
+   "cues": [
+    {
+     "action": "shrugs",
+     "animation": "shrug",
+     "at": 0,
+     "fraction": 0.0
+    }
+   ],
+   "audio": "mic-1.wav"
+  }
+ ],
+ "opener": [
+  {
+   "reply": "Okay, be honest with me.",
+   "speech": "Okay, be honest with me.",
+   "cues": [
+    {
+     "action": "sighs",
+     "animation": "sigh",
+     "at": 0,
+     "fraction": 0.0
+    }
+   ],
+   "audio": "opener-0.wav"
+  },
+  {
+   "reply": "Is a whip pan transition cringe now, or is it back?",
+   "speech": "Is a whip pan transition cringe now, or is it back?",
+   "cues": [],
+   "audio": "opener-1.wav"
+  }
+ ]
+}
