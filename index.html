@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Marina — a desktop companion</title>
-<meta name="description" content="A VRM avatar that lives on your desktop. Local voice, formant-driven lip sync, spring-bone hair, long-term memory. Runs on an 8 GB M2.">
+<title>Marina, a desktop companion</title>
+<meta name="description" content="An anime companion who lives on your Mac desktop. Talk or type, she answers in her own voice, lip syncs and acts out what she writes. Try her in the browser.">
 <link rel="icon" href="icon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -83,6 +83,8 @@ h1 em{font-style:italic; color:var(--accent)}
   display:block; width:100%; height:auto;
   filter:drop-shadow(0 40px 90px rgba(0,0,0,.75));
   animation:breathe 9s ease-in-out infinite;
+  -webkit-mask-image:linear-gradient(to bottom,#000 78%,transparent 99%);
+  mask-image:linear-gradient(to bottom,#000 78%,transparent 99%);
 }
 @keyframes breathe{0%,100%{transform:translateY(0)}50%{transform:translateY(-11px)}}
 .figure::before{ /* measurement grid behind her */
@@ -98,7 +100,7 @@ h1 em{font-style:italic; color:var(--accent)}
 /* One annotation column on the left. Anything hanging off the right edge
    overflows the viewport at this width and forces horizontal scroll. */
 .c1{top:22%; left:-34%}  .c1::before{right:-42px; width:36px}
-.c2{top:45%; left:-40%}  .c2::before{right:-42px; width:36px}
+.c2{top:45%; left:-52%}  .c2::before{right:-42px; width:36px}
 .c3{top:68%; left:-31%}  .c3::before{right:-42px; width:36px}
 
 /* ---------- sections ---------- */
@@ -145,6 +147,63 @@ footer{padding:70px 0 90px; border-top:1px solid var(--line)}
 .d1{animation-delay:.05s}.d2{animation-delay:.15s}.d3{animation-delay:.25s}
 .d4{animation-delay:.35s}.d5{animation-delay:.5s}
 
+
+/* ---------- try her ---------- */
+.try-grid{display:grid; grid-template-columns:minmax(0,1fr) 460px; gap:48px; align-items:start}
+.desk{
+  position:relative; height:720px; border:1px solid var(--line-2); border-radius:10px; overflow:hidden;
+  background:
+    radial-gradient(90% 70% at 20% 10%, #2a3350 0%, transparent 60%),
+    radial-gradient(80% 80% at 90% 90%, #3b2a44 0%, transparent 60%),
+    linear-gradient(160deg,#141a28,#0b0e15);
+  box-shadow:0 40px 120px rgba(0,0,0,.55);
+}
+.menubar{height:26px; display:flex; align-items:center; gap:18px; padding:0 14px;
+  background:rgba(12,14,20,.55); backdrop-filter:blur(10px); border-bottom:1px solid var(--line);
+  font-family:var(--sans); font-size:12px; color:#cfd6e4}
+.menubar b{font-weight:500}
+.menubar .r{margin-left:auto; color:var(--muted); font-family:var(--mono); font-size:11px}
+.fakewin{position:absolute; left:22px; top:58px; width:62%; height:62%; border-radius:8px;
+  background:rgba(16,19,27,.92); border:1px solid var(--line); overflow:hidden}
+.fakewin .bar{height:26px; display:flex; gap:7px; align-items:center; padding:0 10px; border-bottom:1px solid var(--line)}
+.fakewin .bar i{width:10px; height:10px; border-radius:50%; background:#3a4152; display:block}
+.fakewin pre{margin:0; padding:14px 16px; font-family:var(--mono); font-size:11.5px; line-height:1.75; color:#7f8aa0; white-space:pre}
+.fakewin pre em{font-style:normal; color:#9ec9ff}
+.desk iframe{position:absolute; right:0; bottom:0; width:420px; max-width:100%; height:680px; border:0; background:transparent}
+.try-side .sec-lede{margin-bottom:26px}
+.chips{display:flex; flex-wrap:wrap; gap:8px; margin:6px 0 26px}
+.chip-btn{font-family:var(--mono); font-size:12px; color:var(--text); background:transparent;
+  border:1px solid var(--line-2); border-radius:999px; padding:8px 14px; cursor:pointer;
+  transition:border-color .18s, background .18s}
+.chip-btn:hover{border-color:var(--accent); background:var(--accent-dim)}
+.howto{list-style:none; display:grid; gap:12px; margin-bottom:26px}
+.howto li{display:grid; grid-template-columns:22px 1fr; gap:12px; font-size:14.5px; color:#c3cad8}
+.howto li span{font-family:var(--mono); font-size:11px; color:var(--accent); padding-top:3px}
+.honest{font-size:13.5px; color:var(--muted); border-left:2px solid var(--accent); padding:4px 0 4px 14px}
+.cards.nine{grid-template-columns:repeat(3,1fr)}
+.new{display:inline-block; font-family:var(--mono); font-size:10px; letter-spacing:.12em; text-transform:uppercase;
+  color:#05080d; background:var(--accent); padding:2px 7px; border-radius:2px; margin-left:8px; vertical-align:middle}
+.ptable{width:100%; border-collapse:collapse; font-size:14.5px; margin-top:8px}
+.ptable th{font-family:var(--mono); font-size:11px; letter-spacing:.12em; text-transform:uppercase; color:var(--muted); font-weight:400; text-align:left; padding:0 4px 12px}
+.ptable td{padding:14px 4px; border-top:1px solid var(--line); color:#c8cfdd; vertical-align:top}
+.ptable td:first-child{color:var(--text)}
+.ptable .yes{color:var(--accent)}
+.steps{display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:1px; background:var(--line); border:1px solid var(--line)}
+.step{background:var(--panel); padding:26px}
+.step h3{font-family:var(--serif); font-weight:400; font-size:23px; margin:10px 0 10px}
+.step p{font-size:14.5px; color:#aeb7c7}
+.step pre{margin-top:14px; background:#0a0d13; border:1px solid var(--line); padding:12px 14px; overflow-x:auto;
+  font-family:var(--mono); font-size:12px; color:#cfe6ff; line-height:1.7}
+.keys{margin-top:46px}
+kbd{font-family:var(--mono); font-size:12px; color:var(--text); border:1px solid var(--line-2); border-bottom-width:2px; border-radius:4px; padding:1px 6px}
+@media (max-width:1000px){
+  .try-grid{grid-template-columns:1fr}
+  .desk{height:640px}
+  .desk iframe{height:600px; width:100%}
+  .fakewin{display:none}
+  .cards.nine,.steps{grid-template-columns:1fr}
+}
+
 @media (max-width:900px){
   .hero{min-height:auto; padding:72px 0 40px}
   .hero-grid{grid-template-columns:1fr; gap:52px}
@@ -168,78 +227,148 @@ footer{padding:70px 0 90px; border-top:1px solid var(--line)}
   <header class="hero">
     <div class="hero-grid">
       <div>
-        <div class="eyebrow rise d1"><span class="dot"></span><span class="label">Desktop companion · macOS</span></div>
+        <div class="eyebrow rise d1"><span class="dot"></span><span class="label">Desktop companion for macOS</span></div>
         <h1 class="rise d2">Mar<em>i</em>na</h1>
-        <div class="tag rise d2">VRM avatar · local voice · 8&nbsp;GB of RAM</div>
-        <p class="lede rise d3">She sits on your desktop in a transparent window. You talk, she talks back —
-          lip-syncing to her own voice and acting out what she writes.</p>
+        <div class="tag rise d2">VRM avatar, local voice, 8&nbsp;GB of RAM</div>
+        <p class="lede rise d3">She lives on your desktop in a transparent window. Talk to her or type,
+          and she answers in her own voice, lip syncing and acting out what she writes. You can cut her
+          off mid sentence, and sometimes she starts the conversation.</p>
         <div class="cta rise d4">
-          <a class="btn primary" href="https://github.com/skep13/marina">View the source</a>
+          <a class="btn primary" href="#try">Try her in your browser</a>
+          <a class="btn" href="https://github.com/skep13/marina">View the source</a>
           <a class="btn" href="#listen">Hear her</a>
         </div>
       </div>
 
       <figure class="figure rise d5">
-        <img src="hero.png" alt="Marina, a grey-haired anime character in a dark jacket, rendered against a transparent background">
-        <div class="callout c1">blink · saccade · <span>gaze</span></div>
-        <div class="callout c2"><span>5 visemes</span> · formant-driven</div>
-        <div class="callout c3"><span>140</span> spring joints</div>
+        <img src="hero.png" alt="Marina, an anime character with long lilac hair, a black ribbon and a dark jacket, on a transparent background">
+        <div class="callout c1">blinks and holds your <span>gaze</span></div>
+        <div class="callout c2"><span>5 mouth shapes</span> from formants</div>
+        <div class="callout c3"><span>195</span> spring joints</div>
       </figure>
     </div>
   </header>
 
-  <section id="what">
-    <div class="sec-head"><span class="sec-num">01</span><h2>Not a chat window</h2></div>
-    <p class="sec-lede">Marina runs in a frameless, always-on-top window with no background — she stands on
-      your desktop, not inside an app. You reach her by typing or by holding a key and speaking.
-      Speech recognition, voice synthesis and rendering all happen locally; only the language model
-      sits behind an OpenAI-compatible endpoint, so it can be Ollama on the same laptop, a box on
-      your LAN, or a hosted API without anything else changing.</p>
-    <p>She is written as a friend rather than an assistant. She has opinions, a TikTok account she
-      complains about, and permission to be busy, unimpressed, or simply unhelpful.</p>
+  <section id="try">
+    <div class="try-grid">
+      <div class="desk" aria-label="A mock desktop with Marina standing in the corner">
+        <div class="menubar"><b>Finder</b><span>File</span><span>Edit</span><span>View</span><span class="r" id="clock">9:41</span></div>
+        <div class="fakewin" aria-hidden="true">
+          <div class="bar"><i></i><i></i><i></i></div>
+<pre><em>fn</em> main() {
+    <em>let</em> transition = edit(<em>"whip_pan"</em>);
+    <em>for</em> take <em>in</em> 1..=40 {
+        render(&amp;transition, take);
+    }
+    <span style="color:#5d6679">// the algorithm better appreciate this</span>
+}</pre>
+        </div>
+        <iframe id="her" src="try/" title="Marina, running in the browser" allow="autoplay"></iframe>
+      </div>
+
+      <div class="try-side">
+        <div class="sec-head"><span class="sec-num">01</span><h2>Try her</h2></div>
+        <p class="sec-lede">This is the real app interface running in your browser, with the same
+          renderer, lip sync and gestures as the desktop version. Her window is transparent, so she
+          stands over whatever is behind her.</p>
+
+        <div class="label" style="margin-bottom:10px">Say something</div>
+        <div class="chips" id="chips">
+          <button class="chip-btn">hey</button>
+          <button class="chip-btn">what are you up to</button>
+          <button class="chip-btn">who are you</button>
+          <button class="chip-btn">how are you</button>
+          <button class="chip-btn">tell me a joke</button>
+          <button class="chip-btn">can you help me</button>
+          <button class="chip-btn">your hair is cute</button>
+        </div>
+
+        <ul class="howto">
+          <li><span>01</span>Type in the box under her and press Enter, or tap one of the lines above.</li>
+          <li><span>02</span>Move your mouse over her. Her eyes follow you, and the buttons along the top fade in.</li>
+          <li><span>03</span>Go quiet for a bit and she will say something on her own.</li>
+          <li><span>04</span>Got your own avatar? The person button at the top loads any .vrm file. It stays on your computer.</li>
+        </ul>
+
+        <p class="honest">Replies on this page are recorded lines in her real voice, picked by keyword.
+          The desktop app answers with a live language model, hears you through the microphone and
+          lets you talk over her.</p>
+      </div>
+    </div>
   </section>
 
-  <section id="how">
-    <div class="sec-head"><span class="sec-num">02</span><h2>How she moves</h2></div>
-    <p class="sec-lede">Three problems worth solving properly rather than faking.</p>
+  <section id="what">
+    <div class="sec-head"><span class="sec-num">02</span><h2>What she does now</h2></div>
+    <p class="sec-lede">She is written as a friend and not an assistant. She has opinions, a TikTok
+      edit she will not stop complaining about, and permission to be busy or just not help.</p>
 
-    <div class="cards">
+    <div class="cards nine">
       <article class="card">
-        <div class="metric">−46 dB → −14 dB</div>
-        <h3>A mouth, not a hinge</h3>
-        <p>Loudness in decibels sets how far the jaw opens. The balance between the first two formant
-          bands picks between five visemes, so the mouth changes <em>shape</em> rather than just size.
-          Sibilants are detected and damped — otherwise every "s" reads as a shout.</p>
-        <div class="foot">aa · ih · ou · ee · oh</div>
+        <div class="metric">0.00 ms between sentences</div>
+        <h3>Talks while she thinks<span class="new">new</span></h3>
+        <p>Replies stream in and she speaks them a sentence at a time, so the first words are out
+          while the model is still writing the rest. Each sentence is lined up on the audio clock so
+          there is no gap between them.</p>
       </article>
-
       <article class="card">
-        <div class="metric">140 joints · 49 mm travel</div>
-        <h3>Hair with real physics</h3>
-        <p>The VRM already carries spring-bone simulation; it just has nothing to react to when she
-          stands still. Instead of animating strands, a simulated breeze leans the gravity direction
-          each joint falls toward — so the solver does the work, and long strands swing further than
-          short ones for free.</p>
-        <div class="foot">non-harmonic gusts, so it never loops audibly</div>
+        <div class="metric">stops mid word</div>
+        <h3>You can cut her off<span class="new">new</span></h3>
+        <p>The mic stays open while she talks, so interrupting her is just talking over her. Only
+          what she actually said goes in the transcript, so her next line follows from what you heard.</p>
       </article>
-
       <article class="card">
-        <div class="metric">19 cues</div>
+        <div class="metric">quiet overnight</div>
+        <h3>She speaks first<span class="new">new</span></h3>
+        <p>She has her own thing going on and will bring it up now and then without being asked.
+          It is rate limited, stays quiet at night, and there is a switch for it in the tray.</p>
+      </article>
+      <article class="card">
+        <div class="metric">19 gestures</div>
         <h3>Performed, not narrated</h3>
-        <p>When the model writes <span style="font-family:var(--mono);color:var(--accent)">*tilts head*</span>,
-          that is stripped from the speech and played as an animation instead of read aloud as
-          "asterisk tilts head asterisk". Each cue fires at the point in the audio where it was
-          written, not dumped at the start.</p>
-        <div class="foot">nod · shake · shrug · eyeroll · wink · sigh · …</div>
+        <p>When the model writes <span style="font-family:var(--mono);color:var(--accent)">*tilts head*</span>
+          it gets cut out of the speech and played as an animation, timed to the point in the audio
+          where it was written. Between replies she shifts, glances and settles on her own.</p>
+      </article>
+      <article class="card">
+        <div class="metric">aa ih ou ee oh</div>
+        <h3>A mouth, not a hinge</h3>
+        <p>Loudness sets how far her mouth opens and the balance between the first two formant bands
+          picks one of five shapes, so it changes with the vowels. Sibilants get damped so every "s"
+          does not look like a shout.</p>
+      </article>
+      <article class="card">
+        <div class="metric">195 joints</div>
+        <h3>Hair with real physics</h3>
+        <p>The model already has spring bones. A simulated breeze leans the direction each joint falls,
+          so the physics does the work and long strands swing further than short ones.</p>
+      </article>
+      <article class="card">
+        <div class="metric">survives restarts</div>
+        <h3>She remembers you</h3>
+        <p>Facts worth keeping get pulled out of your conversations and fed into later ones. Say
+          "remember that" and it is saved straight away, whether or not the model noticed.</p>
+      </article>
+      <article class="card">
+        <div class="metric">all local</div>
+        <h3>A few small skills<span class="new">new</span></h3>
+        <p>She can set a timer, read what you just copied, open a link or write something down. She
+          knows the time, which app you are in and when your battery is low. She looks at your
+          screen only when you press the button.</p>
+      </article>
+      <article class="card">
+        <div class="metric">GPU server or this Mac</div>
+        <h3>Pick her brain<span class="new">new</span></h3>
+        <p>Point her at any OpenAI compatible model. Mine runs on a GPU server over an SSH tunnel,
+          and if that goes quiet she falls back to a small model on the Mac and tells you she did.</p>
       </article>
     </div>
   </section>
 
   <section id="listen">
     <div class="sec-head"><span class="sec-num">03</span><h2>Her voice</h2></div>
-    <p class="sec-lede">Kokoro, 82M parameters, running on the laptop's CPU at roughly three times
-      realtime. Two voicepacks blended for timbre, then pitched up a semitone without changing
-      duration — generation is slowed by the same ratio the resample speeds it back up by.</p>
+    <p class="sec-lede">Kokoro, an 82M parameter voice model, running on the laptop's CPU at about three
+      times realtime. Two voicepacks are blended for her tone and then pitched up a semitone without
+      changing the timing.</p>
 
     <div class="tracks">
       <div class="track">
@@ -257,20 +386,82 @@ footer{padding:70px 0 90px; border-top:1px solid var(--line)}
     </div>
   </section>
 
+  <section id="private">
+    <div class="sec-head"><span class="sec-num">04</span><h2>What stays on your Mac</h2></div>
+    <p class="sec-lede">Your voice never leaves the machine in either direction. I checked by watching
+      the bridge's connections through a full conversation. The only text that leaves goes to whichever
+      model you point her at, so with Ollama on the same Mac nothing leaves at all.</p>
+
+    <table class="ptable">
+      <tr><th></th><th>Stays on the Mac</th><th>Leaves the Mac</th></tr>
+      <tr><td>Microphone audio</td><td class="yes">Transcribed locally</td><td>Never</td></tr>
+      <tr><td>Her voice</td><td class="yes">Synthesised locally</td><td>Never</td></tr>
+      <tr><td>Conversation and memory</td><td class="yes">Saved to disk here</td><td></td></tr>
+      <tr><td>What you said, as text</td><td></td><td>Sent to your model</td></tr>
+      <tr><td>Clipboard, when she reads it</td><td></td><td>Sent to your model, and you can turn it off</td></tr>
+      <tr><td>Screenshots</td><td class="yes">Only when you press the button</td><td>Sent to your vision model</td></tr>
+    </table>
+  </section>
+
+  <section id="run">
+    <div class="sec-head"><span class="sec-num">05</span><h2>Run the real thing</h2></div>
+    <p class="sec-lede">It needs a Mac. I built and tested it on an M2 MacBook Air with 8&nbsp;GB of RAM.</p>
+
+    <div class="steps">
+      <div class="step">
+        <div class="metric">step 1</div>
+        <h3>Clone it to your home folder</h3>
+        <p>Keep it at ~/marina. Desktop, Documents and Downloads are protected by macOS, and the app
+          hangs with no error if it lives in one of them.</p>
+<pre>git clone https://github.com/skep13/marina ~/marina
+cd ~/marina &amp;&amp; ./setup-mac.sh</pre>
+      </div>
+      <div class="step">
+        <div class="metric">step 2</div>
+        <h3>Give her a brain</h3>
+        <p>The easiest option is Ollama on the same Mac. Copy the example config and set base_url to
+          your Ollama address.</p>
+<pre>ollama pull llama3.2:3b
+cp character_config.example.yaml character_config.yaml
+# base_url: "http://127.0.0.1:11434/v1"</pre>
+      </div>
+      <div class="step">
+        <div class="metric">step 3</div>
+        <h3>Add an avatar</h3>
+        <p>Export a VRM from VRoid Studio (a .vroid project file will not load) and put it at
+          app/models/model.vrm, or pick one with the person button once the app is open.</p>
+      </div>
+      <div class="step">
+        <div class="metric">step 4</div>
+        <h3>Build the app</h3>
+        <p>This makes Marina.app, puts it in Applications and starts her backend for you. The first
+          reply is slower while the speech and voice models load.</p>
+<pre>./build-app.sh</pre>
+      </div>
+    </div>
+
+    <table class="spec keys">
+      <tr><td>Talk</td><td><kbd>&#8984;</kbd> <kbd>&#8679;</kbd> <kbd>Space</kbd> to start and again to stop, or the mic button</td></tr>
+      <tr><td>Cut her off</td><td>Talk over her, or <kbd>&#8984;</kbd> <kbd>&#8679;</kbd> <kbd>.</kbd></td></tr>
+      <tr><td>Hide or show</td><td><kbd>&#8984;</kbd> <kbd>&#8679;</kbd> <kbd>H</kbd></td></tr>
+      <tr><td>Quit from anywhere</td><td><kbd>&#8984;</kbd> <kbd>&#8679;</kbd> <kbd>Q</kbd></td></tr>
+      <tr><td>Buttons</td><td>Hidden until you hover over her, so she looks clean the rest of the time</td></tr>
+    </table>
+  </section>
+
   <section id="specs">
-    <div class="sec-head"><span class="sec-num">04</span><h2>Measured, on the machine it was built for</h2></div>
-    <p class="sec-lede">A MacBook Air with 8&nbsp;GB of RAM. Every number below was taken on it, and the
-      constraint shaped the whole design — nothing here is sized for a workstation.</p>
+    <div class="sec-head"><span class="sec-num">06</span><h2>Measured, on the machine it was built for</h2></div>
+    <p class="sec-lede">A MacBook Air with 8&nbsp;GB of RAM. Every number below was taken on it, and
+      that limit shaped the whole design.</p>
 
     <table class="spec">
-      <tr><td>Speech → text</td><td><b>0.98 s</b> for 8.5 s of audio · Faster-Whisper <span style="color:var(--muted)">base.en</span>, int8, CPU</td></tr>
-      <tr><td>Text → speech</td><td><b>3.2×</b> realtime · Kokoro 82M, ONNX, CPU</td></tr>
-      <tr><td>Language model</td><td><b>37–44 tok/s</b> · llama3.2:3b on Metal, or any OpenAI-compatible endpoint</td></tr>
-      <tr><td>Full turn, warm</td><td><b>~1.5 s</b> from message to speech</td></tr>
-      <tr><td>Avatar</td><td>53k triangles · MToon · 140 spring joints, drawn at display refresh</td></tr>
-      <tr><td>Memory footprint</td><td><b>~1.5 GB</b> for the bridge, renderer and avatar together</td></tr>
-      <tr><td>Long-term memory</td><td>Durable facts distilled from conversation, plus a pattern-matched
-        "remember that…" path that doesn't depend on a small model noticing</td></tr>
+      <tr><td>Speech to text</td><td><b>0.98 s</b> for 8.5 s of audio with Faster-Whisper <span style="color:var(--muted)">base.en</span> on the CPU</td></tr>
+      <tr><td>Text to speech</td><td><b>3.3x</b> realtime once warm with Kokoro 82M on the CPU</td></tr>
+      <tr><td>Between sentences</td><td><b>0.00 ms</b> gap, because each one is scheduled on the audio clock</td></tr>
+      <tr><td>Language model</td><td><b>about 55 tok/s</b> with Qwen3-VL 8B on my GPU server, or <b>37 to 44 tok/s</b> with llama3.2:3b on the Mac</td></tr>
+      <tr><td>Full turn, warm</td><td><b>about 1.5 s</b> from message to speech</td></tr>
+      <tr><td>Avatar</td><td>53k triangles, 20 MToon materials and 195 spring joints, drawn at display refresh</td></tr>
+      <tr><td>Memory footprint</td><td><b>about 1.5 GB</b> for the bridge, renderer and avatar together</td></tr>
     </table>
   </section>
 
@@ -279,13 +470,13 @@ footer{padding:70px 0 90px; border-top:1px solid var(--line)}
       <div>
         <div class="label" style="margin-bottom:14px">Built on</div>
         <div class="credit">
-          <a href="https://github.com/rayenfeng/riko_project">riko_project</a> ·
-          <a href="https://github.com/pixiv/three-vrm">three-vrm</a> ·
-          <a href="https://github.com/SYSTRAN/faster-whisper">faster-whisper</a> ·
-          <a href="https://huggingface.co/hexgrad/Kokoro-82M">Kokoro-82M</a> ·
-          <a href="https://ollama.com">Ollama</a> ·
+          <a href="https://github.com/rayenfeng/riko_project">riko_project</a>,
+          <a href="https://github.com/pixiv/three-vrm">three-vrm</a>,
+          <a href="https://github.com/SYSTRAN/faster-whisper">faster-whisper</a>,
+          <a href="https://huggingface.co/hexgrad/Kokoro-82M">Kokoro-82M</a>,
+          <a href="https://ollama.com">Ollama</a> and
           <a href="https://www.electronjs.org">Electron</a><br>
-          Character made in <a href="https://vroid.com/en/studio">VRoid Studio</a>.
+          Character made in <a href="https://vroid.com/en/studio">VRoid Studio</a>
         </div>
       </div>
       <a class="btn primary" href="https://github.com/skep13/marina">github.com/skep13/marina</a>
@@ -293,5 +484,22 @@ footer{padding:70px 0 90px; border-top:1px solid var(--line)}
   </footer>
 
 </div>
+
+<script>
+// The lines above her are shortcuts into the real input inside the frame.
+const her = document.getElementById('her');
+document.getElementById('chips').addEventListener('click', (e) => {
+  const b = e.target.closest('.chip-btn');
+  if (!b) return;
+  try {
+    const w = her.contentWindow;
+    w.__preview?.touch();
+    w.__marina?.send(b.textContent.trim());
+  } catch { /* frame still loading */ }
+});
+const clock = document.getElementById('clock');
+const tick = () => { clock.textContent = new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }); };
+tick(); setInterval(tick, 30000);
+</script>
 </body>
 </html>
