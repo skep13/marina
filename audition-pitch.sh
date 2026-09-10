@@ -1,12 +1,6 @@
 #!/usr/bin/env bash
-# Renders the current voice at a range of pitches so you can pick one by ear.
-#   ./audition-pitch.sh              # 0 to 2.5 in half-steps
-#   ./audition-pitch.sh 0 1 2 3 4    # explicit values
 set -euo pipefail
 cd "$(dirname "$0")"
-# Call the interpreter directly — a moved project leaves stale absolute
-# paths in activate and in every console-script shebang, but the
-# interpreter itself resolves its prefix from its own location.
 PY="$(pwd)/.venv/bin/python"
 [ -x "$PY" ] || { echo "No venv. Run ./setup-mac.sh" >&2; exit 1; }
 STEPS="${*:-0 0.5 1 1.5 2 2.5}" "$PY" - <<'PY'

@@ -1,4 +1,4 @@
-// What expressions and face morphs does the loaded model actually have?
+
 const { app, BrowserWindow, ipcMain } = require('electron');
 const fs = require('fs'); const path = require('path');
 const ROOT = path.join(__dirname, '..');

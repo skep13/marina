@@ -35,7 +35,6 @@ def main():
         if sovits_gen(llm_output, output_wav_path):
             play_audio(output_wav_path)
 
-        # Clean up generated clips, but keep the in-progress recording.
         for fp in AUDIO_DIR.glob("output_*.wav"):
             fp.unlink(missing_ok=True)
 

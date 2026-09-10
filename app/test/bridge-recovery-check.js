@@ -1,5 +1,4 @@
-// Verifies the renderer waits for a slow bridge instead of giving up, and
-// recovers if the bridge dies and comes back.
+
 const { app, BrowserWindow, ipcMain } = require('electron');
 const http = require('http');
 const fs = require('fs'); const path = require('path');
@@ -11,7 +10,6 @@ ipcMain.handle('load-vrm', async () => {
 ipcMain.handle('pick-vrm', async () => ({ canceled: true }));
 ipcMain.on('quit', () => {}); ipcMain.on('minimize', () => {});
 
-// A stand-in bridge we can switch on and off at will.
 function fakeBridge() {
   return http.createServer((req, res) => {
     res.setHeader('Access-Control-Allow-Origin', '*');

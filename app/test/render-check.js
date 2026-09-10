@@ -1,6 +1,4 @@
-// Headless-ish smoke test: load the real renderer with the real model and
-// capture a PNG so we can verify orientation, framing and that the bundle
-// actually initialises. Run: npx electron test/render-check.js
+
 const { app, BrowserWindow, ipcMain } = require('electron');
 const fs = require('fs');
 const path = require('path');
@@ -22,14 +20,14 @@ ipcMain.on('set-click-through', () => {});
 ipcMain.on('quit', () => {});
 ipcMain.on('minimize', () => {});
 
-app.disableHardwareAcceleration && null; // keep GPU on: we need WebGL
+app.disableHardwareAcceleration && null;
 
 app.whenReady().then(async () => {
   const win = new BrowserWindow({
     width: 420,
     height: 680,
     show: false,
-    backgroundColor: BG,   // opaque so the capture is readable
+    backgroundColor: BG,
     webPreferences: {
       preload: path.join(ROOT, 'preload.js'),
       contextIsolation: true,
@@ -48,7 +46,6 @@ app.whenReady().then(async () => {
 
   await win.loadFile(path.join(ROOT, 'renderer', 'index.html'));
 
-  // Give the 17 MB VRM time to parse and a few frames time to render.
   await new Promise((r) => setTimeout(r, Number(process.env.SHOT_WAIT || 12000)));
 
   const state = await win.webContents.executeJavaScript(`(() => {

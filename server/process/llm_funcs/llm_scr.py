@@ -25,8 +25,6 @@ from process.tools import registry as tools
 
 char_config = load_config()
 
-# `llm:` is the current shape; the bare OPENAI_API_KEY / model keys are what
-# upstream used, kept working so an upstream config still runs.
 _llm = char_config.get("llm") or {}
 
 BASE_URL = (_llm.get("base_url") or "").strip() or None
@@ -35,9 +33,6 @@ MODEL = _llm.get("model") or char_config.get("model")
 TEMPERATURE = _llm.get("temperature", 1.0)
 MAX_TOKENS = _llm.get("max_tokens", 2048)
 
-# How many past turns stay verbatim in the prompt. Everything older is gone
-# from the transcript — anything worth keeping has been distilled into memory
-# by then. Bounded history is what stops the context window growing forever.
 HISTORY_TURNS = int(_llm.get("history_turns", 12))
 REMEMBER = bool(_llm.get("remember", True))
 
@@ -72,39 +67,18 @@ def volatile_message():
     content = (persona.as_prompt_block() + ambient.as_prompt_block()).strip()
     return {"role": "system", "content": content} if content else None
 
-# Failover: the GPU box is only reachable on the home network. Off it, she
-# falls back to a model on this Mac rather than simply failing.
 FALLBACK_BASE = (_llm.get("fallback_base_url") or "").strip() or None
 FALLBACK_MODEL = _llm.get("fallback_model") or MODEL
 FALLBACK_KEY = _llm.get("fallback_api_key") or "not-needed"
 STICKY = float(_llm.get("fallback_sticky_seconds", 30))
 
-# Qwen3 and friends are hybrid reasoning models: left alone they emit a long
-# <think> block, which llama.cpp returns as reasoning_content — so a short
-# request can burn its whole token budget and hand back empty content. She
-# talks in one or two sentences and speaks them aloud, so thinking is pure
-# latency here. Sent per-request rather than set on the server, which is
-# shared with other people who may well want it on.
 THINKING = bool(_llm.get("thinking", False))
 
-# llama-server keeps a fixed seed when a request does not carry one, so the
-# same question gets a byte-identical answer every time — she repeated herself
-# verbatim with the previous exchange sitting in her own context. Set an
-# integer here to make runs reproducible; leave it null for a live-feeling
-# companion.
 SEED = _llm.get("seed")
 
-# The GPU box runs --repeat-penalty 1.0, i.e. off, which is the right default
-# for a server other people share. For her it is not: she loops on the same
-# turn of phrase, and with a persona thread in the prompt she returns to the
-# same anecdote in reply after reply. Applied per-request, like everything
-# else opinionated here.
 REPEAT_PENALTY = float(_llm.get("repeat_penalty", 1.12))
 FREQUENCY_PENALTY = float(_llm.get("frequency_penalty", 0.35))
 
-# With replies streamed, this is effectively the time-to-first-token budget —
-# once tokens are flowing the connection stays alive on its own. A shared GPU
-# box under load can take a while to get started, so it is configurable.
 TIMEOUT = float(_llm.get("timeout_seconds", 30.0))
 
 client = OpenAI(api_key=API_KEY, base_url=BASE_URL, timeout=TIMEOUT, max_retries=0)
@@ -113,8 +87,6 @@ fallback_client = (
     if FALLBACK_BASE else None
 )
 
-# When the primary fails, stop hammering it for a while — otherwise every turn
-# pays the connection timeout before falling back.
 _primary_down_until = 0.0
 _active = "server"
 
@@ -145,7 +117,6 @@ def _pick():
         return fallback_client, model_for("local"), "local"
     if m == "server":
         return client, model_for("server"), "server"
-    # auto
     if fallback_client and time.time() < _primary_down_until:
         return fallback_client, model_for("local"), "local"
     return client, model_for("server"), "server"
@@ -171,7 +142,7 @@ def _request_extras(kw):
         kw["frequency_penalty"] = FREQUENCY_PENALTY
     if REPEAT_PENALTY and REPEAT_PENALTY != 1.0:
         extra = dict(kw.get("extra_body") or {})
-        extra.setdefault("repeat_penalty", REPEAT_PENALTY)   # llama.cpp's own
+        extra.setdefault("repeat_penalty", REPEAT_PENALTY)
         kw["extra_body"] = extra
     return kw
 
@@ -236,30 +207,18 @@ def load_history():
             try:
                 raw = json.load(f)
             except json.JSONDecodeError:
-                # Corrupt file: start the transcript over. The system prompt is
-                # added separately each turn, and memory is a different file.
                 return []
         history = [_flatten(m) for m in raw if isinstance(m, dict) and "role" in m]
-        # Drop any stored system message; it is rebuilt fresh each turn so that
-        # config edits and new memories both take effect immediately.
         return [m for m in history if m["role"] != "system"]
     return []
 
 
-# Memory extraction runs on a background thread and a streamed reply is
-# written from another, so two turns can be saved at once. Without this the
-# file ends up with one writer's JSON appended to another's — which
-# `load_history` reads as corrupt and silently starts the conversation over.
 _history_lock = threading.RLock()
 
 
 def save_history(history):
-    # Only the recent window is persisted, so the file cannot grow without end.
     trimmed = [m for m in history if m["role"] != "system"][-(HISTORY_TURNS * 2):]
     with _history_lock:
-        # Written beside the target and moved into place: a reader either sees
-        # the whole previous file or the whole new one, never a half-written
-        # array. os.replace is atomic within a filesystem.
         tmp = f"{HISTORY_FILE}.tmp"
         with open(tmp, "w", encoding="utf-8") as f:
             json.dump(trimmed, f, indent=2)
@@ -281,9 +240,6 @@ def save_turn(user_text, assistant_text):
             history.append({"role": "user", "content": user_text})
         history.append({"role": "assistant", "content": assistant_text})
         save_history(history)
-    # Nothing was said to her, so there is nothing about the user to distil —
-    # extracting from her own unprompted line would only teach her her own
-    # opinions back.
     if REMEMBER and user_text is not None:
         memory_extract.remember_async(client, MODEL, user_text, assistant_text)
 
@@ -316,7 +272,6 @@ def llm_response(user_input):
     history = load_history()[-(HISTORY_TURNS * 2):]
     history.append({"role": "user", "content": user_input})
 
-    # System prompt is rebuilt every turn so new memories land immediately.
     completion = get_reply([system_message()] + history)
     reply = (completion.choices[0].message.content or "").strip()
 
@@ -324,7 +279,6 @@ def llm_response(user_input):
     save_history(history)
 
     if REMEMBER:
-        # Runs on a background thread — the reply is already on its way.
         memory_extract.remember_async(client, MODEL, user_input, reply)
 
     return reply
@@ -359,9 +313,6 @@ def _collect_tool_calls(delta, calls):
                 slot["arguments"] += fn.arguments
 
 
-# Servers that do not implement tool calling say so in different ways. Rather
-# than maintain a list of them, the first genuine refusal disables tools for
-# the rest of the session and she carries on as she did before.
 _tools_supported = True
 
 
@@ -380,8 +331,6 @@ def _rejects_tools(e):
     if e.status_code not in (400, 404, 422, 501):
         return False
     body = (str(getattr(e, "message", "")) or str(e)).lower()
-    # A 400 for some other reason (a bad message shape, a context overflow)
-    # must not be read as "no tools here".
     return "tool" in body or "function" in body or e.status_code in (404, 501)
 
 
@@ -400,9 +349,6 @@ def llm_stream(user_input=None, extra_system=None, use_tools=True):
     in without becoming part of her permanent character.
     """
     history = load_history()[-(HISTORY_TURNS * 2):]
-    # `user_input` is None when nobody said anything — an unprompted opener.
-    # She is picking the conversation up rather than answering, so there is no
-    # user turn to add and none to record afterwards.
     if user_input is not None:
         history.append({"role": "user", "content": user_input})
 
@@ -413,11 +359,6 @@ def llm_stream(user_input=None, extra_system=None, use_tools=True):
     global _tools_supported
 
     volatile = volatile_message()
-    # The volatile block goes after the history, not before it: everything in
-    # front of it stays byte-identical between turns and stays cached. It sits
-    # just ahead of the newest user turn so it reads as context for what they
-    # just said; with no user turn at all — an unprompted opener — it goes
-    # last, which is the same position relative to what she is answering.
     tail = ([volatile] if volatile else [])
     if user_input is not None and history:
         messages = [system] + history[:-1] + tail + history[-1:]
@@ -425,9 +366,6 @@ def llm_stream(user_input=None, extra_system=None, use_tools=True):
         messages = [system] + history + tail
     offer = tools.definitions() if (use_tools and _tools_supported) else None
 
-    # One round trip at most: she asks for a tool, gets the answer, and says
-    # something about it. Chains beyond that are for agents, not for someone
-    # you are talking to — and a small model given room to loop will.
     for attempt in range(2):
         calls = {}
         try:
@@ -438,20 +376,11 @@ def llm_stream(user_input=None, extra_system=None, use_tools=True):
                     continue
                 delta = event.choices[0].delta
                 _collect_tool_calls(delta, calls)
-                # Hybrid reasoning models put the <think> block in
-                # reasoning_content. Thinking is off by default, but a server
-                # that ignores the flag would otherwise stream a paragraph of
-                # deliberation straight into her mouth.
                 piece = getattr(delta, "content", None)
                 if not piece:
                     continue
                 yield piece
-        except Exception as e:                          # noqa: BLE001
-            # Only a rejected *request* means the endpoint cannot do tools. A
-            # timeout or a dropped connection says nothing about tool support,
-            # and catching those here turned a busy server into a permanent
-            # downgrade for the rest of the session — she quietly lost the
-            # ability to set a timer because one reply was slow.
+        except Exception as e:
             if offer is None or not _rejects_tools(e):
                 raise
             print(f"[llm] endpoint rejected tool definitions "
@@ -479,6 +408,4 @@ def llm_stream(user_input=None, extra_system=None, use_tools=True):
                 "tool_call_id": call["id"] or f"call_{i}",
                 "content": result,
             })
-        # Second pass talks about what happened; offering the tools again
-        # invites her to call the same one on a loop.
         offer = None

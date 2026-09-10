@@ -29,7 +29,6 @@ app.whenReady().then(async () => {
   console.log('expressions   :', info.expressions.join(', '));
   console.log('morph meshes  :', info.morphs.map(m => `${m.mesh}(${m.targets})`).join(', '));
 
-  // Measure "mouth openness" as the count of inner-mouth-coloured pixels.
   const measure = async (label) => {
     await new Promise(r => setTimeout(r, 400));
     const img = await win.capturePage();

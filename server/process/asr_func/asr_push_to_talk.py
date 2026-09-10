@@ -33,7 +33,7 @@ def build_model():
     if cfg.get("offline", True):
         try:
             return WhisperModel(name, local_files_only=True, **kwargs)
-        except Exception:                               # noqa: BLE001
+        except Exception:
             print(f"[asr] {name} isn't cached yet; downloading it once.",
                   flush=True)
 
@@ -59,9 +59,6 @@ def record_and_transcribe(model, output_file="recording.wav", samplerate=44100):
     input()
     print("Recording... press ENTER to stop")
 
-    # The upstream version pre-allocated a fixed 60s buffer and always wrote
-    # all 60 seconds to disk, padding every clip with silence. Stream instead
-    # so the clip is exactly as long as you spoke.
     frames = queue.Queue()
 
     def callback(indata, _frames, _time, status):

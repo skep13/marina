@@ -1,6 +1,4 @@
-// Regression test for the bug where the avatar froze whenever the window lost
-// focus. Mirrors main.js's real window options, then steals focus with a second
-// window and checks the animation loop is still running.
+
 const { app, BrowserWindow, ipcMain } = require('electron');
 const fs = require('fs'); const path = require('path');
 const ROOT = path.join(__dirname, '..');
@@ -17,7 +15,7 @@ const sample = `(() => {
 })()`;
 
 app.whenReady().then(async () => {
-  // Exactly the options main.js uses.
+
   const win = new BrowserWindow({
     width: 420, height: 680, show: true,
     transparent: true, frame: false, hasShadow: false,
@@ -33,7 +31,6 @@ app.whenReady().then(async () => {
   await win.loadFile(path.join(ROOT, 'renderer', 'index.html'));
   await new Promise(r => setTimeout(r, 11000));
 
-  // Steal focus, the way any other app would.
   const thief = new BrowserWindow({ width: 500, height: 400, alwaysOnTop: true });
   await thief.loadURL('data:text/html,<h1>focus thief</h1>');
   thief.focus();

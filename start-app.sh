@@ -1,5 +1,4 @@
 #!/usr/bin/env bash
-# Starts the transparent desktop avatar.
 set -euo pipefail
 cd "$(dirname "$0")/app"
 

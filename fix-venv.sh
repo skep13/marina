@@ -1,11 +1,4 @@
 #!/usr/bin/env bash
-# Repairs a virtualenv after the project folder has been moved.
-#
-# A venv bakes its own absolute path into every activate script and into the
-# shebang of every console script (pip, uvicorn, ...). Move the folder and those
-# all point at nothing. The interpreter itself is fine — it derives sys.prefix
-# from its own location — which is why the app keeps working while the shell
-# scripts break.
 set -euo pipefail
 cd "$(dirname "$0")"
 ROOT="$(pwd)"
@@ -18,7 +11,6 @@ if [ "$CURRENT" != "$ROOT/.venv" ]; then
   exit 1
 fi
 
-# Any absolute path in bin/ that isn't the current one is stale.
 STALE="$(grep -rhoE '/[A-Za-z0-9_./ -]+/\.venv' .venv/bin/activate 2>/dev/null | head -1 || true)"
 if [ -z "$STALE" ] || [ "$STALE" = "$ROOT/.venv" ]; then
   echo "venv paths already correct ($ROOT/.venv)"

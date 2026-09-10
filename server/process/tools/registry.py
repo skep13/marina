@@ -33,8 +33,6 @@ ALLOW_OPEN_URL = bool(_cfg.get("open_url", True))
 ALLOW_TIMERS = bool(_cfg.get("timers", True))
 CLIPBOARD_LIMIT = int(_cfg.get("clipboard_chars", 2000))
 
-# Timers that have gone off and not yet been said out loud. The idle poll
-# drains this, so a timer reaches you the same way an unprompted thought does.
 _announcements = []
 _lock = threading.Lock()
 
@@ -48,10 +46,6 @@ def _announce(text):
     with _lock:
         _announcements.append(text)
 
-
-# ----------------------------------------------------------------------
-#  The tools
-# ----------------------------------------------------------------------
 
 def set_timer(minutes, label=""):
     if not ALLOW_TIMERS:
@@ -81,7 +75,7 @@ def read_clipboard():
         return "The clipboard is off limits."
     try:
         out = subprocess.run(["pbpaste"], capture_output=True, text=True, timeout=2)
-    except Exception as e:                              # noqa: BLE001
+    except Exception as e:
         return f"Could not read the clipboard: {e}"
     text = (out.stdout or "").strip()
     if not text:
@@ -97,13 +91,11 @@ def open_url(url):
         return "Opening links is switched off."
     url = (url or "").strip()
     parsed = urlparse(url)
-    # http(s) only. Everything else — file://, custom schemes, anything that
-    # would hand a path to another application — is refused outright.
     if parsed.scheme not in ("http", "https") or not parsed.netloc:
         return "Only http and https links can be opened."
     try:
         subprocess.run(["open", url], timeout=3, check=False)
-    except Exception as e:                              # noqa: BLE001
+    except Exception as e:
         return f"Could not open it: {e}"
     print(f"[tool] opened {url}", flush=True)
     return f"Opened {parsed.netloc}."
@@ -131,9 +123,6 @@ SPECS = [
             "required": ["minutes"],
         }}),
     ("read_clipboard", read_clipboard, ALLOW_CLIPBOARD, {
-        # Written at the failure mode rather than the feature. Described
-        # neutrally, the model would answer "probably a typo" about an error
-        # it had never seen — guessing reads as far worse than looking.
         "description": "Read what is on the clipboard. You cannot see it any "
                        "other way, so call this whenever they mention "
                        "something they copied or pasted, or refer to 'this' "
@@ -188,5 +177,5 @@ def run(name, arguments):
         return str(fn(**args))
     except TypeError as e:
         return f"Wrong arguments for {name}: {e}"
-    except Exception as e:                              # noqa: BLE001
+    except Exception as e:
         return f"{name} failed: {type(e).__name__}: {e}"

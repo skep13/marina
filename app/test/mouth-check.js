@@ -1,5 +1,4 @@
-// Diagnoses lip sync: reports VRM expression override flags, then plays real
-// TTS audio and samples the mouth values over time.
+
 const { app, BrowserWindow, ipcMain } = require('electron');
 const fs = require('fs'); const path = require('path');
 const ROOT = path.join(__dirname, '..');

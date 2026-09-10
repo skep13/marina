@@ -1,5 +1,4 @@
-// Verifies the window really is transparent: mirrors main.js's BrowserWindow
-// options, then samples the alpha channel of a capture.
+
 const { app, BrowserWindow, ipcMain } = require('electron');
 const fs = require('fs');
 const path = require('path');
@@ -42,7 +41,7 @@ app.whenReady().then(async () => {
 
   const img = await win.capturePage();
   const { width, height } = img.getSize();
-  const bmp = img.toBitmap();   // BGRA, premultiplied
+  const bmp = img.toBitmap();
   const at = (x, y) => {
     const i = (y * width + x) * 4;
     return { b: bmp[i], g: bmp[i + 1], r: bmp[i + 2], a: bmp[i + 3] };
@@ -50,10 +49,10 @@ app.whenReady().then(async () => {
 
   console.log(JSON.stringify({
     size: `${width}x${height}`,
-    topLeft:     at(4, 60),                                   // empty background
-    topRight:    at(width - 5, 60),                           // empty background
-    midLeftEdge: at(3, Math.floor(height * 0.55)),            // empty background
-    centre:      at(Math.floor(width / 2), Math.floor(height * 0.35)), // avatar
+    topLeft:     at(4, 60),
+    topRight:    at(width - 5, 60),
+    midLeftEdge: at(3, Math.floor(height * 0.55)),
+    centre:      at(Math.floor(width / 2), Math.floor(height * 0.35)),
   }, null, 2));
 
   fs.writeFileSync(path.join(__dirname, 'shot-transparent.png'), img.toPNG());

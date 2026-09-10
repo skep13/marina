@@ -1,4 +1,4 @@
-// What is actually driving the mouth when nothing is playing?
+
 const { app, BrowserWindow, ipcMain } = require('electron');
 const fs = require('fs'); const path = require('path');
 const ROOT = path.join(__dirname, '..');
@@ -31,7 +31,6 @@ app.whenReady().then(async () => {
     await new Promise(r => setTimeout(r, 1200));
   }
 
-  // Capture with happy forced to zero, to see if that is what opens the mouth.
   fs.writeFileSync(path.join(__dirname, 'idle-mouth-normal.png'), (await win.capturePage()).toPNG());
   await win.webContents.executeJavaScript(`
     window.__marina.vrm.expressionManager.setValue('happy', 0);

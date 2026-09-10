@@ -15,12 +15,9 @@ import tempfile
 import threading
 from pathlib import Path
 
-SAMPLERATE = 16000  # Whisper resamples to 16k anyway; recording there saves work.
+SAMPLERATE = 16000
 CHANNELS = 1
 
-# Kept before the moment speech is detected. A detector needs a few frames to
-# be sure, and without this the recording starts a fifth of a second late —
-# which reliably eats the first word.
 PREROLL_SECONDS = 0.35
 
 
@@ -30,10 +27,10 @@ class Recorder:
         self._stream = None
         self._frames = None
         self._vad = None
-        self._pending = None       # partial frame left over between callbacks
+        self._pending = None
         self._samples_seen = 0
         self._onset_sample = None
-        self.events = None         # VAD events, when monitoring
+        self.events = None
 
     @property
     def is_recording(self):
@@ -129,7 +126,6 @@ class Recorder:
             start = max(0, int(onset - PREROLL_SECONDS * SAMPLERATE))
             audio = audio[start:]
 
-        # Under ~0.25s is almost certainly a mis-click, not speech.
         if len(audio) < SAMPLERATE * 0.25:
             return None
 

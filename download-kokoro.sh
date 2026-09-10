@@ -1,5 +1,4 @@
 #!/usr/bin/env bash
-# Fetches the Kokoro voice model (~340 MB) used for local TTS on the Mac.
 set -euo pipefail
 cd "$(dirname "$0")"
 

@@ -24,12 +24,8 @@ _mode = (_llm.get("mode") or "auto").strip().lower()
 if _mode not in VALID:
     _mode = "auto"
 
-# Set by the LLM layer when a call actually lands somewhere, so `current()`
-# reports reality rather than intent.
 _last_used = "local" if _mode == "local" else "server"
 
-# Chosen model per backend. Defaults come from the config; the UI can override
-# either at runtime without restarting.
 _models = {
     "server": _llm.get("model"),
     "local": _llm.get("fallback_model") or _llm.get("model"),

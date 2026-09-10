@@ -1,4 +1,4 @@
-// Captures the UI chrome with controls forced visible, to inspect the icons.
+
 const { app, BrowserWindow, ipcMain } = require('electron');
 const fs = require('fs'); const path = require('path');
 const ROOT = path.join(__dirname, '..');

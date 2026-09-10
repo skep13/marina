@@ -24,10 +24,6 @@ class TTSError(RuntimeError):
     pass
 
 
-# ----------------------------------------------------------------------
-#  Kokoro (local)
-# ----------------------------------------------------------------------
-
 _kokoro = None
 _kokoro_lock = threading.Lock()
 
@@ -106,8 +102,6 @@ def _pitch_shift(audio, semitones):
     ratio = 2.0 ** (semitones / 12.0)
     try:
         import soxr
-        # Resample to a lower rate then reinterpret at the original rate:
-        # the samples play back faster, so pitch rises by `ratio`.
         return soxr.resample(audio, ratio, 1.0)
     except ImportError:
         import numpy as np
@@ -126,15 +120,9 @@ def _kokoro_gen(text):
     semitones = float(cfg.get("pitch", 0.0))
     ratio = 2.0 ** (semitones / 12.0)
 
-    # Generate slower by the pitch ratio so that resampling afterwards lands
-    # back on the speed actually asked for.
     speed = float(cfg.get("speed", 1.0)) / ratio
 
     try:
-        # create_timed reports when each phoneme is spoken. That turns lip sync
-        # from an inference about the audio into a fact about it — the analyser
-        # has to guess a vowel from two formant bands, and it guesses wrong on
-        # quiet or overlapping sounds.
         audio, sample_rate, timings = kokoro.create_timed(
             text,
             voice=voice,
@@ -156,29 +144,17 @@ def _kokoro_gen(text):
 
     buf = io.BytesIO()
     sf.write(buf, audio, sample_rate, format="WAV", subtype="PCM_16")
-    # The timings describe the pre-shift audio. _pitch_shift resamples by the
-    # same ratio the generation speed was divided by, so the result is shorter
-    # by that ratio and every timestamp has to come back with it.
     return buf.getvalue(), visemes_from(timings, 1.0 / ratio)
 
 
-# IPA, as espeak-ng hands it to Kokoro, folded onto the five mouth shapes the
-# VRM actually has. Only the vowel decides the shape; consonants either close
-# the mouth or barely change it, so they are carried by the closures below.
 _VISEME_BY_PHONEME = {
-    # aa - open
     "ɑ": "aa", "a": "aa", "ʌ": "aa", "æ": "aa", "ɐ": "aa", "ɒ": "aa",
-    # ee - spread
     "i": "ee", "ɪ": "ee", "e": "ee", "ɛ": "ee", "eɪ": "ee", "ᵻ": "ee",
-    # ih - narrow
     "ə": "ih", "ɚ": "ih", "ɜ": "ih", "ɝ": "ih", "ɹ": "ih",
-    # oh - rounded open
     "ɔ": "oh", "o": "oh", "oʊ": "oh", "aʊ": "oh", "ɔɪ": "oh", "aɪ": "oh",
-    # ou - rounded closed
     "u": "ou", "ʊ": "ou", "w": "ou", "uː": "ou",
 }
 
-# Lips meet: these must read as closed or she talks through a held vowel.
 _CLOSED = set("mbp")
 
 
@@ -200,7 +176,7 @@ def visemes_from(timings, scale=1.0):
             continue
         viseme = _VISEME_BY_PHONEME.get(raw[:2]) or _VISEME_BY_PHONEME.get(base)
         if not viseme:
-            continue        # consonant with no shape of its own; let it ride
+            continue
         track.append({
             "t": round(timing.start * scale, 4),
             "v": viseme,
@@ -216,10 +192,6 @@ def kokoro_voices():
     except TTSError:
         return []
 
-
-# ----------------------------------------------------------------------
-#  Dispatch
-# ----------------------------------------------------------------------
 
 def describe():
     if PROVIDER == "kokoro":
@@ -255,7 +227,7 @@ def synthesize(text):
         from process.tts_func.sovits_ping import SovitsError, sovits_gen_bytes
 
         try:
-            return sovits_gen_bytes(text), []      # no phoneme timings from sovits
+            return sovits_gen_bytes(text), []
         except SovitsError as e:
             raise TTSError(str(e)) from e
 
@@ -276,5 +248,5 @@ def warmup():
         _load_kokoro()
         try:
             _kokoro_gen("Ready.")
-        except Exception as e:                      # noqa: BLE001
+        except Exception as e:
             print(f"[tts] warmup inference failed: {e}", flush=True)

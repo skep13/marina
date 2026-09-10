@@ -1,8 +1,4 @@
-// Proves a streamed reply actually streams: that she starts talking before the
-// model has finished writing, and that the sentences are scheduled edge to
-// edge rather than with a gap wherever synthesis happened to land.
-//
-// Needs the bridge running.  Run: npx electron test/stream-check.js
+
 const { app, BrowserWindow, ipcMain } = require('electron');
 const fs = require('fs');
 const path = require('path');
@@ -45,7 +41,7 @@ app.whenReady().then(async () => {
   let firstAudio = null;
   let seen = 0;
   const samples = [];
-  for (let i = 0; i < 900; i++) {   // up to 90s: a shared GPU box can be slow to start
+  for (let i = 0; i < 900; i++) {
     await new Promise((r) => setTimeout(r, 100));
     const u = await win.webContents.executeJavaScript('window.__marina.utterance');
     if (u.chunks.length > seen) {
@@ -53,7 +49,7 @@ app.whenReady().then(async () => {
       if (firstAudio === null) firstAudio = Date.now() - t0;
       samples.push({ at: Date.now() - t0, chunks: seen, playedTo: u.now - u.epoch });
     }
-    if (seen && u.epoch < 0) break;      // reply finished
+    if (seen && u.epoch < 0) break;
   }
 
   const u = samples.length ? samples[samples.length - 1] : null;
@@ -67,15 +63,11 @@ app.whenReady().then(async () => {
                 `audio played to ${s.playedTo.toFixed(2)} s`);
   }
 
-  // Every chunk must begin exactly where the previous one ended. Anything
-  // above a millisecond is an audible seam.
   let worstGap = 0;
   for (let i = 1; i < chunks.length; i++) {
     worstGap = Math.max(worstGap, Math.abs(chunks[i].start - chunks[i - 1].end));
   }
-  // A gap of zero is also the proof that synthesis never fell behind: a
-  // starved queue starts the next chunk at "now" instead of at the previous
-  // chunk's end, which shows up here as a gap.
+
   console.log(`largest gap between chunks: ${(worstGap * 1000).toFixed(2)} ms`);
   console.log(errs.length ? `console errors:\n  ${errs.join('\n  ')}` : 'no console errors');
 

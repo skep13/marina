@@ -1,15 +1,6 @@
 #!/usr/bin/env bash
-# Benchmarks any Ollama / llama.cpp / LM Studio endpoint so you can compare
-# machines honestly instead of guessing.
-#
-#   ./bench-llm.sh                                  # whatever the config points at
-#   ./bench-llm.sh http://thinkpad.local:11434 llama3.2:3b
-#   ./bench-llm.sh http://beelink.local:11434 qwen3:8b
 set -euo pipefail
 cd "$(dirname "$0")"
-# Call the interpreter directly — a moved project leaves stale absolute
-# paths in activate and in every console-script shebang, but the
-# interpreter itself resolves its prefix from its own location.
 PY="$(pwd)/.venv/bin/python"
 [ -x "$PY" ] || { echo "No venv. Run ./setup-mac.sh" >&2; exit 1; }
 
@@ -32,7 +23,6 @@ def _post(url, payload):
                                  {"Content-Type": "application/json"})
     with urllib.request.urlopen(req, timeout=600) as r:
         return json.load(r)
-
 
 def call(prompt, n_predict=120):
     """Works with Ollama (/api/generate) and llama.cpp (/completion).

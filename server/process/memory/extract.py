@@ -41,13 +41,9 @@ user: "what's the weather like"
 user: "thanks, that works"
 []"""
 
-# Keeps a runaway model from filling the store with junk in one turn.
 MAX_PER_TURN = 3
 MAX_FACT_CHARS = 160
 
-# Extraction costs a whole extra generation. On a machine where the model gets
-# evicted between turns that is not free, so don't spend it on exchanges that
-# cannot plausibly contain a durable fact.
 MIN_USER_CHARS = 15
 
 _TRIVIAL = {
@@ -114,9 +110,6 @@ def extract(client, model, user_text, assistant_text):
         return []
 
 
-# An explicit "remember that ..." should never depend on a 3B model noticing.
-# These patterns capture it directly, which is the only fully reliable path
-# to memory on this hardware.
 _EXPLICIT = [
     re.compile(r"\b(?:please\s+)?remember\s*[:,]?\s*(?:that\s+|this\s*[:,]?\s*)?(.+)", re.I),
     re.compile(r"\bdon'?t\s+forget\s*[:,]?\s*(?:that\s+)?(.+)", re.I),
@@ -124,16 +117,12 @@ _EXPLICIT = [
     re.compile(r"\bkeep\s+in\s+mind\s*[:,]?\s*(?:that\s+)?(.+)", re.I),
 ]
 
-# Rewriting "I live" to "the user live" leaves it ungrammatical, so the verb
-# needs conjugating. A whitelist is used rather than a general rule because
-# guessing wrong turns a noun into a verb and mangles the fact.
 _IRREGULAR = {"have": "has", "am": "is", "'m": "is", "do": "does", "go": "goes"}
 _VERBS = {
     "live", "work", "prefer", "use", "own", "need", "want", "run", "like",
     "hate", "have", "build", "study", "play", "speak", "drive", "code",
     "stream", "sleep", "eat", "am", "do", "go",
 }
-# Adverbs that can sit between the subject and the verb.
 _ADVERBS = {"only", "just", "also", "currently", "usually", "always", "never",
             "sometimes", "still", "mainly", "mostly", "often", "really"}
 
@@ -157,7 +146,6 @@ def _to_third_person(fact):
     fact = re.sub(r"^me\b", "the user", fact, flags=re.I)
     fact = re.sub(r"^i\s+", "the user ", fact, flags=re.I)
 
-    # Conjugate the first verb after "the user", skipping any adverbs.
     parts = fact.split()
     if len(parts) >= 3 and parts[0].lower() == "the" and parts[1].lower() == "user":
         i = 2
@@ -186,7 +174,6 @@ def explicit_fact(user_text):
 
 def remember_async(client, model, user_text, assistant_text):
     """Fire-and-forget: runs after the reply is already on its way."""
-    # An explicit request is stored immediately and never sent to the model.
     direct = explicit_fact(user_text)
     if direct:
         fact = store.add(direct, source="explicit")
