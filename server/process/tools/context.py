@@ -26,7 +26,6 @@ SHOW_TIME = bool(_ctx.get("time", True))
 SHOW_APP = bool(_ctx.get("frontmost_app", True))
 SHOW_BATTERY = bool(_ctx.get("battery", True))
 
-# Anything slower than this is not worth having on every single turn.
 TIMEOUT = 0.6
 
 
@@ -35,7 +34,7 @@ def _run(args):
         out = subprocess.run(args, capture_output=True, text=True,
                              timeout=TIMEOUT)
         return out.stdout.strip() if out.returncode == 0 else ""
-    except Exception:                                   # noqa: BLE001
+    except Exception:
         return ""
 
 
@@ -62,7 +61,6 @@ def frontmost_app():
     if not asn:
         return ""
     raw = _run(["lsappinfo", "info", "-only", "name", asn])
-    # Comes back as: "LSDisplayName"="Firefox"
     if "=" not in raw:
         return ""
     return raw.rsplit("=", 1)[-1].strip().strip('"')
@@ -81,7 +79,6 @@ def battery():
     if not percent:
         return ""
     level = int(percent)
-    # Only worth a sentence when it is actually notable.
     if charging:
         return "on charge" if level < 95 else ""
     if level <= 15:

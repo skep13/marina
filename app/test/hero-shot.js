@@ -1,4 +1,4 @@
-// Captures Marina on a transparent background for the demo page.
+
 const { app, BrowserWindow, ipcMain } = require('electron');
 const fs = require('fs'); const path = require('path');
 const ROOT = path.join(__dirname, '..');
@@ -16,7 +16,7 @@ app.whenReady().then(async () => {
   });
   await win.loadFile(path.join(ROOT, 'renderer', 'index.html'));
   await new Promise(r => setTimeout(r, 13000));
-  // Hide the chat UI so the shot is just her.
+
   await win.webContents.executeJavaScript(`
     for (const id of ['bar','status','chrome','notice','bubble'])
       { const e = document.getElementById(id); if (e) e.style.display='none'; }

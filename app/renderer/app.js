@@ -13,26 +13,19 @@ const btnMic     = el('btn-mic');
 const dot        = el('dot');
 const statusText = el('status-text');
 
-// ============================================================
-//  Three.js scene
-// ============================================================
-
 const renderer = new THREE.WebGLRenderer({
   canvas,
-  alpha: true,             // transparent framebuffer -> transparent desktop window
+  alpha: true,
   antialias: true,
-  // The click-through hit test reads a pixel back after the frame is drawn,
-  // which is only valid if the buffer survives the composite.
+
   preserveDrawingBuffer: true,
 });
 renderer.setClearColor(0x000000, 0);
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 
-const scene = new THREE.Scene();               // no background => stays transparent
+const scene = new THREE.Scene();
 
-// A narrow FOV is a long lens. Wide angles up close enlarge the nearest
-// feature (the head) and read as caricature; ~21 deg is portrait territory.
 const camera = new THREE.PerspectiveCamera(21, 1, 0.1, 20);
 
 const key = new THREE.DirectionalLight(0xffffff, 2.0);
@@ -40,8 +33,6 @@ key.position.set(1, 1.6, 2.2);
 scene.add(key);
 scene.add(new THREE.AmbientLight(0xffffff, 1.2));
 
-// three-vrm drives the eyes toward this object; parenting it to the camera
-// means "look at the cursor" is just a small offset in view space.
 const lookTarget = new THREE.Object3D();
 lookTarget.position.set(0, 0, -1);
 camera.add(lookTarget);
@@ -57,21 +48,17 @@ function resize() {
 window.addEventListener('resize', resize);
 resize();
 
-// ============================================================
-//  VRM
-// ============================================================
-
 let vrm = null;
 let bones = {};
 let basePose = {};
-let springs = [];        // { joint, dir, power } captured at load
-let mouthCloseTargets = [];   // VRoid's Fcl_MTH_Close morph, per face mesh
+let springs = [];
+let mouthCloseTargets = [];
 
 const loader = new GLTFLoader();
 loader.register((parser) => new VRMLoaderPlugin(parser));
 
 function frameUpperBody(v) {
-  // Aim the camera at the head and pull back enough to see head + shoulders.
+
   const head = v.humanoid?.getNormalizedBoneNode('head');
   const target = new THREE.Vector3();
   if (head) {
@@ -80,15 +67,12 @@ function frameUpperBody(v) {
   } else {
     new THREE.Box3().setFromObject(v.scene).getCenter(target);
   }
-  // Frame head-to-waist rather than just the face: pick the distance that
-  // makes VIEW_HEIGHT metres of the avatar fill the window vertically.
-  const VIEW_HEIGHT = 0.67;                 // metres of avatar in frame
-  const DROP = 0.06;                        // how far below the head to centre
+
+  const VIEW_HEIGHT = 0.67;
+  const DROP = 0.06;
   const fovRad = (camera.fov * Math.PI) / 180;
   const dist = VIEW_HEIGHT / (2 * Math.tan(fovRad / 2));
 
-  // VRM avatars face +Z once three-vrm has normalised them, so the camera
-  // belongs on the +Z side.
   camera.position.set(target.x, target.y - DROP, target.z + dist);
   camera.lookAt(target.x, target.y - DROP, target.z);
   camera.updateMatrixWorld(true);
@@ -105,7 +89,6 @@ async function mountVRM(arrayBuffer, label) {
     vrm = null;
   }
 
-  // No-op for VRM 1.0; rotates 0.x models 180 deg so both face the same way.
   VRMUtils.rotateVRM0(next);
   VRMUtils.removeUnnecessaryVertices?.(next.scene);
   VRMUtils.combineSkeletons?.(next.scene);
@@ -133,8 +116,6 @@ async function mountVRM(arrayBuffer, label) {
   hideNotice('model');
 }
 
-// Bones the idle animation drives. Not every model rigs all of them
-// (upperChest and the shoulders are optional in VRM), so each is guarded.
 const IDLE_BONES = [
   'hips', 'spine', 'chest', 'upperChest', 'neck', 'head',
   'leftShoulder', 'rightShoulder',
@@ -143,9 +124,6 @@ const IDLE_BONES = [
   'leftHand', 'rightHand',
 ];
 
-// VRM's rest pose is a T-pose with the arms straight out to the sides.
-// This is the relaxed standing pose everything else is layered on top of.
-// Z swings the arms down; asymmetry keeps it from looking like a mannequin.
 const REST_POSE = {
   leftShoulder:  [0, 0, 0.05],
   rightShoulder: [0, 0, -0.06],
@@ -175,7 +153,6 @@ function buildRestPose(v) {
   }
 }
 
-/** Offset a bone from its rest pose. Additive, so layers compose. */
 function poseBone(name, dx, dy, dz) {
   const node = bones[name];
   const base = basePose[name];
@@ -183,30 +160,15 @@ function poseBone(name, dx, dy, dz) {
   node.rotation.set(base.x + dx, base.y + (dy || 0), base.z + (dz || 0));
 }
 
-// ---------------------------------------------------------------------------
-//  Lip colour
-//
-//  The lips are painted into the face-skin texture, so there's no material to
-//  tint — the pixels have to change. Luckily they're the only strongly
-//  saturated thing on that texture, and they sit in a known patch of UV space
-//  (the cheek blush is saturated too, but lives lower down), so a box plus a
-//  saturation floor isolates them cleanly.
-//
-//  Measured on this model: lips at u 0.44-0.56, v 0.74-0.78, saturation > 0.22,
-//  where nothing else on the texture exceeds 0.20 inside that box.
-// ---------------------------------------------------------------------------
-
 const LIPS = {
-  // Fractions of texture size, so this survives a different texture resolution.
+
   region: { u0: 0.40, v0: 0.72, u1: 0.62, v1: 0.80 },
   minSaturation: 0.18,
-  saturation: 0.42,     // multiplier: 1 = untouched, 0 = grey
-  lighten: 1.06,        // slight lift so they don't read as a dark line
-  hueShift: -0.012,     // nudge off pink, toward a neutral rose-brown
+  saturation: 0.42,
+  lighten: 1.06,
+  hueShift: -0.012,
 };
 
-// The inner mouth is a separate, very red texture; left alone it looks lurid
-// next to desaturated lips once she opens her mouth.
 const INNER_MOUTH = { saturation: 0.62, lighten: 0.98 };
 
 function rgbToHsv(r, g, b) {
@@ -235,7 +197,6 @@ function hsvToRgb(h, s, v) {
   }
 }
 
-/** Repaint a texture in place. `box` is in UV fractions, or null for all of it. */
 function recolourTexture(tex, box, opts) {
   const src = tex?.image;
   if (!src || !src.width) return false;
@@ -274,8 +235,6 @@ function recolourTexture(tex, box, opts) {
 
   ctx.putImageData(img, x0, y0);
 
-  // Swapping the source keeps every other texture setting (flipY, colorSpace,
-  // wrapping) exactly as the loader configured it.
   tex.image = canvas;
   tex.needsUpdate = true;
   return touched;
@@ -301,15 +260,8 @@ function restyleFace(v) {
   return { lips, mouth };
 }
 
-// VRoid exports the face with the lips slightly parted, and the VRM `neutral`
-// expression doesn't bind the blendshape that closes them — so at rest the
-// mouth hangs open. The shape exists (Fcl_MTH_Close), it's just never driven.
-// Find it and drive it ourselves.
 const MOUTH_CLOSE_MORPH = 'Fcl_MTH_Close';
 
-// The VRM expression presets carry no plain brow raise, but the VRoid face
-// ships the shapes — they are simply never driven outside a full expression.
-// A face with a completely static brow is the other half of looking vacant.
 const BROW_MORPHS = ['Fcl_BRW_Fun', 'Fcl_BRW_Surprised', 'Fcl_BRW_Sorrow'];
 let browTargets = {};
 
@@ -325,15 +277,6 @@ function collectBrows(v) {
   });
 }
 
-/** Idle brow life. Runs after vrm.update() for the same reason the mouth does.
- *
- *  This model binds no brow morph to any VRM expression, so the brows were
- *  simply never driven — half of why a resting face reads as vacant. Nothing
- *  else writes them, so we own them outright: an earlier version took the max
- *  against the previous frame to avoid stepping on the expression system, but
- *  with nothing resetting them each frame that was a ratchet the value could
- *  never come back down from. `room` is what keeps a cue's expression clear.
- */
 function applyIdleBrow(t) {
   const emoting = Math.max(
     cueOut.expr.happy || 0, cueOut.expr.sad || 0, cueOut.expr.angry || 0,
@@ -342,11 +285,11 @@ function applyIdleBrow(t) {
   const room = Math.max(0, 1 - emoting * 2);
 
   const values = {
-    // Slow ambient tension, plus the lift when she re-engages with you.
+
     Fcl_BRW_Fun: room * (0.06 + 0.05 * noise1(t * 0.19 + 7) + browFlash * 0.22),
-    // A touch of raise while she is speaking; flat brows read as bored.
+
     Fcl_BRW_Surprised: room * Math.max(0, mouthOpen * 0.14 + 0.03 * noise1(t * 0.23 + 19)),
-    // Faint inner-brow drift, the difference between resting and blank.
+
     Fcl_BRW_Sorrow: room * Math.max(0, 0.05 * noise1(t * 0.14 + 55)),
   };
 
@@ -371,18 +314,9 @@ function collectMouthClose(v) {
   });
 }
 
-/** Close the resting mouth, releasing as she speaks or emotes.
- *
- *  Must run AFTER vrm.update(), which rewrites every morph the expression
- *  system owns — set it before and it gets clobbered the same frame.
- */
 function applyRestingMouth() {
   if (!mouthCloseTargets.length) return;
 
-  // A deliberate cue should win over the resting shape — but the ambient mood
-  // drift must NOT. On this model `happy` parts the lips, so letting the idle
-  // smile release the closing morph left the mouth hanging open at rest, which
-  // is the exact bug this is here to prevent.
   const emoting = Math.max(
     cueOut.expr.happy || 0, cueOut.expr.sad || 0,
     cueOut.expr.angry || 0, cueOut.expr.surprised || 0,
@@ -395,7 +329,6 @@ function applyRestingMouth() {
   }
 }
 
-/** Grab every spring-bone joint and remember its resting gravity. */
 function collectSprings(v) {
   springs = [];
   const mgr = v.springBoneManager;
@@ -424,10 +357,6 @@ async function loadFromDisk() {
   }
 }
 
-// ============================================================
-//  Idle motion + lip sync
-// ============================================================
-
 const pointer = { x: 0, y: 0 };
 window.addEventListener('mousemove', (e) => {
   pointer.x = (e.clientX / window.innerWidth) * 2 - 1;
@@ -436,70 +365,52 @@ window.addEventListener('mousemove', (e) => {
 
 let blinkTimer = 1 + Math.random() * 3;
 let blinkPending = 0;
-let blinkT = 999;        // seconds into the current blink
+let blinkT = 999;
 let blinkDur = 0.14;
 
 let moodTimer = 0;
 let mood = 0;
 let moodTarget = 0;
 
-// ---------------------------------------------------------------------------
-//  Idle gaze
-//
-//  Not a random walk around centre — that reads as staring through you. Real
-//  idle gaze is a series of *held* fixations, mostly on the person you are
-//  with, broken by aversions: a glance up while recalling, down while
-//  thinking, sideways when bored. Coming back is what makes it read as being
-//  with someone rather than looking past them.
-//
-//  Where she looks away to is not arbitrary either. Up-and-off tends to go
-//  with remembering, down with turning something over.
-// ---------------------------------------------------------------------------
-
 const AVERSIONS = [
-  { x: -0.38, y:  0.27, hold: [1.1, 2.4] },   // up-left, recalling
-  { x:  0.36, y:  0.25, hold: [1.1, 2.4] },   // up-right
-  { x: -0.27, y: -0.23, hold: [1.4, 3.0] },   // down-left, thinking
+  { x: -0.38, y:  0.27, hold: [1.1, 2.4] },
+  { x:  0.36, y:  0.25, hold: [1.1, 2.4] },
+  { x: -0.27, y: -0.23, hold: [1.4, 3.0] },
   { x:  0.25, y: -0.21, hold: [1.4, 3.0] },
-  { x: -0.48, y:  0.04, hold: [1.6, 3.4] },   // sideways, drifting off
+  { x: -0.48, y:  0.04, hold: [1.6, 3.4] },
   { x:  0.46, y: -0.02, hold: [1.6, 3.4] },
 ];
 
-// She is talking if there is audio coming out, not merely if a reply exists.
 const speaking = () => mouthOpen > 0.02 || playing > 0;
 
 let gazeTimer = 0;
 let gazeAway = false;
 const gaze = { x: 0, y: 0 };
 const gazeTarget = { x: 0, y: 0 };
-// The head chases the eyes rather than moving with them, so it lags.
+
 const gazeHead = { x: 0, y: 0 };
 const gazeHeadV = { x: 0, y: 0 };
-// Smoothed ambient head pose, and its velocity.
+
 const headS = { x: 0, y: 0, z: 0 };
 const headV = { x: 0, y: 0, z: 0 };
-// The torso trails the head down the same chain.
+
 const torsoS = { x: 0, y: 0 };
 const torsoV = { x: 0, y: 0 };
-// Fast and slow followers on the speech envelope; their difference is stress.
-let envFast = 0, envSlow = 0;
-let browFlash = 0;          // brief raise on re-engaging
 
-/** Smooth value noise. Sines at fixed frequencies visibly loop; this doesn't. */
+let envFast = 0, envSlow = 0;
+let browFlash = 0;
+
 const _hash = (i) => {
   const s = Math.sin(i * 127.1) * 43758.5453;
   return (s - Math.floor(s)) * 2 - 1;
 };
 function noise1(x) {
   const i = Math.floor(x), f = x - i;
-  // Quintic rather than smoothstep: its second derivative is continuous too,
-  // so the motion has no faint kink as it crosses each control point.
+
   const u = f * f * f * (f * (f * 6 - 15) + 10);
   return _hash(i) * (1 - u) + _hash(i + 1) * u;
 }
 
-/** Two octaves. One octave drifts evenly; real movement has a fine tremor
- *  riding on the slow wander. */
 function fbm(x) {
   return noise1(x) * 0.72 + noise1(x * 2.7 + 13.7) * 0.28;
 }
@@ -531,30 +442,15 @@ function decodeBase64Wav(base64) {
   return ensureAudio().decodeAudioData(bytes.buffer);
 }
 
-/** The reply currently being spoken, one sentence-sized chunk at a time.
- *
- *  The bridge streams a reply as it is written, so the audio arrives in
- *  pieces. Playing each piece the moment it decodes would leave an audible
- *  seam at every sentence — the gap is however long the next synthesis took.
- *  Instead each chunk is scheduled against the audio clock at the exact
- *  instant the previous one ends, which is sample-accurate and free.
- *
- *  Kokoro runs at 3-4x realtime once warm and sentences are seconds long, so
- *  after the first chunk synthesis stays comfortably ahead of playback. When
- *  it does not — a slow first load, a long pause from the model — `nextStart`
- *  has already gone by, and the chunk starts immediately instead of being
- *  scheduled into the past.
- */
 const utterance = {
-  epoch: -1,        // audio-clock time chunk 0 began, or -1 between replies
-  nextStart: 0,     // where the next chunk goes
-  chunks: [],       // { index, start, end, src }
-  ended: false,     // no more chunks are coming
+  epoch: -1,
+  nextStart: 0,
+  chunks: [],
+  ended: false,
 };
 
 let playing = 0;
 
-/** How many chunks she has fully finished saying, right now. */
 function chunksSpoken() {
   if (utterance.epoch < 0) return 0;
   const now = audioCtx.currentTime;
@@ -563,13 +459,10 @@ function chunksSpoken() {
   return n;
 }
 
-/** Queue one chunk of a streamed reply. Returns when it is scheduled, not
- *  when it has played — the caller must not block the stream reader. */
 async function enqueueChunk(base64, cues) {
   const ctx = ensureAudio();
   const buffer = await decodeBase64Wav(base64);
 
-  // A small lead so the first chunk is scheduled rather than raced.
   const LEAD = 0.06;
   if (utterance.epoch < 0) {
     utterance.epoch = ctx.currentTime + LEAD;
@@ -596,13 +489,11 @@ async function enqueueChunk(base64, cues) {
   appendCues(cues, start - utterance.epoch, buffer.duration);
 }
 
-/** Silence her immediately. Returns how many chunks she got through, which
- *  is what the bridge needs to trim the transcript back to what was heard. */
 function stopSpeaking() {
   if (utterance.epoch < 0) return 0;
   const spoken = chunksSpoken();
   for (const c of utterance.chunks) {
-    try { c.src.stop(); } catch { /* already ended */ }
+    try { c.src.stop(); } catch {   }
   }
   utterance.chunks = [];
   utterance.epoch = -1;
@@ -613,7 +504,6 @@ function stopSpeaking() {
   return spoken;
 }
 
-/** Resolves when everything queued has finished playing. */
 function untilSpoken() {
   if (utterance.epoch < 0 || !utterance.chunks.length) return Promise.resolve();
   const last = utterance.chunks[utterance.chunks.length - 1];
@@ -628,7 +518,6 @@ function endUtterance() {
   cueEpoch = -1;
 }
 
-/** One-shot playback, for replies that don't stream (screen looks, openers). */
 async function speak(base64, onStart) {
   stopSpeaking();
   utterance.ended = false;
@@ -659,20 +548,9 @@ async function speak(base64, onStart) {
   });
 }
 
-/** Lip sync.
- *
- *  Jaw opening comes from loudness, but a mouth that only opens and closes
- *  reads as a puppet. Vowel *shape* comes from where the energy sits in the
- *  spectrum: the first two formants roughly separate open/closed (F1) and
- *  front/back (F2), so the ratio between those bands picks between the five
- *  visemes the model rigs. Sibilants ("s", "sh") are almost all high-frequency
- *  energy with a nearly closed mouth, so they get detected and damped —
- *  otherwise every "s" reads as a shout.
- */
-const DB_FLOOR = -46;    // below this the mouth is closed
-const DB_CEIL = -14;     // at this it is fully open
+const DB_FLOOR = -46;
+const DB_CEIL = -14;
 
-// Band edges in Hz, resolved to FFT bins once the context sample rate is known.
 const BANDS = { f1: [250, 900], f2: [900, 2500], sib: [4000, 9000] };
 let bandBins = null;
 
@@ -695,8 +573,6 @@ function bandEnergy(range) {
 
 const clamp01 = (v) => (v < 0 ? 0 : v > 1 ? 1 : v);
 
-// Current and target weights per viseme. Each is smoothed on its own so the
-// mouth morphs between shapes instead of snapping.
 const VISEMES = ['aa', 'ih', 'ou', 'ee', 'oh'];
 const viseme = { aa: 0, ih: 0, ou: 0, ee: 0, oh: 0 };
 const visemeTarget = { aa: 0, ih: 0, ou: 0, ee: 0, oh: 0 };
@@ -719,7 +595,7 @@ function updateMouth(dt) {
     const db = 20 * Math.log10(rms + 1e-6);
 
     open = clamp01((db - DB_FLOOR) / (DB_CEIL - DB_FLOOR));
-    // Jaw opening isn't linear in loudness.
+
     open = Math.pow(open, 1.35) * 0.92;
     if (open < 0.05) open = 0;
 
@@ -732,11 +608,8 @@ function updateMouth(dt) {
     const frontness = voiced > 0.001 ? clamp01(e2 / voiced) : 0.4;
     const sibilance = (voiced + e3) > 0.001 ? clamp01(e3 / (voiced + e3)) : 0;
 
-    // A sibilant is a near-closed mouth, not an open one.
     if (sibilance > 0.45) open *= 1 - (sibilance - 0.45) * 1.2;
 
-    // Overlapping tents across the front/back axis, so neighbouring vowels
-    // blend rather than pop.
     const w = {
       ee: clamp01((frontness - 0.58) * 3.4),
       ih: clamp01(1 - Math.abs(frontness - 0.52) * 4.2),
@@ -744,7 +617,7 @@ function updateMouth(dt) {
       oh: clamp01((0.36 - frontness) * 3.6),
       ou: clamp01((0.28 - frontness) * 4.0),
     };
-    // Rounded vowels close the mouth; open ones need the jaw down.
+
     w.aa *= 0.5 + open * 0.5;
     w.ou *= 1.15 - open * 0.4;
     w.ee += sibilance * 0.5;
@@ -758,14 +631,12 @@ function updateMouth(dt) {
     }
   }
 
-  // Attack fast, release slower — reads as speech, not a flapping jaw.
   for (const v of VISEMES) {
     const t = visemeTarget[v];
     const rate = t > viseme[v] ? 24 : 12;
     viseme[v] += (t - viseme[v]) * Math.min(1, rate * dt);
   }
 
-  // A single scalar for everything that reacts to "is she talking".
   mouthOpen = clamp01(viseme.aa + viseme.oh + viseme.ee * 0.6 + viseme.ih * 0.6 + viseme.ou * 0.5);
 
   const em = vrm?.expressionManager;
@@ -775,58 +646,31 @@ function updateMouth(dt) {
 
 const TAU = Math.PI * 2;
 
-/** The torso, kept deliberately small.
- *
- *  At portrait framing the arms, hips and legs are off-screen, so animating
- *  them is wasted work. What's left is a trace of breathing through the
- *  shoulders — enough that the frame isn't a freeze-frame, and enough to give
- *  the spring bones something to react to.
- */
 function updateBody(t, dtBody) {
-  // ---- prosody ------------------------------------------------------
-  // The talking nod was a fixed 7.1 Hz sine: the same metronome whatever she
-  // said, running at the same rate through a shouted word and a mumbled one.
-  // Two followers on the mouth envelope — one quick, one slow — and the gap
-  // between them marks the stressed syllables, which is what a head actually
-  // moves on.
+
   envFast += (mouthOpen - envFast) * Math.min(1, dtBody * 14);
   envSlow += (mouthOpen - envSlow) * Math.min(1, dtBody * 2.2);
   const stress = Math.max(0, envFast - envSlow);
 
-  // Breathing is not a sine. The in-breath is quicker than the out-breath,
-  // and the period wanders — a metronome is the giveaway.
   const bphase = t * 0.21 + 0.07 * noise1(t * 0.05);
   const bw = bphase - Math.floor(bphase);
   const breath = (bw < 0.4
     ? Math.sin((bw / 0.4) * Math.PI * 0.5)
     : Math.cos(((bw - 0.4) / 0.6) * Math.PI * 0.5)) * 2 - 1;
 
-  // People are not equally animated minute to minute. A slow envelope gives
-  // her livelier stretches and calmer ones instead of a constant activity
-  // level, which is the other half of what reads as mechanical.
   const energy = 0.68 + 0.42 * noise1(t * 0.035 + 3);
 
-  // ---- weight shift -------------------------------------------------
-  // Nobody stands evenly on both feet for long. A very slow lateral shift
-  // through the hips, with the spine leaning back the other way so she stays
-  // over her own centre rather than toppling.
   const shift = fbm(t * 0.031 + 61) * energy;
 
-  // ---- the torso follows the head -----------------------------------
-  // Later and less than the head, which is itself later and less than the
-  // eyes. That descending chain is what makes a turn read as one movement
-  // through a body instead of three parts moving independently.
   const TK = 2.6, TC = 2.9;
   torsoV.y += (TK * (gazeHead.x - torsoS.y) - TC * torsoV.y) * dtBody;
   torsoV.x += (TK * (-gazeHead.y - torsoS.x) - TC * torsoV.x) * dtBody;
   torsoS.y += torsoV.y * dtBody;
   torsoS.x += torsoV.x * dtBody;
 
-  const twist = torsoS.y * 0.30;      // yaw carried by the torso
+  const twist = torsoS.y * 0.30;
   const lean  = torsoS.x * 0.10;
 
-  // Each bone gets one call: poseBone sets from rest rather than accumulating,
-  // so every contribution for a bone has to be summed here.
   poseBone('hips',
     lean * 0.4,
     twist * 0.30 + shift * 0.020,
@@ -850,13 +694,9 @@ function updateBody(t, dtBody) {
   poseBone('rightShoulder',
     -0.010 * breath - lift - stress * 0.06, 0, -0.006 * breath - lift * 0.5);
 
-  // ---- arms ----------------------------------------------------------
-  // Mostly passive: they hang off a torso that is moving, so they swing a
-  // little against it and settle a beat later. A touch of independent drift
-  // on top, out of phase left to right, so they aren't a mirrored pair.
   const armL = fbm(t * 0.077 + 11) * energy;
   const armR = fbm(t * 0.071 + 29) * energy;
-  const swing = twist * 0.55;         // arms lag the twist, so they trail it
+  const swing = twist * 0.55;
 
   poseBone('leftUpperArm',
     0.012 * armL - 0.010 * breath,
@@ -871,37 +711,18 @@ function updateBody(t, dtBody) {
   poseBone('leftHand', 0.018 * armR, 0, -0.014 * armL);
   poseBone('rightHand', 0.017 * armL, 0, 0.013 * armR);
 
-  // Head motion is what actually swings the hair, so it carries most of the
-  // life in this framing. Split across neck and head so the skull isn't
-  // pivoting on a stick.
-
-  // Noise rather than sines: fixed frequencies beat against each other into a
-  // pattern you start to recognise after a minute of watching her.
   const nx = fbm(t * 0.13);
   const ny = fbm(t * 0.11 + 40);
   const nz = fbm(t * 0.09 + 80);
 
-  // The head carries part of the gaze shift, a beat behind the eyes. Without
-  // this the eyes slide about in a head that is doing something unrelated,
-  // which is most of what makes an idle avatar look vacant.
   const followX = -gazeHead.y * 0.19;
   const followY = gazeHead.x * 0.40;
 
-  // The ambient layer — drift, gaze-following, breathing sway — goes through
-  // its own soft filter before anything else is added. Every source feeding it
-  // (a stepped saccade target, a noise field, an energy envelope) has its own
-  // character, and filtering the sum is what stops those seams showing as
-  // snap. Deliberate cues are added *after* it, so a nod stays a nod instead
-  // of being smoothed into a nod-shaped smudge.
-  // Only the raw sources go through it. The gaze-follow already came out of
-  // its own spring, and running it through a second filter in series ate the
-  // motion — head range fell to 5 degrees and the head stopped visibly
-  // tracking the eyes at all. It is added after, still smooth, undiminished.
   const idleX = pointer.y * 0.09 + 0.016 * nx * energy;
   const idleY = pointer.x * 0.17 + 0.034 * ny * energy;
   const idleZ = 0.018 * nz * energy;
 
-  const HK = 5.0, HC = 4.2;          // 0.36 Hz, near-critically damped
+  const HK = 5.0, HC = 4.2;
   headV.x += (HK * (idleX - headS.x) - HC * headV.x) * dtBody;
   headV.y += (HK * (idleY - headS.y) - HC * headV.y) * dtBody;
   headV.z += (HK * (idleZ - headS.z) - HC * headV.z) * dtBody;
@@ -917,19 +738,8 @@ function updateBody(t, dtBody) {
   poseBone('head', x * 0.60, y * 0.60, z * 0.5);
 }
 
-// ---------------------------------------------------------------------------
-//  Action cues
-//
-//  The model writes physical actions as *tilts head*. The bridge strips those
-//  out of the spoken text and sends them here with a position in the reply, so
-//  each one fires at roughly the moment it would have been said.
-//
-//  Only the head, face and shoulders are on camera, so every cue is built from
-//  those. `p` is 0..1 progress through the cue.
-// ---------------------------------------------------------------------------
-
-const ease = (p) => Math.sin(p * Math.PI);               // up and back down
-const settle = (p) => Math.sin(p * Math.PI) * (1 - p);   // overshoot, then rest
+const ease = (p) => Math.sin(p * Math.PI);
+const settle = (p) => Math.sin(p * Math.PI) * (1 - p);
 
 const CUES = {
   nod:       { dur: 1.0, run: (p, o) => { o.hx += Math.sin(p * TAU * 1.5) * 0.20 * (1 - p); } },
@@ -953,7 +763,7 @@ const CUES = {
                  o.expr.relaxed = ease(p) * 0.3;
                } },
   sigh:      { dur: 2.0, run: (p, o) => {
-                 o.hx += ease(p) * 0.16;                  // head drops
+                 o.hx += ease(p) * 0.16;
                  o.expr.sad = ease(p) * 0.45;
                  o.shoulder -= ease(p) * 0.06;
                } },
@@ -961,11 +771,11 @@ const CUES = {
   sad:       { dur: 2.0, run: (p, o) => { o.expr.sad = ease(p) * 0.7; o.hx += ease(p) * 0.12; } },
   surprised: { dur: 1.2, run: (p, o) => {
                  o.expr.surprised = ease(p) * 0.85;
-                 o.hx -= settle(p) * 0.18;                // head pulls back
+                 o.hx -= settle(p) * 0.18;
                } },
   blush:     { dur: 2.2, run: (p, o) => {
                  o.expr.happy = ease(p) * 0.4;
-                 o.hy += ease(p) * 0.16;                  // looks away
+                 o.hy += ease(p) * 0.16;
                  o.hx += ease(p) * 0.09;
                } },
   think:     { dur: 2.0, run: (p, o) => {
@@ -989,36 +799,26 @@ const CUES = {
   emote:     { dur: 1.0, run: (p, o) => { o.hx += Math.sin(p * TAU) * 0.06; } },
 };
 
-// Expressions a cue can drive, so we know what to clear each frame.
 const CUE_EXPRESSIONS = ['happy', 'sad', 'angry', 'relaxed', 'surprised'];
 
-let pendingCues = [];   // { animation, at } seconds from cue-clock start
-let activeCues = [];    // { animation, elapsed, dur }
-let cueClock = -1;      // seconds since the reply started, or -1 when idle
-// Audio-clock time the current reply began, or -1 when she isn't speaking.
-// A streamed reply arrives in pieces over several seconds, so the cue clock
-// is read off the audio clock rather than accumulated from frame times —
-// otherwise a dropped frame shifts every remaining gesture in the reply.
+let pendingCues = [];
+let activeCues = [];
+let cueClock = -1;
+
 let cueEpoch = -1;
 
 const cueOut = { hx: 0, hy: 0, hz: 0, shoulder: 0, gazeX: 0, gazeY: 0, blinkLeft: 0, expr: {} };
 const cueScratch = { hx: 0, hy: 0, hz: 0, shoulder: 0, gazeX: 0, gazeY: 0, blinkLeft: 0, expr: {} };
 
-/** Queue a whole reply's cues against the real audio duration. */
 function scheduleCues(cues, duration) {
   pendingCues = (cues || []).map((c) => ({
     animation: c.animation,
-    at: Math.max(0, (c.fraction ?? 0) * duration - 0.15),   // land slightly early
+    at: Math.max(0, (c.fraction ?? 0) * duration - 0.15),
   }));
   activeCues = [];
   cueClock = pendingCues.length ? 0 : -1;
 }
 
-/** Add one streamed chunk's cues, positioned within the whole reply.
- *
- *  `offset` is where this chunk starts relative to the first one, so a shrug
- *  written in the third sentence still lands in the third sentence.
- */
 function appendCues(cues, offset, duration) {
   for (const c of cues || []) {
     pendingCues.push({
@@ -1029,20 +829,6 @@ function appendCues(cues, offset, duration) {
   pendingCues.sort((a, b) => a.at - b.at);
 }
 
-// ---------------------------------------------------------------------------
-//  Spontaneous gestures
-//
-//  Between replies she only drifted, which is most of what still read as
-//  robotic: a person waiting is not motionless, they shift and glance and
-//  settle. These are the same cues the model can ask for, fired on her own.
-//
-//  Drawn from a shuffled bag rather than picked at random each time. Plain
-//  random repeats itself in clumps — three tilts in a row — and a fixed list
-//  is worse, because you learn the order. A bag gives every gesture an outing
-//  before any repeats, reshuffled each pass, and never lets the reshuffle
-//  butt the same gesture against itself.
-// ---------------------------------------------------------------------------
-
 const IDLE_GESTURES = ['tilt', 'lean', 'smile', 'nod', 'shrug', 'think', 'brow', 'sigh', 'eyeroll', 'stare'];
 
 let gestureBag = [];
@@ -1052,11 +838,11 @@ let gestureTimer = 6 + Math.random() * 8;
 function drawGesture() {
   if (!gestureBag.length) {
     gestureBag = IDLE_GESTURES.slice();
-    for (let i = gestureBag.length - 1; i > 0; i--) {      // Fisher-Yates
+    for (let i = gestureBag.length - 1; i > 0; i--) {
       const j = (Math.random() * (i + 1)) | 0;
       [gestureBag[i], gestureBag[j]] = [gestureBag[j], gestureBag[i]];
     }
-    // Don't let a fresh shuffle hand back what just played.
+
     if (gestureBag[gestureBag.length - 1] === lastGesture && gestureBag.length > 1) {
       const swap = (Math.random() * (gestureBag.length - 1)) | 0;
       [gestureBag[gestureBag.length - 1], gestureBag[swap]] =
@@ -1068,7 +854,7 @@ function drawGesture() {
 }
 
 function updateIdleGestures(dt) {
-  // Never on top of a reply — those cues are timed to her words.
+
   if (cueClock >= 0 || mouthOpen > 0.05) { gestureTimer = Math.max(gestureTimer, 2.5); return; }
 
   gestureTimer -= dt;
@@ -1076,8 +862,7 @@ function updateIdleGestures(dt) {
   gestureTimer = 7 + Math.random() * 11;
 
   const def = CUES[drawGesture()];
-  // Stretched and damped: the cue shapes are written for punctuating speech,
-  // and at that intensity an unprompted one lands as a jolt.
+
   if (def) activeCues.push({ run: def.run, elapsed: 0, dur: def.dur * 1.8, gain: 0.5 });
 }
 
@@ -1086,9 +871,6 @@ function updateCues(dt) {
   cueOut.shoulder = cueOut.gazeX = cueOut.gazeY = cueOut.blinkLeft = 0;
   for (const name of CUE_EXPRESSIONS) cueOut.expr[name] = 0;
 
-  // While audio is playing the cue clock is the audio clock; without it (TTS
-  // down, or a reply that was nothing but actions) it falls back to counting
-  // frames against an assumed reading pace.
   if (cueEpoch >= 0 && audioCtx) {
     cueClock = audioCtx.currentTime - cueEpoch;
   } else if (cueClock >= 0) {
@@ -1101,8 +883,7 @@ function updateCues(dt) {
       const def = CUES[next.animation] || CUES.emote;
       activeCues.push({ run: def.run, elapsed: 0, dur: def.dur });
     }
-    // A streamed reply is still being written, so an empty queue does not mean
-    // the reply is over — only a finished utterance releases the clock.
+
     if (cueEpoch < 0 && !pendingCues.length && !activeCues.length) cueClock = -1;
   }
 
@@ -1114,9 +895,6 @@ function updateCues(dt) {
 
     if (c.gain === undefined || c.gain === 1) { c.run(p, cueOut); continue; }
 
-    // A spontaneous gesture is a smaller version of the same movement. Run it
-    // into a scratch buffer and fold the result in at reduced strength, so an
-    // unprompted shrug is a shift in the seat rather than a performance.
     cueScratch.hx = cueScratch.hy = cueScratch.hz = 0;
     cueScratch.shoulder = cueScratch.gazeX = cueScratch.gazeY = cueScratch.blinkLeft = 0;
     for (const name of CUE_EXPRESSIONS) cueScratch.expr[name] = 0;
@@ -1134,10 +912,6 @@ function updateCues(dt) {
   }
 }
 
-// Most of this model's spring joints ship with gravityPower: 0, which means
-// gravityDir alone does nothing — it gets multiplied by zero. So the breeze has
-// to supply its own magnitude: compose (restGravity * restPower) + wind, then
-// feed the solver the resulting direction AND length.
 const WIND_STRENGTH = 0.15;
 
 const _wind = new THREE.Vector3();
@@ -1146,8 +920,6 @@ const _force = new THREE.Vector3();
 function updateHair(t) {
   if (!springs.length) return;
 
-  // Two slow components plus a faster flutter, under a slower gust envelope,
-  // so it breathes instead of oscillating.
   const gust = 0.55 + 0.45 * Math.sin(t * TAU * 0.037);
   const wx = (Math.sin(t * TAU * 0.13) * 0.6
             + Math.sin(t * TAU * 0.29 + 1.3) * 0.28
@@ -1168,69 +940,47 @@ function updateHair(t) {
   }
 }
 
-/** Eyes and face — the part you actually see at this crop. */
 function updateGaze(dt, t) {
   gazeTimer -= dt;
   if (gazeTimer <= 0) {
     const from = { x: gazeTarget.x, y: gazeTarget.y };
 
     if (gazeAway) {
-      // Come back. Settling near the eyes rather than exactly on them, so it
-      // is not the identical spot every time.
+
       gazeAway = false;
       gazeTarget.x = (Math.random() - 0.5) * 0.10;
       gazeTarget.y = (Math.random() - 0.5) * 0.07;
-      // Holds your eye for longer while she is the one talking.
+
       gazeTimer = (speaking() ? 2.6 : 1.6) + Math.random() * 3.4;
-      browFlash = 1;                     // brows lift a touch on re-engaging
+      browFlash = 1;
     } else if (Math.random() < (speaking() ? 0.16 : 0.45)) {
       gazeAway = true;
       const a = AVERSIONS[(Math.random() * AVERSIONS.length) | 0];
-      // Speaking pulls the aversion in and cuts it short — mid-sentence you
-      // flick away and come straight back, you don't go and stare at a wall.
+
       const near = speaking() ? 0.55 : 1;
       gazeTarget.x = (a.x + (Math.random() - 0.5) * 0.10) * near;
       gazeTarget.y = (a.y + (Math.random() - 0.5) * 0.08) * near;
       gazeTimer = (a.hold[0] + Math.random() * (a.hold[1] - a.hold[0]))
                 * (speaking() ? 0.45 : 1);
     } else {
-      // Still on you, just not frozen: a small shift within the face.
+
       gazeTarget.x = (Math.random() - 0.5) * 0.14;
       gazeTarget.y = (Math.random() - 0.5) * 0.10;
       gazeTimer = 1.3 + Math.random() * 2.2;
     }
 
-    // People often, but not always, blink through a large gaze shift. Firing
-    // on every one of them pushed the rate to 34/min against a human resting
-    // rate of 15-20, which reads as nervous rather than alive.
     const jump = Math.hypot(gazeTarget.x - from.x, gazeTarget.y - from.y);
     if (jump > 0.28 && blinkTimer > 0.9 && Math.random() < 0.4) blinkTimer = 0.02;
   }
 
-  // Saccades snap; they don't glide. Larger ones take measurably longer than
-  // small ones, so the rate falls off with distance rather than every jump
-  // taking the same time regardless of how far it goes.
   const dist = Math.hypot(gazeTarget.x - gaze.x, gazeTarget.y - gaze.y);
   const k = Math.min(1, dt * (13 - Math.min(7, dist * 9)));
   gaze.x += (gazeTarget.x - gaze.x) * k;
   gaze.y += (gazeTarget.y - gaze.y) * k;
 
-  // Ocular drift: the eye never truly holds still on a fixation.
   const driftX = noise1(t * 1.7) * 0.012;
   const driftY = noise1(t * 1.4 + 31) * 0.009;
 
-  // The head follows the eyes, late and only part of the way. This coupling
-  // is what stops the head and eyes reading as two separate mechanisms.
-  //
-  // A spring rather than an exponential lag. An exponential approach eases in
-  // and never overshoots, which is precisely the motion that reads as
-  // mechanical; damping below critical (2*sqrt(K) = 10.2 here) lets the head
-  // carry slightly past the mark and settle back, the way a real one does.
-  // K=26 was a 0.81 Hz head settling in ~0.6s — brisk enough to read as a
-  // servo; a real head turn takes over a second. Softening this costs no
-  // range, because a spring still converges on its target either way; it only
-  // changes how it gets there. C sits just under critical (2*sqrt(6) = 4.9),
-  // leaving a trace of overshoot so it settles rather than arrives.
   const K = 6, C = 4.4;
   gazeHeadV.x += (K * (gazeTarget.x - gazeHead.x) - C * gazeHeadV.x) * dt;
   gazeHeadV.y += (K * (gazeTarget.y - gazeHead.y) - C * gazeHeadV.y) * dt;
@@ -1250,31 +1000,29 @@ function updateBlink(dt) {
   blinkTimer -= dt;
   if (blinkTimer <= 0) {
     blinkT = 0;
-    blinkDur = 0.11 + Math.random() * 0.07;   // no two blinks the same length
+    blinkDur = 0.11 + Math.random() * 0.07;
     if (blinkPending > 0) {
       blinkPending -= 1;
       blinkTimer = 2.4 + Math.random() * 4.6;
     } else if (Math.random() < 0.25) {
-      blinkPending = 1;        // people often blink twice in quick succession
+      blinkPending = 1;
       blinkTimer = 0.24;
     } else {
       blinkTimer = 2.4 + Math.random() * 4.6;
     }
   }
-  // A blink is not symmetric: the lid snaps shut in roughly a third of the
-  // time it takes to open again. Decaying one linear value did both halves at
-  // the same rate, which is a shutter, not an eyelid.
+
   blinkT += dt;
   const bp = blinkT / blinkDur;
   const blink = bp >= 1 ? 0
     : bp < 0.32
-      ? Math.pow(bp / 0.32, 0.62)                    // snap shut
-      : Math.pow(1 - (bp - 0.32) / 0.68, 1.7);       // ease back open
+      ? Math.pow(bp / 0.32, 0.62)
+      : Math.pow(1 - (bp - 0.32) / 0.68, 1.7);
   const em = vrm.expressionManager;
   if (!em) return;
 
   if (cueOut.blinkLeft > 0.01) {
-    // A wink: one eye closes on its own, the other keeps blinking normally.
+
     em.setValue('blink', 0);
     em.setValue('blinkLeft', Math.max(blink, cueOut.blinkLeft));
     em.setValue('blinkRight', blink);
@@ -1285,7 +1033,6 @@ function updateBlink(dt) {
   }
 }
 
-/** A slow drift between neutral and a faint smile, so the face isn't a mask. */
 function updateMood(dt) {
   const em = vrm.expressionManager;
   if (!em) return;
@@ -1293,14 +1040,11 @@ function updateMood(dt) {
   moodTimer -= dt;
   if (moodTimer <= 0) {
     moodTimer = 4 + Math.random() * 9;
-    // Kept low deliberately: this expression opens the mouth on VRoid models,
-    // and a resting smile should be closed-lipped.
+
     moodTarget = Math.random() < 0.5 ? 0 : 0.05 + Math.random() * 0.10;
   }
   mood += (moodTarget - mood) * Math.min(1, dt * 1.3);
 
-  // 'happy' moves the mouth too, so back off while she's speaking or it
-  // fights the visemes. A cue always wins over the idle mood.
   const idleHappy = mood * (1 - Math.min(1, mouthOpen * 1.4));
   em.setValue('happy', Math.max(idleHappy, cueOut.expr.happy));
   em.setValue('sad', cueOut.expr.sad);
@@ -1318,38 +1062,25 @@ function tick() {
   const t = timer.getElapsed();
 
   if (vrm) {
-    // Mouth first: the idle layer reads mouthOpen to add a talking nod.
+
     updateMouth(dt);
     updateCues(dt);
     updateIdleGestures(dt);
-    updateGaze(dt, t);       // before the body: the head reads the gaze target
+    updateGaze(dt, t);
     updateBody(t, dt);
     updateBlink(dt);
     updateMood(dt);
     updateHair(t);
 
-    // Drives the humanoid rig, expressions, lookAt and the hair/skirt
-    // spring bones — which is what makes the idle motion carry.
     vrm.update(dt);
 
-    // After update, so the expression system doesn't overwrite it.
     applyRestingMouth();
     applyIdleBrow(t);
   }
 
   renderer.render(scene, camera);
-  updateClickThrough();          // after render: the hit test reads the frame
+  updateClickThrough();
 }
-
-// ============================================================
-//  Click-through
-//
-//  The window is a big transparent rectangle and, to the mouse, entirely
-//  solid — so it swallows every click on the desktop behind it. Main keeps it
-//  ignoring the mouse; this decides when to hand it back, by testing what is
-//  actually under the cursor: a visible control, or a non-transparent pixel
-//  of her. Everything else clicks through to whatever is behind.
-// ============================================================
 
 const gl = renderer.getContext();
 const probe = new Uint8Array(4);
@@ -1361,8 +1092,7 @@ function overUI(x, y) {
   for (const sel of UI) {
     const box = hit.closest(sel);
     if (!box) continue;
-    // The bar and chrome are opacity:0 until hovered, but still hit-testable —
-    // without this check their invisible footprints would block clicks.
+
     if (sel === '#drag-strip') return true;
     return parseFloat(getComputedStyle(box).opacity) > 0.05;
   }
@@ -1372,10 +1102,10 @@ function overUI(x, y) {
 function overAvatar(x, y) {
   const r = renderer.getPixelRatio();
   const px = Math.round(x * r);
-  const py = Math.round((window.innerHeight - y) * r);   // GL origin is bottom-left
+  const py = Math.round((window.innerHeight - y) * r);
   if (px < 0 || py < 0 || px >= gl.drawingBufferWidth || py >= gl.drawingBufferHeight) return false;
   gl.readPixels(px, py, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, probe);
-  return probe[3] > 12;      // ignore antialiased fringes and faint hair tips
+  return probe[3] > 12;
 }
 
 let solid = null;
@@ -1383,9 +1113,7 @@ let cursor = null;
 
 window.addEventListener('mousemove', (e) => {
   cursor = [e.clientX, e.clientY];
-  // :hover is not dependable while the window is ignoring the mouse, and the
-  // controls only become clickable once they are visible — so reveal them from
-  // the forwarded move instead of relying on it.
+
   document.body.classList.add('near');
 });
 window.addEventListener('mouseleave', () => {
@@ -1406,13 +1134,7 @@ function updateClickThrough() {
   setSolid(overUI(x, y) || overAvatar(x, y));
 }
 
-// Started here, not at the render loop: the first frame calls
-// updateClickThrough(), which would hit `cursor` in its temporal dead zone.
 tick();
-
-// ============================================================
-//  Bridge
-// ============================================================
 
 let busy = false;
 let recording = false;
@@ -1423,8 +1145,7 @@ function setStatus(kind, text) {
 }
 
 let noticeKind = null;
-// Main supervises the bridge; say so on screen rather than letting her just
-// go quiet, which is indistinguishable from her ignoring you.
+
 window.marina.onBridgeDown?.((msg) => {
   setStatus('bad', 'backend restarting');
   showNotice(msg || 'Backend stopped. Restarting\u2026', 'bridge');
@@ -1439,7 +1160,7 @@ function showNotice(msg, kind = 'general') {
   notice.textContent = msg;
   notice.classList.remove('hidden');
 }
-/** Only clear the notice if it belongs to the subsystem that just recovered. */
+
 function hideNotice(kind = null) {
   if (kind !== null && noticeKind !== kind) return;
   noticeKind = null;
@@ -1478,8 +1199,7 @@ async function handleResult(result) {
   if (result.error) showNotice(result.error, 'bridge'); else hideNotice('bridge');
   noteBackendUsed(result);
 
-  // The bridge already strips the markup; `reply` is what to show.
-  if (result.reply) say(result.reply);
+  if (result.speech) say(result.speech);
 
   if (result.audio) {
     setStatus('busy', 'speaking');
@@ -1490,14 +1210,12 @@ async function handleResult(result) {
     disarmBargeIn(req);
     if (inflight === req) inflight = null;
   } else if (result.cues && result.cues.length) {
-    // No audio (TTS down, or a reply that was nothing but actions) — still
-    // perform, timed off a rough reading pace of ~14 characters/second.
+
     scheduleCues(result.cues, Math.max(1.5, (result.speech || '').length / 14));
   }
   setBusy(false);
 }
 
-/** Read an NDJSON stream from the bridge, one event per line. */
 async function* readEvents(response) {
   const reader = response.body.getReader();
   const decoder = new TextDecoder();
@@ -1516,37 +1234,33 @@ async function* readEvents(response) {
   if (buf.trim()) yield JSON.parse(buf.trim());
 }
 
-// The reply in flight, so it can be cut off from anywhere.
 let inflight = null;
 
-/** Say one streamed chunk: bubble text, audio, and the cues written into it. */
 async function playChunk(ev, req) {
   noteBackendUsed(ev);
   if (ev.error) showNotice(ev.error, 'bridge');
-  // The bubble fills in as she speaks rather than appearing whole, which is
-  // the visible half of the same effect the audio gives.
-  req.text = (req.text ? req.text + ' ' : '') + ev.reply;
-  say(req.text);
+
+  if (ev.speech) {
+    req.text = (req.text ? req.text + ' ' : '') + ev.speech;
+    say(req.text);
+  }
   if (ev.audio) {
     if (!req.chunks) setStatus('busy', 'speaking');
     await enqueueChunk(ev.audio, ev.cues);
   } else if (ev.cues && ev.cues.length) {
-    // No audio for this chunk — still perform, at a reading pace.
+
     appendCues(ev.cues, 0, Math.max(1.5, (ev.speech || '').length / 14));
     if (cueEpoch < 0 && cueClock < 0) cueClock = 0;
   }
   req.chunks++;
-  // She is talking now, so arm the microphone to hear you talk over her.
+
   if (req.chunks === 1) armBargeIn(req);
 }
 
-/** Drain a reply stream. Shared by asking her something and by cutting in. */
 async function consumeReply(res, req) {
   if (!res.ok) throw new Error(`bridge returned ${res.status}`);
   for await (const ev of readEvents(res)) {
-    // Interrupting tells the bridge to stop generating, but a sentence or two
-    // may already be on the wire. Keep reading so the connection closes
-    // cleanly — just don't say any of it.
+
     if (req.cancelled) continue;
     if (ev.type === 'chunk') await playChunk(ev, req);
     else if (ev.type === 'error') showNotice(ev.message, 'bridge');
@@ -1565,11 +1279,6 @@ function newRequest() {
   return req;
 }
 
-/** Ask, and speak the answer as it is written.
- *
- *  The bridge sends one event per sentence — text, cues and its own audio —
- *  so the first words are out while the model is still writing the rest.
- */
 async function send(text) {
   if (busy || !text.trim()) return;
   setBusy(true, 'thinking');
@@ -1591,17 +1300,6 @@ async function send(text) {
   }
 }
 
-// ---------------------------------------------------------------------------
-//  Barge-in
-//
-//  A friend you cannot cut off is a cutscene. While she talks, the bridge
-//  keeps the microphone open and watches it; talking over her stops her
-//  mid-word, and what you said becomes the next thing you said — no button.
-//
-//  The reply to it comes back down the same stream, so from here an
-//  interruption is just the conversation carrying on.
-// ---------------------------------------------------------------------------
-
 let bargeEnabled = true;
 
 async function armBargeIn(req) {
@@ -1618,8 +1316,7 @@ async function armBargeIn(req) {
     for await (const ev of readEvents(res)) {
       if (ev.type === 'disabled') { bargeEnabled = false; return; }
       if (ev.type === 'speech') {
-        // She stops before anything else happens — the whole point is that it
-        // feels immediate, and transcription takes a second.
+
         req.tookOver = true;
         await interrupt();
         inflight = next;
@@ -1642,34 +1339,15 @@ async function armBargeIn(req) {
       endUtterance();
       setBusy(false);
     }
-    // Her answer armed a monitor of its own, so you can cut in again. Once
-    // she has finished, close it — otherwise the microphone stays open until
-    // it times out, minutes after anyone is talking.
+
     disarmBargeIn(next);
     if (inflight === next) inflight = null;
   } catch {
-    /* Aborted because she finished talking, or the bridge went away. Neither
-       is worth a notice: barge-in is an affordance, not a feature you invoked. */
+
   } finally {
     if (req.barge === controller) req.barge = null;
   }
 }
-
-/** Close the monitor when she finishes a reply uninterrupted.
- *
- *  Not when she was interrupted: the monitor stream is carrying the reply to
- *  what you said, so aborting it there would cut her off a second time.
- */
-// ---------------------------------------------------------------------------
-//  Speaking first
-//
-//  She has a life of her own — a thread she is stuck on for the day — and
-//  until now the only way to hear about it was to talk to her first.
-//
-//  A long poll rather than a push: one request is held open until the bridge
-//  decides it is time, and reopened when it returns. That needs no second
-//  channel and reconnects on its own when the bridge restarts.
-// ---------------------------------------------------------------------------
 
 let idleMuted = false;
 let idlePoll = null;
@@ -1687,8 +1365,7 @@ async function waitForOpener() {
 
     for await (const ev of readEvents(res)) {
       if (ev.type === 'disabled') { idleMuted = true; return; }
-      // Never talk over the user, and never on top of a reply she is already
-      // giving. The poll simply comes back around.
+
       if (busy || recording) return;
       if (ev.type === 'chunk') {
         if (!req.chunks) { inflight = req; setBusy(true, 'speaking'); }
@@ -1700,12 +1377,10 @@ async function waitForOpener() {
       endUtterance();
     }
   } catch {
-    /* Bridge restarting, or the window closed. The retry below covers it. */
+
   } finally {
     if (idlePoll === controller) idlePoll = null;
-    // Only clean up if this poll actually took the floor. It usually does
-    // not — it bows out the moment the user is mid-conversation, and clearing
-    // the busy state there would re-enable the UI on top of a live reply.
+
     if (req.chunks) {
       disarmBargeIn(req);
       if (inflight === req) inflight = null;
@@ -1716,7 +1391,6 @@ async function waitForOpener() {
 
 let openerLoopRunning = false;
 
-/** Keep one poll open forever, backing off while the bridge is down. */
 async function startOpenerPoll() {
   if (openerLoopRunning) return;
   openerLoopRunning = true;
@@ -1730,24 +1404,17 @@ function setIdleMuted(value) {
   idleMuted = !!value;
   post('/idle/mute', { muted: idleMuted }).catch(() => {});
   if (idleMuted && idlePoll) {
-    try { idlePoll.abort(); } catch { /* already closed */ }
+    try { idlePoll.abort(); } catch {   }
   }
 }
 
 function disarmBargeIn(req) {
   if (req?.barge && !req.tookOver) {
-    try { req.barge.abort(); } catch { /* already closed */ }
+    try { req.barge.abort(); } catch {   }
     req.barge = null;
   }
 }
 
-/** Cut her off mid-sentence.
- *
- *  Silences the speakers immediately, then tells the bridge how many sentences
- *  were actually heard. The bridge stops generating and records only those, so
- *  the next thing she says follows from what you heard rather than from a
- *  paragraph that only ever existed on the server.
- */
 async function interrupt() {
   if (!inflight && utterance.epoch < 0) return 0;
   const heard = stopSpeaking();
@@ -1755,7 +1422,7 @@ async function interrupt() {
   setBusy(false);
   try {
     await post('/interrupt', { chunks: heard });
-  } catch { /* she has already stopped talking, which is the urgent part */ }
+  } catch {   }
   return heard;
 }
 
@@ -1781,8 +1448,7 @@ async function toggleListen() {
   const req = newRequest();
   try {
     const res = await fetch(BRIDGE + '/listen/stop/stream', { method: 'POST' });
-    // The transcript comes back before the first sentence does, so it can go
-    // in the bubble while she is still thinking.
+
     await consumeReply(res, req);
   } catch (e) {
     if (!req.cancelled) showNotice(`Voice failed: ${e.message}`);
@@ -1792,10 +1458,6 @@ async function toggleListen() {
     setBusy(false);
   }
 }
-
-// ============================================================
-//  UI wiring
-// ============================================================
 
 function sendFromInput() {
   const text = input.value;
@@ -1810,7 +1472,6 @@ input.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') input.blur();
 });
 
-/** Take one screenshot and ask her about it. Never automatic. */
 async function lookAtScreen() {
   if (busy) return;
   setBusy(true, 'looking…');
@@ -1823,7 +1484,6 @@ async function lookAtScreen() {
     return;
   }
 
-  // Anything already typed becomes the question about the screen.
   const question = input.value.trim();
   input.value = '';
   say(question || 'Let me look…');
@@ -1845,7 +1505,6 @@ window.marina.onLookAtScreen(lookAtScreen);
 btnMic.addEventListener('click', toggleListen);
 window.marina.onToggleListen(toggleListen);
 
-// Cut her off with the keyboard, from anywhere.
 window.marina.onInterrupt?.(() => { interrupt(); });
 
 window.marina.onSetOpeners?.((on) => {
@@ -1853,8 +1512,6 @@ window.marina.onSetOpeners?.((on) => {
   if (!idleMuted) startOpenerPoll();
 });
 
-// Brain picker. Lists what each backend can actually serve and lets you
-// choose explicitly — no guessing which model you're talking to.
 let brainMode = 'auto';
 
 function paintBrain(mode, current, model) {
@@ -1891,7 +1548,6 @@ async function openPicker() {
 
   list.innerHTML = '';
 
-  // Automatic first — it's the sensible default.
   list.appendChild(pickItem(
     'Automatic', 'Prefer the server, fall back to this Mac',
     data.mode === 'auto',
@@ -1924,7 +1580,6 @@ async function openPicker() {
 
 function closePicker() { el('picker').classList.add('hidden'); }
 
-/** Keep the pill honest after every reply, not just when the picker opens. */
 function noteBackendUsed(data) {
   if (!data || !data.backend) return;
   const label = data.backend === 'local' ? 'this Mac' : 'GPU server';
@@ -1941,7 +1596,7 @@ async function refreshBrain() {
     const h = await (await fetch(`${BRIDGE}/health`)).json();
     paintBrain(h.llm_mode, h.llm_using, h.model);
     setStatus('ok', `${h.llm_using} · ${h.model}`);
-  } catch { /* status dot already reflects trouble */ }
+  } catch {   }
 }
 
 function togglePicker() {
@@ -1976,12 +1631,9 @@ el('btn-reset').addEventListener('click', async () => {
   try {
     await post('/reset');
     say('Fine, forgotten.');
-  } catch { /* bridge down; the status dot already says so */ }
+  } catch {   }
 });
 
-
-// Debug hook — lets the test harness sample the rig, and makes the scene
-// pokeable from devtools without exporting module internals.
 window.__marina = {
   get vrm() { return vrm; },
   get bones() { return bones; },
@@ -2001,8 +1653,7 @@ window.__marina = {
   send,
   interrupt,
   isSpeaking: () => playing > 0,
-  // The scheduled start/end of every chunk in the reply being spoken, so a
-  // test can prove the queue is gapless rather than taking it on trust.
+
   get utterance() {
     return {
       epoch: utterance.epoch,
@@ -2014,13 +1665,6 @@ window.__marina = {
   audioState: () => (audioCtx ? audioCtx.state : 'none'),
   THREE,
 };
-
-// ---- boot ----
-
-// The app launches the Python bridge as a child process, so the window is up
-// well before the bridge is listening. A single health check at boot therefore
-// loses the race and shows "bridge isn't running" forever. Poll instead, and
-// drop back into polling any time a request fails.
 
 let bridgeReady = false;
 let polling = false;
@@ -2039,15 +1683,13 @@ while (true) {
         const info = await res.json();
         bridgeReady = true;
         polling = false;
-        // The screen-look button only exists when the bridge says vision is on.
+
         const see = el('btn-see');
         if (see) see.hidden = !info.vision;
         paintBrain(info.llm_mode || 'auto', info.llm_using, info.model);
         setStatus('ok', `ready · ${info.model}`);
         hideNotice('bridge');
-        // Warming up matters more than it used to: with replies streamed a
-        // sentence at a time, the first synthesis of the session is on the
-        // critical path for the first word she says.
+
         post('/warmup').catch(() => {});
         bargeEnabled = info.barge_in !== false;
         if (info.idle) idleMuted = !!info.idle.muted || info.idle.enabled === false;
@@ -2055,13 +1697,12 @@ while (true) {
         return;
       }
     } catch {
-      /* not up yet */
+
     }
 
     const waited = Date.now() - started;
     if (waited < quietFor) {
-      // A cold start takes ~10s (Python imports Whisper and friends), so
-      // don't cry wolf inside that window.
+
       setStatus('busy', 'starting…');
     } else if (!announced) {
       announced = true;
@@ -2073,14 +1714,11 @@ while (true) {
 }
 }
 
-/** Call when a request fails, so we recover instead of staying stuck. */
 function bridgeLost() {
 bridgeReady = false;
 pollForBridge({ quietFor: 0 });
 }
 
-// Hidden until /health confirms vision is on, so it never flashes into view
-// on a cold start and then vanishes.
 el('btn-see').hidden = true;
 
 pollForBridge();

@@ -1,4 +1,4 @@
-// Fires each cue animation and confirms it actually moves the rig / face.
+
 const { app, BrowserWindow, ipcMain } = require('electron');
 const fs = require('fs'); const path = require('path');
 const ROOT = path.join(__dirname, '..');

@@ -1,8 +1,4 @@
 #!/usr/bin/env bash
-# Builds Marina.app and installs it to /Applications.
-#
-# The bundle records this folder's absolute path so the app can find the Python
-# venv and server script at launch — so if you move the project, re-run this.
 set -euo pipefail
 cd "$(dirname "$0")"
 ROOT="$(pwd)"

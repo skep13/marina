@@ -18,8 +18,6 @@ _persona = _config.get("persona") or {}
 
 ENABLED = bool(_persona.get("enabled", True))
 
-# Deliberately specific. "She makes videos" gives a small model nothing to work
-# with; "the audio desyncs about four seconds in" gives it something to say.
 DEFAULT_THREADS = [
     "You are four hours into a Jujutsu Kaisen edit and the audio desyncs about "
     "four seconds in every single time you export.",
@@ -55,11 +53,6 @@ def current_thread(when=None):
     return pool[seed % len(pool)]
 
 
-# How often the thread is in the prompt at all. Told to bring it up "if it
-# fits" on every single turn, a small model fits it in every single time — the
-# same edit and the same view count in reply after reply. The instruction was
-# never the problem; being asked at all is a nudge it cannot ignore, so most
-# turns should not ask.
 MENTION_RATE = float(_persona.get("mention_rate", 0.34))
 
 
@@ -69,7 +62,6 @@ def as_prompt_block(when=None, roll=None):
     thread = current_thread(when)
     if not thread:
         return ""
-    # `roll` is injectable so the behaviour is testable without patching random.
     if (roll if roll is not None else random.random()) > MENTION_RATE:
         return ""
     return (

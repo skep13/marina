@@ -3,12 +3,8 @@ const fs = require('fs');
 const path = require('path');
 const { spawn } = require('child_process');
 
-// Models bundled with the app. Inside app.asar once packaged, so read-only.
 const BUNDLED_MODELS_DIR = path.join(__dirname, 'models');
 
-// Where a model YOU choose gets stored. userData is writable in both the
-// packaged app and in development, and it survives rebuilds — so swapping the
-// avatar doesn't get undone the next time the app is rebuilt.
 function userModelsDir() {
   return path.join(app.getPath('userData'), 'models');
 }
@@ -34,16 +30,13 @@ function readAsTransferable(file) {
   return buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength);
 }
 
-// Where the Python side lives. Unpackaged that's the repo above this folder;
-// packaged, the build writes the absolute path into the bundle so the .app can
-// still find the venv and the server script.
 function projectRoot() {
   if (app.isPackaged) {
     const marker = path.join(process.resourcesPath, 'project-root.txt');
     try {
       const p = fs.readFileSync(marker, 'utf8').trim();
       if (p && fs.existsSync(p)) return p;
-    } catch { /* fall through */ }
+    } catch {   }
   }
   return path.join(__dirname, '..');
 }
@@ -59,7 +52,6 @@ async function bridgeAlive() {
   }
 }
 
-/** Start the Python bridge unless one is already listening. */
 async function startBridge() {
   if (await bridgeAlive()) {
     console.log('Bridge already running; not starting another.');
@@ -79,10 +71,6 @@ async function startBridge() {
     return;
   }
 
-  // Send the child's output straight to a file descriptor rather than piping
-  // it through Node. Launched from Finder there is no stdout attached, so
-  // forwarding to process.stdout blocks as soon as the pipe buffer fills —
-  // which wedged the bridge before it could bind its port.
   const logPath = path.join(app.getPath('userData'), 'bridge.log');
   let out = 'ignore';
   try {
@@ -105,20 +93,7 @@ async function startBridge() {
   });
 }
 
-// ---------------------------------------------------------------------------
-//  Supervision
-//
-//  Nothing watched the bridge before: if it died she simply went quiet, with
-//  no restart and nothing on screen to say why. It is the process that does
-//  all the actual work, so it is the one thing here worth supervising.
-//
-//  Backing off matters as much as restarting. A bridge that dies immediately
-//  and forever — a broken venv, a missing model — would otherwise respawn in a
-//  tight loop, and the failure it is looping on is exactly the kind you want
-//  to be told about rather than have hidden by a retry.
-// ---------------------------------------------------------------------------
-
-let quitting = false;      // a deliberate quit must not look like a crash
+let quitting = false;
 const RESTART_DELAYS = [1000, 2000, 5000, 10000, 30000];
 let restartCount = 0;
 let restartTimer = null;
@@ -127,8 +102,6 @@ let lastHealthy = Date.now();
 function scheduleRestart(code) {
   if (restartTimer) return;
 
-  // A bridge that ran fine for a while and then died is a fresh incident, not
-  // a continuation of an old one.
   if (Date.now() - lastHealthy > 60000) restartCount = 0;
 
   if (restartCount >= RESTART_DELAYS.length) {
@@ -149,7 +122,6 @@ function notifyRenderer(channel, message) {
   if (win && !win.isDestroyed()) win.webContents.send(channel, message);
 }
 
-/** Poll health so a *hung* bridge is caught too, not only one that exited. */
 function watchBridge() {
   setInterval(async () => {
     if (quitting) return;
@@ -159,18 +131,17 @@ function watchBridge() {
       lastHealthy = Date.now();
       return;
     }
-    // Alive as a process but not answering: kill it so the exit handler
-    // restarts it through the same path as any other death.
+
     if (bridge && Date.now() - lastHealthy > 45000) {
       console.log('Bridge is up but not responding; restarting it.');
       lastHealthy = Date.now();
-      try { bridge.kill('SIGKILL'); } catch { /* already gone */ }
+      try { bridge.kill('SIGKILL'); } catch {   }
     }
   }, 5000);
 }
 
 function stopBridge() {
-  if (!bridge) return;               // we didn't start it; leave it alone
+  if (!bridge) return;
   bridge.kill('SIGTERM');
   bridge = null;
 }
@@ -178,7 +149,7 @@ const STATE_FILE = () => path.join(app.getPath('userData'), 'window-state.json')
 
 let win = null;
 let tray = null;
-let bridge = null;          // the Python process, when we started it
+let bridge = null;
 
 function readState() {
   try {
@@ -194,11 +165,9 @@ function writeState() {
   const [width, height] = win.getSize();
   try {
     fs.writeFileSync(STATE_FILE(), JSON.stringify({ x, y, width, height }));
-  } catch { /* not worth crashing over */ }
+  } catch {   }
 }
 
-// Set by the renderer's hit test, many times a second; the no-op guard matters
-// more than the call itself. Registered once — createWindow can run again.
 let ignoring = true;
 ipcMain.on('click-through', (_e, ignore) => {
   if (!win || win.isDestroyed() || ignore === ignoring) return;
@@ -217,7 +186,7 @@ function createWindow() {
     height,
     x: saved?.x ?? workArea.x + workArea.width - width - 24,
     y: saved?.y ?? workArea.y + workArea.height - height - 24,
-    // The transparent-desktop-pet combination:
+
     transparent: true,
     frame: false,
     hasShadow: false,
@@ -226,50 +195,37 @@ function createWindow() {
     resizable: true,
     skipTaskbar: true,
     fullscreenable: false,
-    // A transparent window with the default title bar style still paints a
-    // rounded background on macOS; 'customButtonsOnHover' does not.
+
     titleBarStyle: 'customButtonsOnHover',
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
       nodeIntegration: false,
-      // Chromium throttles requestAnimationFrame in unfocused windows. This is
-      // a floating widget that is almost never focused, so without this the
-      // whole avatar — idle motion, hair, lip sync — freezes the moment you
-      // click anything else.
+
       backgroundThrottling: false,
     },
   });
 
-  // A transparent window is still a solid window as far as the mouse is
-  // concerned: without this, the whole rectangle swallows every click on the
-  // desktop behind it. Ignore the mouse by default and let the renderer switch
-  // it back on when the cursor is actually over her or over a control.
-  // `forward: true` keeps mousemove flowing to the renderer so it can tell.
   win.setIgnoreMouseEvents(true, { forward: true });
 
-  // Float above full-screen apps and follow you between Spaces.
   win.setAlwaysOnTop(true, 'floating');
   win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
 
   win.webContents.setBackgroundThrottling(false);
   win.loadFile(path.join(__dirname, 'renderer', 'index.html'));
 
-  ignoring = true;   // fresh window starts click-through again
+  ignoring = true;
 
   win.on('moved', writeState);
   win.on('resized', writeState);
   win.on('closed', () => { win = null; });
 
-  // External links open in the real browser, never inside the avatar window.
   win.webContents.setWindowOpenHandler(({ url }) => {
     shell.openExternal(url);
     return { action: 'deny' };
   });
 }
 
-// Whether she is allowed to speak first. Mirrored here so the tray can show
-// the right label without asking the renderer.
 let openersOn = true;
 
 function buildTray() {
@@ -318,15 +274,12 @@ app.whenReady().then(() => {
   createWindow();
   buildTray();
 
-  // An always-on-top transparent window with hover-only controls is very easy
-  // to get stuck with. These always work, whatever the renderer is doing.
   globalShortcut.register('CommandOrControl+Shift+Q', () => app.quit());
   globalShortcut.register('CommandOrControl+Shift+H', () => {
     if (!win) return createWindow();
     win.isVisible() ? win.hide() : win.show();
   });
-  // Push to talk works even when the window is hidden.
-  // Cut her off from anywhere, without having to find the window first.
+
   globalShortcut.register('CommandOrControl+Shift+.', () => {
     win?.webContents.send('interrupt');
   });
@@ -347,11 +300,8 @@ app.on('will-quit', () => {
 });
 app.on('window-all-closed', () => app.quit());
 
-// ---------- IPC ----------
-
 ipcMain.handle('load-vrm', async () => {
-  // Reading in the main process and shipping bytes over IPC avoids file://
-  // fetch being blocked by CORS in the renderer.
+
   const found = findModel();
   if (!found) {
     return { error: `No .vrm found in ${userModelsDir()} or ${BUNDLED_MODELS_DIR}` };
@@ -371,7 +321,7 @@ ipcMain.handle('pick-vrm', async () => {
   const dir = userModelsDir();
   try {
     fs.mkdirSync(dir, { recursive: true });
-    // Clear old ones so the new pick is unambiguously the one that loads.
+
     for (const f of fs.readdirSync(dir)) {
       if (f.toLowerCase().endsWith('.vrm')) fs.rmSync(path.join(dir, f), { force: true });
     }
@@ -386,12 +336,6 @@ ${e.message}`);
   }
 });
 
-/** Grab the screen once, on demand.
- *
- *  Deliberately one-shot: there is no continuous capture anywhere in this app.
- *  Marina's own window is hidden for the shot, both so she doesn't photograph
- *  herself into a hall of mirrors and so the screenshot is what YOU see.
- */
 ipcMain.handle('capture-screen', async () => {
   if (process.platform === 'darwin') {
     const status = systemPreferences.getMediaAccessStatus('screen');
@@ -408,7 +352,7 @@ ipcMain.handle('capture-screen', async () => {
   if (wasVisible) win.hide();
 
   try {
-    // Let the compositor actually remove the window before grabbing.
+
     await new Promise((r) => setTimeout(r, 220));
 
     const { width, height } = screen.getPrimaryDisplay().size;
@@ -425,7 +369,6 @@ ipcMain.handle('capture-screen', async () => {
     const shot = sources[0].thumbnail;
     if (shot.isEmpty()) return { error: 'Screen capture came back empty.' };
 
-    // JPEG keeps the payload small; a 1400px screenshot is ~200 KB.
     return { image: shot.toJPEG(72).toString('base64'), mime: 'image/jpeg' };
   } catch (e) {
     return { error: `Screen capture failed: ${e.message}` };

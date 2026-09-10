@@ -1,18 +1,6 @@
 #!/usr/bin/env bash
-# One-time setup for the Mac side.
-#
-# The Mac runs: microphone -> Faster-Whisper -> (your LLM) -> Kokoro TTS -> avatar.
-# Nothing here needs torch, CUDA, or GPT-SoVITS.
 set -euo pipefail
 cd "$(dirname "$0")"
-
-# ----------------------------------------------------------------------
-# Find a Python >= 3.10.
-#
-# macOS ships 3.9, and onnxruntime >= 1.20 (which Kokoro needs) has no 3.9
-# wheels. Rather than touch the system Python, fall back to uv, which installs
-# a standalone interpreter under ~/.local/share/uv.
-# ----------------------------------------------------------------------
 
 is_ok() {
   [ -x "$1" ] && "$1" -c 'import sys; sys.exit(0 if sys.version_info >= (3,10) else 1)' 2>/dev/null
@@ -50,7 +38,6 @@ fi
 
 echo "Using $("$PY" --version) at $PY"
 
-# Only now is it safe to destroy the old environment.
 echo "==> Creating .venv"
 rm -rf .venv
 "$PY" -m venv .venv

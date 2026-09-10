@@ -25,7 +25,6 @@ def build_payload(in_text):
         "media_type": "wav",
         "streaming_mode": False,
     }
-    # Optional knobs — only sent if present in the config.
     for key in (
         "text_split_method",
         "speed_factor",
@@ -50,7 +49,6 @@ def sovits_gen_bytes(in_text, timeout=120):
     except requests.RequestException as e:
         raise SovitsError(f"Could not reach GPT-SoVITS at {API_URL}: {e}") from e
 
-    # GPT-SoVITS reports failures as JSON with a 400, not as audio.
     ctype = response.headers.get("content-type", "")
     if response.status_code != 200 or "application/json" in ctype:
         detail = response.text[:500]

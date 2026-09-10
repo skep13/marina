@@ -9,39 +9,30 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from process.text_func.speech import SentenceSplitter, split_reply   # noqa: E402
+from process.text_func.speech import SentenceSplitter, split_reply
 
-# (reply, must be spoken, must NOT be spoken, expected animation or None)
 CASES = [
-    # The regression: a one-word stage direction was read aloud as a word.
     ("*snaps* fine, it's whatever.", ["fine"], ["snaps"], "emote"),
     ("*sighs* i know.", ["i know"], ["sighs"], "sigh"),
     ("*shrugs* dunno.", ["dunno"], ["shrugs"], "shrug"),
     ("*blinks* wait, what?", ["wait"], ["blinks"], None),
 
-    # The inverse: emphasis must survive, or the sentence loses a word.
     ("that edit took *so long* to render.", ["so long", "render"], [], None),
     ("i said *nothing* about that.", ["nothing"], [], None),
     ("it's *that* bad.", ["that"], [], None),
     ("this is *really* annoying.", ["really"], [], None),
 
-    # Multi-word stage directions still work.
     ("*tilts her head* you sure about that?", ["you sure"], ["tilts"], "tilt"),
     ("*rolls her eyes* obviously.", ["obviously"], ["rolls"], "eyeroll"),
 
-    # Brackets are never dialogue; parentheses usually are.
     ("[leans back] nope.", ["nope"], ["leans back"], "lean"),
     ("i think (probably) yes.", ["probably"], [], None),
 
-    # Markdown and emoji never reach the voice.
     ("**bold** and `code` and \U0001F642 done.", ["done"], ["`", "*"], None),
     ("*unclosed action here", [], ["unclosed"], None),
 ]
 
 
-# Streaming cuts the reply into speakable pieces as it is written. The rules
-# that matter: never lose a word, and never cut inside a stage direction —
-# half an asterisk on each side and both halves get read out loud.
 STREAM_CASES = [
     "*sighs* fine. i'll look at it. but you owe me, seriously.",
     "it rendered at 3.5 fps which is, frankly, an insult. *rolls her eyes*",

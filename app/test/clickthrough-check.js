@@ -1,5 +1,4 @@
-// Does the transparent window hand clicks back to the desktop?
-// Probes a grid across the window and reports how much of it is solid.
+
 const { app, BrowserWindow, ipcMain } = require('electron');
 const fs = require('fs'); const path = require('path');
 const ROOT = path.join(__dirname, '..');

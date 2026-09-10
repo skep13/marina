@@ -1,5 +1,4 @@
-// Samples the idle layer over time: does she actually move, and do the head
-// and eyes move together rather than as two unrelated mechanisms?
+
 const { app, BrowserWindow, ipcMain } = require('electron');
 const fs = require('fs'); const path = require('path');
 const ROOT = path.join(__dirname, '..');
@@ -145,8 +144,6 @@ app.whenReady().then(async () => {
     };
   })()`);
 
-  // Gesture ordering: a bag should cover everything before repeating, and
-  // never hand back the same gesture twice running.
   const g = await win.webContents.executeJavaScript(`(() => {
     const seq = []; for (let i = 0; i < 300; i++) seq.push(window.__marina.drawGesture());
     let immediate = 0;

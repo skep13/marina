@@ -31,14 +31,9 @@ ENABLED = bool(_idle.get("enabled", True))
 MIN_GAP = float(_idle.get("min_gap_minutes", 25)) * 60
 MAX_PER_HOUR = int(_idle.get("max_per_hour", 2))
 PROBABILITY = float(_idle.get("probability", 0.5))
-# Local hours during which she stays quiet. Inclusive start, exclusive end,
-# and it wraps around midnight.
 QUIET_FROM = int(_idle.get("quiet_from_hour", 23))
 QUIET_UNTIL = int(_idle.get("quiet_until_hour", 9))
 
-# What she is being asked to do. Deliberately not "be helpful": the failure
-# mode for an unprompted line is "is there anything I can help you with?",
-# which is the single least friend-like sentence available.
 OPENER_INSTRUCTION = (
     "\n\nNothing has been said for a while and the silence is yours to break. "
     "Say one thing, unprompted — something on your mind, something you were "
@@ -50,7 +45,7 @@ OPENER_INSTRUCTION = (
 
 _lock = threading.Lock()
 _last_interaction = time.time()
-_spoken_at = []          # timestamps of recent openers, for the hourly cap
+_spoken_at = []
 _muted = False
 
 
@@ -79,14 +74,13 @@ def in_quiet_hours(now=None):
         return False
     if QUIET_FROM < QUIET_UNTIL:
         return QUIET_FROM <= hour < QUIET_UNTIL
-    return hour >= QUIET_FROM or hour < QUIET_UNTIL     # wraps midnight
+    return hour >= QUIET_FROM or hour < QUIET_UNTIL
 
 
 def note_spoken():
     now = time.time()
     with _lock:
         _spoken_at.append(now)
-        # Only the last hour matters to the cap, so the list stays tiny.
         _spoken_at[:] = [t for t in _spoken_at if now - t < 3600]
     note_interaction()
 
@@ -125,6 +119,4 @@ def due(now=None, roll=None):
             return False
     if in_quiet_hours():
         return False
-    # The last gate is a coin flip, so that being quiet for exactly
-    # `min_gap_minutes` is not a reliable way to summon her.
     return (roll if roll is not None else random.random()) < PROBABILITY

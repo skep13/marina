@@ -1,4 +1,4 @@
-// Renders at an awkward window size to check the UI doesn't stretch.
+
 const { app, BrowserWindow, ipcMain } = require('electron');
 const fs = require('fs'); const path = require('path');
 const ROOT = path.join(__dirname, '..');
@@ -26,7 +26,7 @@ app.whenReady().then(async () => {
   await new Promise(r => setTimeout(r, 500));
   fs.writeFileSync(path.join(__dirname, 'scale.png'), (await win.capturePage()).toPNG());
   console.log(`  window ${m.win[0]}x${m.win[1]}`);
-  // The column the avatar sits in: everything must live inside it.
+
   const COL = Math.min(440, m.win[0] - 24);
   const colL = Math.round(m.win[0]/2 - COL/2), colR = Math.round(m.win[0]/2 + COL/2);
   console.log(`  column  ${colL}..${colR}`);

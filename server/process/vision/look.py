@@ -21,17 +21,10 @@ ENABLED = bool(_vision.get("enabled", True))
 MODEL = _vision.get("model", "qwen2.5vl:3b")
 MAX_TOKENS = int(_vision.get("max_tokens", 300))
 
-# Vision models charge tokens by pixel area — qwen2.5-VL is roughly one token
-# per 28x28 patch. A raw Retina screenshot is ~6,500 tokens and blows a 4,096
-# context on its own, so the long edge is clamped here rather than trusting the
-# caller to have done it. 1024px keeps a screenshot near ~800 tokens while
-# still leaving UI text readable.
 MAX_EDGE = int(_vision.get("max_edge", 1024))
 
 DEFAULT_QUESTION = "What is on my screen right now?"
 
-# Kept deliberately terse: the answer is going to be spoken aloud, and a vision
-# model left unguided will narrate every pixel.
 SYSTEM = """You are looking at a screenshot of the user's screen.
 
 Answer their question about it in one to three short sentences, in a casual
@@ -50,11 +43,6 @@ class VisionError(RuntimeError):
 _client = None
 
 
-# The vision model is a second llama-server rather than the chat one — a
-# projector has to be loaded alongside the weights, and the chat model is not
-# going to be evicted every time she glances at the screen. Falls back to the
-# chat endpoint so an Ollama setup, which swaps models itself, still works
-# with nothing configured.
 BASE_URL = (_vision.get("base_url") or _llm.get("base_url") or "").strip() or None
 API_KEY = _vision.get("api_key") or _llm.get("api_key") or "not-needed"
 
