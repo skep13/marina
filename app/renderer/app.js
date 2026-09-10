@@ -1869,7 +1869,7 @@ function paintBrain(mode, current, model) {
 function pickItem(label, sub, selected, onClick, dim) {
   const d = document.createElement('div');
   d.className = 'pick-item' + (selected ? ' on' : '') + (dim ? ' dim' : '');
-  d.innerHTML = `<span class="tick">${selected ? '✓' : ''}</span><span>${label}</span>`;
+  d.innerHTML = `<span class="tick">${selected ? '\u2713' : ''}</span><span>${label}</span>`;
   if (sub) d.title = sub;
   if (!dim) d.addEventListener('click', onClick);
   return d;

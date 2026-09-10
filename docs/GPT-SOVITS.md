@@ -157,7 +157,7 @@ curl -X POST http://127.0.0.1:9880/tts \
   }' --output test.wav
 ```
 
-> ⚠️ **`ref_audio_path` is resolved on the server, not on your Mac.** This trips
+> **`ref_audio_path` is resolved on the server, not on your Mac.** This trips
 > everyone up. The upstream config shipped with `D:\PyProjects\...`, a Windows
 > path, which is why it fails out of the box. Copy your reference WAV onto the
 > server and put *that* path in the config.
@@ -187,7 +187,7 @@ python -m server.process.tts_func.sovits_ping
 That writes `output.wav` and prints how long the server took. If it's under
 about 2 seconds per sentence, conversation will feel natural.
 
-> 🔒 **The API has no authentication whatsoever.** Anyone who can reach port
+> **The API has no authentication whatsoever.** Anyone who can reach port
 > 9880 can use your GPU and read any file path you pass it. Do not port-forward
 > it to the open internet. Put it on Tailscale/WireGuard, or SSH-tunnel it:
 > `ssh -N -L 9880:127.0.0.1:9880 you@server`, then leave `api_url` pointing at

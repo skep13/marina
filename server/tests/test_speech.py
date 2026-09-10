@@ -34,7 +34,7 @@ CASES = [
     ("i think (probably) yes.", ["probably"], [], None),
 
     # Markdown and emoji never reach the voice.
-    ("**bold** and `code` and 🙂 done.", ["done"], ["`", "*"], None),
+    ("**bold** and `code` and \U0001F642 done.", ["done"], ["`", "*"], None),
     ("*unclosed action here", [], ["unclosed"], None),
 ]
 
