@@ -21,11 +21,11 @@ Against that, here's what the cloning-capable models want:
 
 | Model | Clones a voice? | RAM | Fits? |
 |---|---|---|---|
-| **Kokoro** (installed) | ✗ fixed voicepacks | **674 MB** | ✅ comfortably |
-| Piper | ✗ (train one instead) | ~150 MB | ✅ comfortably |
-| F5-TTS (MLX) | ✅ zero-shot | ~1.5–2 GB | ⚠️ tight |
-| Chatterbox | ✅ zero-shot, best quality | **~6 GB** | ❌ no |
-| GPT-SoVITS | ✅ zero-shot + fine-tune | needs torch (~6 GB installed), wants CUDA | ❌ no |
+| **Kokoro** (installed) | No, fixed voicepacks | **674 MB** | Yes, easily |
+| Piper | No, but you can train one | ~150 MB | Yes, easily |
+| F5-TTS (MLX) | Yes, zero shot | ~1.5–2 GB | Just about |
+| Chatterbox | Yes, zero shot, best quality | **~6 GB** | No |
+| GPT-SoVITS | Yes, zero shot and fine tuning | needs torch (~6 GB installed), wants CUDA | No |
 
 So: local voice on the Mac — yes, easily. Local *cloned* voice on the Mac —
 only by giving something up.
