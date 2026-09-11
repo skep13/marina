@@ -40,32 +40,44 @@ HISTORY_FILE = resolve(char_config["history_file"])
 BASE_SYSTEM_PROMPT = char_config["presets"]["default"]["system_prompt"]
 
 
+def _stable_context():
+    """Coarse, slow-changing context safe to sit in the cached system prefix.
+
+    The old per-turn volatile block carried the minute and the frontmost app,
+    which change constantly and, sitting between history turns, forced a full
+    prompt reprocess every reply. Everything here changes at most a few times a
+    day (part of day, the date-seeded thread), so the system prefix stays
+    stable and the conversation caches as an append-only sequence.
+    """
+    from datetime import datetime
+    bits = []
+    # The date-seeded life-thread is deliberately NOT here. Kept in the always
+    # cached prefix it was the same every turn, so she fixated on it and looped
+    # the same line in reply after reply. Her character (TikTok, anime, snark)
+    # already lives in the base prompt; she reaches for a life detail when it
+    # fits rather than being handed the same one to repeat.
+    h = datetime.now().hour
+    part = ("the middle of the night" if h < 5 else "early morning" if h < 8 else
+            "morning" if h < 12 else "afternoon" if h < 17 else
+            "evening" if h < 22 else "late evening")
+    bits.append(f"It is {datetime.now():%A} {part}. "
+                "Use this only if it is actually relevant.")
+    return "\n\n" + "\n\n".join(bits) if bits else ""
+
+
 def system_message():
     """The stable half of the prompt: who she is, and what she remembers.
 
     Everything here changes rarely, which matters more than it looks. Servers
     cache the processed prefix of a prompt, and llama.cpp reprocesses from the
-    first token that differs — so anything volatile at the front throws away
-    the cache for the whole conversation behind it. Measured on this setup
-    that is the difference between a first token in 0.2 s and one in 20 s.
-    See `volatile_message`.
+    first token that differs, so keeping this half stable is what lets a
+    conversation reuse the cache instead of reprocessing every turn.
     """
     return {
         "role": "system",
-        "content": BASE_SYSTEM_PROMPT + memory.as_prompt_block(),
+        "content": BASE_SYSTEM_PROMPT + memory.as_prompt_block() + _stable_context(),
     }
 
-
-def volatile_message():
-    """The half that changes every turn — the clock, and what is on her mind.
-
-    Deliberately placed last, immediately before the newest user turn, so the
-    cached prefix behind it stays intact. Putting the time of day in the
-    system prompt instead meant the cache was invalidated every single minute,
-    and every reply after the change of minute paid full prompt processing.
-    """
-    content = (persona.as_prompt_block() + ambient.as_prompt_block()).strip()
-    return {"role": "system", "content": content} if content else None
 
 FALLBACK_BASE = (_llm.get("fallback_base_url") or "").strip() or None
 FALLBACK_MODEL = _llm.get("fallback_model") or MODEL
@@ -216,13 +228,51 @@ def load_history():
 _history_lock = threading.RLock()
 
 
+# How many turns to show the model, and how the window moves. Sliding the
+# window one turn at a time drops the oldest message every reply, which shifts
+# every token after the system prompt and defeats the server's prompt cache —
+# turning each reply into a full reprocess. Instead the file keeps a generous
+# backlog, trimmed only in batches, and `_window` advances the send-window in
+# blocks so the cached prefix survives a long run of turns.
+SEND_WINDOW = HISTORY_TURNS * 2          # messages shown to the model
+RETAIN = HISTORY_TURNS * 6               # messages kept on disk
+
+
+def _window(history):
+    """The slice of history to send, advanced in blocks for cache stability."""
+    msgs = [m for m in history if m.get("role") != "system"]
+    if len(msgs) <= SEND_WINDOW:
+        return msgs
+    # Snap the window start down to a multiple of SEND_WINDOW, so it jumps once
+    # every SEND_WINDOW messages rather than sliding on every turn.
+    start = ((len(msgs) - SEND_WINDOW) // SEND_WINDOW) * SEND_WINDOW
+    return msgs[start:]
+
+
 def save_history(history):
-    trimmed = [m for m in history if m["role"] != "system"][-(HISTORY_TURNS * 2):]
+    msgs = [m for m in history if m["role"] != "system"]
+    if len(msgs) > RETAIN:
+        msgs = msgs[-(RETAIN - SEND_WINDOW):]   # batch trim: drop a chunk at once
+    trimmed = msgs
     with _history_lock:
         tmp = f"{HISTORY_FILE}.tmp"
         with open(tmp, "w", encoding="utf-8") as f:
             json.dump(trimmed, f, indent=2)
         os.replace(tmp, HISTORY_FILE)
+
+
+def _extract_backend():
+    """Which model does the background fact-extraction run on.
+
+    Deliberately the local Mac model when there is one: extraction fires after
+    every reply with a different prompt, and on the shared single-slot GPU that
+    would evict the conversation from the prompt cache and make the next reply
+    pay a full reprocess. Extraction is background work with no latency budget,
+    so the small local model is the right place for it.
+    """
+    if fallback_client is not None:
+        return fallback_client, FALLBACK_MODEL
+    return client, MODEL
 
 
 def save_turn(user_text, assistant_text):
@@ -235,13 +285,13 @@ def save_turn(user_text, assistant_text):
     if not assistant_text:
         return
     with _history_lock:
-        history = load_history()[-(HISTORY_TURNS * 2):]
+        history = _window(load_history())
         if user_text is not None:
             history.append({"role": "user", "content": user_text})
         history.append({"role": "assistant", "content": assistant_text})
         save_history(history)
     if REMEMBER and user_text is not None:
-        memory_extract.remember_async(client, MODEL, user_text, assistant_text)
+        memory_extract.remember_async(*_extract_backend(), user_text, assistant_text)
 
 
 def reset_history():
@@ -262,14 +312,14 @@ def get_reply(messages):
 def note_exchange(user_text, assistant_text):
     """Record a turn that didn't come from the chat model (e.g. a screen look),
     so she can refer back to it."""
-    history = load_history()[-(HISTORY_TURNS * 2):]
+    history = _window(load_history())
     history.append({"role": "user", "content": user_text})
     history.append({"role": "assistant", "content": assistant_text})
     save_history(history)
 
 
 def llm_response(user_input):
-    history = load_history()[-(HISTORY_TURNS * 2):]
+    history = _window(load_history())
     history.append({"role": "user", "content": user_input})
 
     completion = get_reply([system_message()] + history)
@@ -279,7 +329,7 @@ def llm_response(user_input):
     save_history(history)
 
     if REMEMBER:
-        memory_extract.remember_async(client, MODEL, user_input, reply)
+        memory_extract.remember_async(*_extract_backend(), user_input, reply)
 
     return reply
 
@@ -348,7 +398,7 @@ def llm_stream(user_input=None, extra_system=None, use_tools=True):
     is how an unprompted opener and a tool result both get their instructions
     in without becoming part of her permanent character.
     """
-    history = load_history()[-(HISTORY_TURNS * 2):]
+    history = _window(load_history())
     if user_input is not None:
         history.append({"role": "user", "content": user_input})
 
@@ -358,12 +408,9 @@ def llm_stream(user_input=None, extra_system=None, use_tools=True):
 
     global _tools_supported
 
-    volatile = volatile_message()
-    tail = ([volatile] if volatile else [])
-    if user_input is not None and history:
-        messages = [system] + history[:-1] + tail + history[-1:]
-    else:
-        messages = [system] + history + tail
+    # Append-only: the system prefix carries the (now stable) context, so the
+    # server reuses the whole cached prefix and prefills only the new turn.
+    messages = [system] + history
     offer = tools.definitions() if (use_tools and _tools_supported) else None
 
     for attempt in range(2):
