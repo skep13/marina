@@ -138,8 +138,11 @@ SPECS = [
             "required": ["url"],
         }}),
     ("remember", remember, True, {
-        "description": "Write down a durable fact about them, so it survives "
-                       "this conversation. Only for things worth keeping.",
+        "description": "Write down a lasting fact about the person you are talking to, so it "
+                       "survives this conversation. Only things that stay true: their name, "
+                         "what they do, what they like, people and pets in their "
+                         "life. Not instructions to yourself, not what is happening "
+                         "right now, not your own feelings or actions.",
         "parameters": {
             "type": "object",
             "properties": {"fact": {"type": "string"}},
