@@ -72,10 +72,41 @@ def all_facts():
     return load()["facts"]
 
 
+import re as _re
+
+# A durable fact is a plain statement about the user that stays true. These
+# patterns catch what the model kept storing instead: things it was told to do,
+# passing state that is only true this second, and its own narration of itself.
+_INSTRUCTION = _re.compile(
+    r"^(say|tell|ask|remind|greet|send|open|play|show|give|make sure|"
+    r"remember to|don'?t forget|note that|be sure|let|call)\b", _re.I)
+_EPHEMERAL = _re.compile(
+    r"\b(currently|right now|at the moment|just now|is talking to|"
+    r"is chatting|today|this (morning|afternoon|evening|session))\b", _re.I)
+# First word signalling the "fact" is about Marina or a third party, not the user.
+_SELF = _re.compile(r"^(i|i'?m|i'?ve|marina|my|we|us|our)\b", _re.I)
+
+
+def _is_durable_fact(text):
+    """True if this is worth keeping as a lasting fact about the user."""
+    t = text.strip()
+    if len(t) < 8 or len(t) > 200:
+        return False
+    if t[0] in "(\"'" or t[-1] in "!?":       # parenthetical dumps, chatter, questions
+        return False
+    if _INSTRUCTION.match(t):
+        return False
+    if _EPHEMERAL.search(t):
+        return False
+    if _SELF.match(t):
+        return False
+    return True
+
+
 def add(text, source="auto"):
     """Store a fact. Returns the fact, or None if it duplicates an existing one."""
     text = " ".join((text or "").split())
-    if len(text) < 4:
+    if not _is_durable_fact(text):
         return None
 
     with _lock:
