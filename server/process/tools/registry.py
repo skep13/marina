@@ -1,19 +1,6 @@
-"""The small number of things she can actually do.
+"""Tools the model can call: timers, clipboard, opening links, remembering.
 
-She had no agency at all: you could talk to her and she could talk back, and
-that was the whole surface. These are deliberately few, local, and dull —
-setting a timer, reading the clipboard you just copied to, opening a link,
-writing something down. Nothing that spends money, deletes anything, or
-reaches out of this machine.
-
-Two constraints shaped the list. Small local models are mediocre at tool
-selection, and every definition here is sent on every turn, so a long list
-costs tokens and makes her worse at the thing she is mainly for, which is
-talking. And a companion that quietly did large things would be alarming, so
-the ceiling is deliberately low.
-
-`open_url` is the only one that reaches outward, and it is restricted to
-http(s) — no file://, no arbitrary schemes, nothing that runs a program.
+open_url only accepts http and https.
 """
 import json
 import subprocess
@@ -67,7 +54,7 @@ def set_timer(minutes, label=""):
     threading.Thread(target=fire, daemon=True).start()
     pretty = f"{int(minutes)} minutes" if minutes >= 1 else f"{int(minutes * 60)} seconds"
     print(f"[tool] timer set for {pretty}{f' ({what})' if what else ''}", flush=True)
-    return f"Timer set for {pretty}{f' — {what}' if what else ''}."
+    return f"Timer set for {pretty}{f' ({what})' if what else ''}."
 
 
 def read_clipboard():
@@ -140,9 +127,9 @@ SPECS = [
     ("remember", remember, True, {
         "description": "Write down a lasting fact about the person you are talking to, so it "
                        "survives this conversation. Only things that stay true: their name, "
-                         "what they do, what they like, people and pets in their "
-                         "life. Not instructions to yourself, not what is happening "
-                         "right now, not your own feelings or actions.",
+                       "what they do, what they like, people and pets in their "
+                       "life. Not instructions to yourself, not what is happening "
+                       "right now, not your own feelings or actions.",
         "parameters": {
             "type": "object",
             "properties": {"fact": {"type": "string"}},
@@ -154,7 +141,6 @@ _HANDLERS = {name: fn for name, fn, on, _ in SPECS if on}
 
 
 def definitions():
-    """The OpenAI tool schema, or None when there is nothing to offer."""
     if not ENABLED:
         return None
     tools = [
@@ -166,7 +152,7 @@ def definitions():
 
 
 def run(name, arguments):
-    """Execute one tool call. Never raises — the model gets told what failed."""
+    """Run one tool call. Errors are returned as text for the model."""
     fn = _HANDLERS.get(name)
     if fn is None:
         return f"There is no tool called {name}."

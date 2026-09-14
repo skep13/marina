@@ -1,9 +1,4 @@
-"""What she says out loud versus what she performs.
-
-Every case here is a shape a small model actually produced, or the direct
-inverse of one. The rule under test is that a stage direction never reaches
-the TTS and an emphasised word never goes missing from it.
-"""
+"""Actions should be performed, not spoken. Emphasis should still be spoken."""
 import sys
 from pathlib import Path
 
@@ -45,7 +40,6 @@ STREAM_CASES = [
 
 
 def check_stream(failures):
-    """Feed each reply through in small deltas, as a model would produce it."""
     for reply in STREAM_CASES:
         for size in (1, 4, 13):
             splitter = SentenceSplitter()
@@ -78,7 +72,7 @@ def run():
                 failures.append(f"{reply!r}\n      missing {phrase!r} from speech {out['speech']!r}")
         for phrase in must_not:
             if phrase.lower() in spoken:
-                failures.append(f"{reply!r}\n      spoke {phrase!r} — should have been performed: {out['speech']!r}")
+                failures.append(f"{reply!r}\n      spoke {phrase!r}, should have been performed: {out['speech']!r}")
         if animation:
             got = [c["animation"] for c in out["cues"]]
             if animation not in got:

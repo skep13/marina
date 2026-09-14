@@ -1,22 +1,5 @@
-"""When she says something without being asked.
-
-She already has a life — `memory/persona.py` gives her a thread she is stuck on
-for the day — and until now the only way to hear about it was to speak first.
-A friend who never opens their mouth unprompted is a search box with a face.
-
-The whole risk here is being annoying, so the defaults are timid and every
-limit is a config key:
-
-  - `min_gap_minutes`  nothing until the room has been quiet this long
-  - `max_per_hour`     a hard ceiling regardless of anything else
-  - `probability`      not every eligible moment is taken, so it is not a
-                       metronome you can set your watch by
-  - `quiet_hours`      no opening the conversation overnight
-  - muting             one switch, honoured immediately, remembered
-
-Nothing here fires while she is mid-reply or the user is mid-sentence; the
-bridge only asks whether it is time when it has nothing else to do.
-"""
+"""Decides when she says something without being asked. See `idle:` in
+character_config.yaml for the limits."""
 import random
 import threading
 import time
@@ -36,7 +19,7 @@ QUIET_UNTIL = int(_idle.get("quiet_until_hour", 9))
 
 OPENER_INSTRUCTION = (
     "\n\nNothing has been said for a while and the silence is yours to break. "
-    "Say one thing, unprompted — something on your mind, something you were "
+    "Say one thing, unprompted: something on your mind, something you were "
     "reminded of, or a passing thought about them. One or two sentences. "
     "Do not offer help, do not ask what they are working on, and do not "
     "greet them as if they just arrived. It must not repeat anything already "
@@ -50,7 +33,6 @@ _muted = False
 
 
 def note_interaction():
-    """Called whenever anything passes between them, in either direction."""
     global _last_interaction
     with _lock:
         _last_interaction = time.time()
@@ -106,7 +88,6 @@ def status():
 
 
 def due(now=None, roll=None):
-    """Is this a moment to say something? Checked often; true rarely."""
     if not ENABLED:
         return False
     now = now or time.time()

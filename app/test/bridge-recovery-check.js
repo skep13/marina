@@ -1,4 +1,3 @@
-
 const { app, BrowserWindow, ipcMain } = require('electron');
 const http = require('http');
 const fs = require('fs'); const path = require('path');
@@ -31,14 +30,14 @@ app.whenReady().then(async () => {
     webPreferences: { preload: path.join(ROOT, 'preload.js'), contextIsolation: true, backgroundThrottling: false } });
   await win.loadFile(path.join(ROOT, 'renderer', 'index.html'));
 
-  console.log('PHASE 1 — no bridge at all (simulating a slow cold start)');
+  console.log('PHASE 1: no bridge at all (simulating a slow cold start)');
   for (const t of [2, 6, 12]) {
     await new Promise(r => setTimeout(r, t * 1000 - (t === 2 ? 0 : (t === 6 ? 2000 : 6000))));
     const s = await win.webContents.executeJavaScript(state());
     console.log(`  t=${t}s  status="${s.status}"  notice=${s.notice ? JSON.stringify(s.notice) : 'none'}`);
   }
 
-  console.log('\nPHASE 2 — bridge appears at ~14s');
+  console.log('\nPHASE 2: bridge appears at ~14s');
   const srv = fakeBridge();
   await new Promise(r => srv.listen(8765, '127.0.0.1', r));
   for (const t of [2, 5]) {
@@ -47,14 +46,14 @@ app.whenReady().then(async () => {
     console.log(`  +${t}s  status="${s.status}"  notice=${s.notice ? JSON.stringify(s.notice) : 'none'}`);
   }
 
-  console.log('\nPHASE 3 — bridge dies');
+  console.log('\nPHASE 3: bridge dies');
   await new Promise(r => srv.close(r));
   await win.webContents.executeJavaScript(`send('hello'); true`).catch(() => {});
   await new Promise(r => setTimeout(r, 4000));
   let s = await win.webContents.executeJavaScript(state());
   console.log(`  status="${s.status}"  notice=${s.notice ? JSON.stringify(s.notice) : 'none'}`);
 
-  console.log('\nPHASE 4 — bridge comes back');
+  console.log('\nPHASE 4: bridge comes back');
   const srv2 = fakeBridge();
   await new Promise(r => srv2.listen(8765, '127.0.0.1', r));
   await new Promise(r => setTimeout(r, 4000));

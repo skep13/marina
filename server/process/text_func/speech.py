@@ -1,16 +1,8 @@
-"""Split an LLM reply into what gets spoken and what gets performed.
+"""Split an LLM reply into speech and animation cues.
 
-Small local models narrate: they emit markdown, emoji, and roleplay actions
-like *tilts head*. Fed straight to TTS, all of that gets read out loud —
-"asterisk tilts head asterisk". This module pulls the reply apart into:
-
-  display - the original text, for the speech bubble
-  speech  - clean prose for the TTS engine
-  cues    - the actions, mapped to animations and positioned in the audio
-
-Cue positions are recorded as a character offset into `speech`, so the frontend
-can fire each one at roughly the moment it would have been spoken rather than
-dumping them all at the start.
+  display - text for the speech bubble
+  speech  - cleaned text for TTS (no markdown, emoji or *actions*)
+  cues    - the *actions*, mapped to animations, with their position in speech
 """
 import re
 
@@ -92,16 +84,7 @@ _VERBISH = re.compile(r"^[a-z]+(?:s|es|ing|ed)$", re.I)
 
 
 def _is_action(inner, kind):
-    """Decide whether a delimited span is a stage direction or just emphasis.
-
-    A cue match settles it. Otherwise the tell is grammatical, not length: a
-    stage direction opens with a verb ("snaps", "walks off slowly"), emphasis
-    does not ("so annoying", "that").
-
-    Length was the old rule and it failed both ways — it spoke a one-word
-    "*snaps*" out loud as if it were emphasis, and swallowed a two-word
-    "*so annoying*" as if it were an action.
-    """
+    """Is this *span* an action ("snaps", "walks off") or emphasis ("so annoying")?"""
     if classify(inner) != "emote":
         return True
     if kind == "bracket":
@@ -194,7 +177,6 @@ _PAIRS = {"(": ")", "[": "]"}
 
 
 def _open_spans(text):
-    """True while a delimiter is open, so a cut here would orphan a marker."""
     if text.count("```") % 2:
         return True
     if text.count("*") % 2:
@@ -206,7 +188,6 @@ def _open_spans(text):
 
 
 def _decimal_point(text, index):
-    """A '.' between two digits ends a number, not a sentence."""
     if text[index] != ".":
         return False
     before = text[index - 1] if index else ""
@@ -215,11 +196,9 @@ def _decimal_point(text, index):
 
 
 class SentenceSplitter:
-    """Accumulates streamed deltas and hands back speakable segments.
+    """Buffers streamed text and returns it a sentence at a time.
 
-    `feed` returns zero or more complete segments; `flush` returns whatever is
-    left at the end of the stream. Segments are raw reply text — run each one
-    through `split_reply` to get its speech and cues.
+    `feed` returns any complete segments, `flush` returns what's left.
     """
 
     def __init__(self, first_min=FIRST_MIN_CHARS, later_min=LATER_MIN_CHARS):

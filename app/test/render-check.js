@@ -1,4 +1,3 @@
-
 const { app, BrowserWindow, ipcMain } = require('electron');
 const fs = require('fs');
 const path = require('path');
@@ -16,7 +15,7 @@ ipcMain.handle('load-vrm', async () => {
   return { name: chosen, buffer: buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength) };
 });
 ipcMain.handle('pick-vrm', async () => ({ canceled: true }));
-ipcMain.on('set-click-through', () => {});
+ipcMain.on('click-through', () => {});
 ipcMain.on('quit', () => {});
 ipcMain.on('minimize', () => {});
 

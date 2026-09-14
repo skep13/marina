@@ -1,8 +1,7 @@
-"""LLM conversation with on-disk history.
+"""Chat completions client with on-disk history.
 
-Speaks the OpenAI chat-completions API, which is the one dialect that OpenAI,
-Ollama, llama.cpp, LM Studio and vLLM all implement. Set `llm.base_url` in
-character_config.yaml to point at a local server instead of OpenAI.
+Works with anything OpenAI-compatible (OpenAI, Ollama, llama.cpp, LM Studio,
+vLLM). Set `llm.base_url` in character_config.yaml.
 """
 import json
 import os
@@ -41,38 +40,16 @@ BASE_SYSTEM_PROMPT = char_config["presets"]["default"]["system_prompt"]
 
 
 def _stable_context():
-    """Coarse, slow-changing context safe to sit in the cached system prefix.
-
-    The old per-turn volatile block carried the minute and the frontmost app,
-    which change constantly and, sitting between history turns, forced a full
-    prompt reprocess every reply. Everything here changes at most a few times a
-    day (part of day, the date-seeded thread), so the system prefix stays
-    stable and the conversation caches as an append-only sequence.
-    """
     from datetime import datetime
-    bits = []
-    # The date-seeded life-thread is deliberately NOT here. Kept in the always
-    # cached prefix it was the same every turn, so she fixated on it and looped
-    # the same line in reply after reply. Her character (TikTok, anime, snark)
-    # already lives in the base prompt; she reaches for a life detail when it
-    # fits rather than being handed the same one to repeat.
-    h = datetime.now().hour
+    now = datetime.now()
+    h = now.hour
     part = ("the middle of the night" if h < 5 else "early morning" if h < 8 else
             "morning" if h < 12 else "afternoon" if h < 17 else
             "evening" if h < 22 else "late evening")
-    bits.append(f"It is {datetime.now():%A} {part}. "
-                "Use this only if it is actually relevant.")
-    return "\n\n" + "\n\n".join(bits) if bits else ""
+    return f"\n\nIt is {now:%A} {part}. Use this only if it is actually relevant."
 
 
 def system_message():
-    """The stable half of the prompt: who she is, and what she remembers.
-
-    Everything here changes rarely, which matters more than it looks. Servers
-    cache the processed prefix of a prompt, and llama.cpp reprocesses from the
-    first token that differs, so keeping this half stable is what lets a
-    conversation reuse the cache instead of reprocessing every turn.
-    """
     return {
         "role": "system",
         "content": BASE_SYSTEM_PROMPT + memory.as_prompt_block() + _stable_context(),
@@ -104,24 +81,20 @@ _active = "server"
 
 
 def describe_endpoint():
-    """The base URL actually being used, for /health."""
     if backend_current() == "local" and FALLBACK_BASE:
         return FALLBACK_BASE
     return BASE_URL or "https://api.openai.com/v1"
 
 
 def active_model():
-    """The model name of whichever backend is currently in use."""
     return model_for()
 
 
 def active_endpoint():
-    """Which backend is currently in use, for /health."""
     return backend_current()
 
 
 def _pick():
-    """Honour the selected mode; 'auto' also respects the failover cooldown."""
     m = backend_mode()
     if m == "local":
         if not fallback_client:
@@ -135,12 +108,6 @@ def _pick():
 
 
 def _request_extras(kw):
-    """Per-request options the shared server should not be forced to set.
-
-    Other people use the same llama-server, so anything opinionated belongs on
-    the request rather than the daemon. Unknown keys are ignored by servers
-    that do not use a chat template, so this is safe for Ollama too.
-    """
     kw = dict(kw)
     if not THINKING:
         extra = dict(kw.get("extra_body") or {})
@@ -160,12 +127,7 @@ def _request_extras(kw):
 
 
 def chat_completion(messages, **kw):
-    """Call the selected backend.
-
-    In 'auto' this falls back to the Mac when the server is unreachable. In
-    'server' it does not — a failure is reported, so you always know where
-    your words went.
-    """
+    """Call the selected backend. Only 'auto' mode falls back to local."""
     global _primary_down_until, _active
     from openai import APIConnectionError, APITimeoutError
 
@@ -184,18 +146,13 @@ def chat_completion(messages, **kw):
         _primary_down_until = time.time() + STICKY
         _active = "local"
         note_used("local")
-        print(f"[llm] server unreachable — using {FALLBACK_MODEL} on this Mac",
+        print(f"[llm] server unreachable, using {FALLBACK_MODEL} on this Mac",
               flush=True)
         return fallback_client.chat.completions.create(
             model=model_for("local"), messages=messages, **kw)
 
 
 def _flatten(message):
-    """Accept both plain strings and the Responses-API list-of-parts shape.
-
-    Upstream stored history as [{"type": "input_text", "text": ...}]. Older
-    history files therefore need converting rather than crashing the client.
-    """
     content = message.get("content")
     if isinstance(content, str):
         return {"role": message["role"], "content": content}
@@ -212,8 +169,6 @@ def _flatten(message):
 
 
 def load_history():
-    """History lives on this Mac only, and is shared across backends —
-    switching brains does not give you a different conversation."""
     if os.path.exists(HISTORY_FILE):
         with open(HISTORY_FILE, "r", encoding="utf-8") as f:
             try:
@@ -228,23 +183,14 @@ def load_history():
 _history_lock = threading.RLock()
 
 
-# How many turns to show the model, and how the window moves. Sliding the
-# window one turn at a time drops the oldest message every reply, which shifts
-# every token after the system prompt and defeats the server's prompt cache —
-# turning each reply into a full reprocess. Instead the file keeps a generous
-# backlog, trimmed only in batches, and `_window` advances the send-window in
-# blocks so the cached prefix survives a long run of turns.
-SEND_WINDOW = HISTORY_TURNS * 2          # messages shown to the model
-RETAIN = HISTORY_TURNS * 6               # messages kept on disk
+SEND_WINDOW = HISTORY_TURNS * 2
+RETAIN = HISTORY_TURNS * 6
 
 
 def _window(history):
-    """The slice of history to send, advanced in blocks for cache stability."""
     msgs = [m for m in history if m.get("role") != "system"]
     if len(msgs) <= SEND_WINDOW:
         return msgs
-    # Snap the window start down to a multiple of SEND_WINDOW, so it jumps once
-    # every SEND_WINDOW messages rather than sliding on every turn.
     start = ((len(msgs) - SEND_WINDOW) // SEND_WINDOW) * SEND_WINDOW
     return msgs[start:]
 
@@ -252,35 +198,21 @@ def _window(history):
 def save_history(history):
     msgs = [m for m in history if m["role"] != "system"]
     if len(msgs) > RETAIN:
-        msgs = msgs[-(RETAIN - SEND_WINDOW):]   # batch trim: drop a chunk at once
-    trimmed = msgs
+        msgs = msgs[-(RETAIN - SEND_WINDOW):]
     with _history_lock:
         tmp = f"{HISTORY_FILE}.tmp"
         with open(tmp, "w", encoding="utf-8") as f:
-            json.dump(trimmed, f, indent=2)
+            json.dump(msgs, f, indent=2)
         os.replace(tmp, HISTORY_FILE)
 
 
 def _extract_backend():
-    """Which model does the background fact-extraction run on.
-
-    Deliberately the local Mac model when there is one: extraction fires after
-    every reply with a different prompt, and on the shared single-slot GPU that
-    would evict the conversation from the prompt cache and make the next reply
-    pay a full reprocess. Extraction is background work with no latency budget,
-    so the small local model is the right place for it.
-    """
     if fallback_client is not None:
         return fallback_client, FALLBACK_MODEL
     return client, MODEL
 
 
 def save_turn(user_text, assistant_text):
-    """Append one exchange, and distil anything worth keeping out of it.
-
-    Every path that produces a reply ends here, including an interrupted one —
-    which passes only the part she actually said out loud.
-    """
     assistant_text = (assistant_text or "").strip()
     if not assistant_text:
         return
@@ -295,7 +227,6 @@ def save_turn(user_text, assistant_text):
 
 
 def reset_history():
-    """Forget the conversation and start over from the system prompt."""
     if os.path.exists(HISTORY_FILE):
         os.remove(HISTORY_FILE)
 
@@ -310,8 +241,7 @@ def get_reply(messages):
 
 
 def note_exchange(user_text, assistant_text):
-    """Record a turn that didn't come from the chat model (e.g. a screen look),
-    so she can refer back to it."""
+    """Save a turn that didn't come from the chat model, e.g. a screen look."""
     history = _window(load_history())
     history.append({"role": "user", "content": user_text})
     history.append({"role": "assistant", "content": assistant_text})
@@ -345,12 +275,6 @@ def get_reply_stream(messages, **kw):
 
 
 def _collect_tool_calls(delta, calls):
-    """Reassemble tool calls from stream deltas.
-
-    They arrive in pieces like everything else: the name in one event, the
-    JSON arguments a few characters at a time across the next several, keyed
-    only by position in the list.
-    """
     for call in getattr(delta, "tool_calls", None) or []:
         slot = calls.setdefault(call.index, {"id": "", "name": "", "arguments": ""})
         if call.id:
@@ -367,13 +291,7 @@ _tools_supported = True
 
 
 def _rejects_tools(e):
-    """Did the endpoint refuse the tool definitions, or just have a bad day?
-
-    A 400 or 422 is the server reading the request and declining it, which is
-    what an endpoint without tool support does. A timeout, a dropped socket or
-    a 500 is a server that is unwell — retrying without tools would hide a
-    real failure and cost her a capability permanently.
-    """
+    """True if the endpoint doesn't support tools (as opposed to being down)."""
     from openai import APIStatusError
 
     if not isinstance(e, APIStatusError):
@@ -385,18 +303,10 @@ def _rejects_tools(e):
 
 
 def llm_stream(user_input=None, extra_system=None, use_tools=True):
-    """Yield the reply as it is generated.
+    """Yield reply text as it arrives. The caller saves the turn with
+    `save_turn`, since only it knows how much was actually spoken.
 
-    Same conversation as `llm_response`, except the caller gets deltas and
-    can start synthesizing before the model has finished. Saving the turn is
-    deliberately not done here: being interrupted means the transcript should
-    record what she said out loud, not what the model went on to write, and
-    only the caller knows where the audio actually stopped. Call `save_turn`
-    with that.
-
-    `extra_system` is appended to the system prompt for this call only, which
-    is how an unprompted opener and a tool result both get their instructions
-    in without becoming part of her permanent character.
+    `extra_system` is added to the system prompt for this call only.
     """
     history = _window(load_history())
     if user_input is not None:
@@ -408,8 +318,6 @@ def llm_stream(user_input=None, extra_system=None, use_tools=True):
 
     global _tools_supported
 
-    # Append-only: the system prefix carries the (now stable) context, so the
-    # server reuses the whole cached prefix and prefills only the new turn.
     messages = [system] + history
     offer = tools.definitions() if (use_tools and _tools_supported) else None
 

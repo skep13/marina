@@ -17,7 +17,6 @@ const renderer = new THREE.WebGLRenderer({
   canvas,
   alpha: true,
   antialias: true,
-
   preserveDrawingBuffer: true,
 });
 renderer.setClearColor(0x000000, 0);
@@ -58,7 +57,6 @@ const loader = new GLTFLoader();
 loader.register((parser) => new VRMLoaderPlugin(parser));
 
 function frameUpperBody(v) {
-
   const head = v.humanoid?.getNormalizedBoneNode('head');
   const target = new THREE.Vector3();
   if (head) {
@@ -161,7 +159,6 @@ function poseBone(name, dx, dy, dz) {
 }
 
 const LIPS = {
-
   region: { u0: 0.40, v0: 0.72, u1: 0.62, v1: 0.80 },
   minSaturation: 0.18,
   saturation: 0.42,
@@ -256,7 +253,7 @@ function restyleFace(v) {
     }
   });
 
-  if (!lips) console.warn('Lip recolour: no matching pixels — check LIPS.region.');
+  if (!lips) console.warn('Lip recolour: no matching pixels, check LIPS.region.');
   return { lips, mouth };
 }
 
@@ -285,11 +282,8 @@ function applyIdleBrow(t) {
   const room = Math.max(0, 1 - emoting * 2);
 
   const values = {
-
     Fcl_BRW_Fun: room * (0.06 + 0.05 * noise1(t * 0.19 + 7) + browFlash * 0.22),
-
     Fcl_BRW_Surprised: room * Math.max(0, mouthOpen * 0.14 + 0.03 * noise1(t * 0.23 + 19)),
-
     Fcl_BRW_Sorrow: room * Math.max(0, 0.05 * noise1(t * 0.14 + 55)),
   };
 
@@ -493,7 +487,7 @@ function stopSpeaking() {
   if (utterance.epoch < 0) return 0;
   const spoken = chunksSpoken();
   for (const c of utterance.chunks) {
-    try { c.src.stop(); } catch {   }
+    try { c.src.stop(); } catch {}
   }
   utterance.chunks = [];
   utterance.epoch = -1;
@@ -647,7 +641,6 @@ function updateMouth(dt) {
 const TAU = Math.PI * 2;
 
 function updateBody(t, dtBody) {
-
   envFast += (mouthOpen - envFast) * Math.min(1, dtBody * 14);
   envSlow += (mouthOpen - envSlow) * Math.min(1, dtBody * 2.2);
   const stress = Math.max(0, envFast - envSlow);
@@ -854,7 +847,6 @@ function drawGesture() {
 }
 
 function updateIdleGestures(dt) {
-
   if (cueClock >= 0 || mouthOpen > 0.05) { gestureTimer = Math.max(gestureTimer, 2.5); return; }
 
   gestureTimer -= dt;
@@ -946,7 +938,6 @@ function updateGaze(dt, t) {
     const from = { x: gazeTarget.x, y: gazeTarget.y };
 
     if (gazeAway) {
-
       gazeAway = false;
       gazeTarget.x = (Math.random() - 0.5) * 0.10;
       gazeTarget.y = (Math.random() - 0.5) * 0.07;
@@ -963,7 +954,6 @@ function updateGaze(dt, t) {
       gazeTimer = (a.hold[0] + Math.random() * (a.hold[1] - a.hold[0]))
                 * (speaking() ? 0.45 : 1);
     } else {
-
       gazeTarget.x = (Math.random() - 0.5) * 0.14;
       gazeTarget.y = (Math.random() - 0.5) * 0.10;
       gazeTimer = 1.3 + Math.random() * 2.2;
@@ -1022,7 +1012,6 @@ function updateBlink(dt) {
   if (!em) return;
 
   if (cueOut.blinkLeft > 0.01) {
-
     em.setValue('blink', 0);
     em.setValue('blinkLeft', Math.max(blink, cueOut.blinkLeft));
     em.setValue('blinkRight', blink);
@@ -1062,7 +1051,6 @@ function tick() {
   const t = timer.getElapsed();
 
   if (vrm) {
-
     updateMouth(dt);
     updateCues(dt);
     updateIdleGestures(dt);
@@ -1210,7 +1198,6 @@ async function handleResult(result) {
     disarmBargeIn(req);
     if (inflight === req) inflight = null;
   } else if (result.cues && result.cues.length) {
-
     scheduleCues(result.cues, Math.max(1.5, (result.speech || '').length / 14));
   }
   setBusy(false);
@@ -1248,7 +1235,6 @@ async function playChunk(ev, req) {
     if (!req.chunks) setStatus('busy', 'speaking');
     await enqueueChunk(ev.audio, ev.cues);
   } else if (ev.cues && ev.cues.length) {
-
     appendCues(ev.cues, 0, Math.max(1.5, (ev.speech || '').length / 14));
     if (cueEpoch < 0 && cueClock < 0) cueClock = 0;
   }
@@ -1260,7 +1246,6 @@ async function playChunk(ev, req) {
 async function consumeReply(res, req) {
   if (!res.ok) throw new Error(`bridge returned ${res.status}`);
   for await (const ev of readEvents(res)) {
-
     if (req.cancelled) continue;
     if (ev.type === 'chunk') await playChunk(ev, req);
     else if (ev.type === 'error') showNotice(ev.message, 'bridge');
@@ -1316,7 +1301,6 @@ async function armBargeIn(req) {
     for await (const ev of readEvents(res)) {
       if (ev.type === 'disabled') { bargeEnabled = false; return; }
       if (ev.type === 'speech') {
-
         req.tookOver = true;
         await interrupt();
         inflight = next;
@@ -1342,9 +1326,7 @@ async function armBargeIn(req) {
 
     disarmBargeIn(next);
     if (inflight === next) inflight = null;
-  } catch {
-
-  } finally {
+  } catch {} finally {
     if (req.barge === controller) req.barge = null;
   }
 }
@@ -1376,9 +1358,7 @@ async function waitForOpener() {
       await untilSpoken();
       endUtterance();
     }
-  } catch {
-
-  } finally {
+  } catch {} finally {
     if (idlePoll === controller) idlePoll = null;
 
     if (req.chunks) {
@@ -1404,13 +1384,13 @@ function setIdleMuted(value) {
   idleMuted = !!value;
   post('/idle/mute', { muted: idleMuted }).catch(() => {});
   if (idleMuted && idlePoll) {
-    try { idlePoll.abort(); } catch {   }
+    try { idlePoll.abort(); } catch {}
   }
 }
 
 function disarmBargeIn(req) {
   if (req?.barge && !req.tookOver) {
-    try { req.barge.abort(); } catch {   }
+    try { req.barge.abort(); } catch {}
     req.barge = null;
   }
 }
@@ -1422,7 +1402,7 @@ async function interrupt() {
   setBusy(false);
   try {
     await post('/interrupt', { chunks: heard });
-  } catch {   }
+  } catch {}
   return heard;
 }
 
@@ -1519,7 +1499,7 @@ function paintBrain(mode, current, model) {
   const b = el('btn-brain');
   if (!b) return;
   const where = mode === 'auto' ? `auto → ${current || '?'}` : mode;
-  b.title = `${where}${model ? ` · ${model}` : ''} — click to change`;
+  b.title = `${where}${model ? ` · ${model}` : ''} (click to change)`;
   b.classList.toggle('on', mode === 'local');
 }
 
@@ -1585,7 +1565,7 @@ function noteBackendUsed(data) {
   const label = data.backend === 'local' ? 'this Mac' : 'GPU server';
   setStatus('ok', `${label} · ${data.model || ''}`.trim());
   if (data.backend === 'local' && brainMode === 'auto') {
-    showNotice('GPU server did not answer — running on this Mac.', 'failover');
+    showNotice('GPU server did not answer, running on this Mac.', 'failover');
   } else {
     hideNotice('failover');
   }
@@ -1596,7 +1576,7 @@ async function refreshBrain() {
     const h = await (await fetch(`${BRIDGE}/health`)).json();
     paintBrain(h.llm_mode, h.llm_using, h.model);
     setStatus('ok', `${h.llm_using} · ${h.model}`);
-  } catch {   }
+  } catch {}
 }
 
 function togglePicker() {
@@ -1631,7 +1611,7 @@ el('btn-reset').addEventListener('click', async () => {
   try {
     await post('/reset');
     say('Fine, forgotten.');
-  } catch {   }
+  } catch {}
 });
 
 window.__marina = {
@@ -1670,13 +1650,13 @@ let bridgeReady = false;
 let polling = false;
 
 async function pollForBridge({ quietFor = 16000 } = {}) {
-if (polling) return;
-polling = true;
+  if (polling) return;
+  polling = true;
 
-const started = Date.now();
-let announced = false;
+  const started = Date.now();
+  let announced = false;
 
-while (true) {
+  while (true) {
     try {
       const res = await fetch(`${BRIDGE}/health`, { signal: AbortSignal.timeout(2000) });
       if (res.ok) {
@@ -1696,13 +1676,10 @@ while (true) {
         startOpenerPoll();
         return;
       }
-    } catch {
-
-    }
+    } catch {}
 
     const waited = Date.now() - started;
     if (waited < quietFor) {
-
       setStatus('busy', 'starting…');
     } else if (!announced) {
       announced = true;
@@ -1711,12 +1688,12 @@ while (true) {
     }
 
     await new Promise((r) => setTimeout(r, waited < quietFor ? 400 : 2000));
-}
+  }
 }
 
 function bridgeLost() {
-bridgeReady = false;
-pollForBridge({ quietFor: 0 });
+  bridgeReady = false;
+  pollForBridge({ quietFor: 0 });
 }
 
 el('btn-see').hidden = true;

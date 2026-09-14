@@ -1,16 +1,5 @@
-"""Can she be interrupted, and does she stop interrupting herself?
-
-Barge-in has one hard problem: while she is talking, her own voice is coming
-out of the speakers and back into the microphone. Every case here is that
-problem — her voice at three playback levels, with and without someone talking
-over it.
-
-The audio is synthesised with the real TTS rather than recorded, so the test
-runs anywhere the app does, and the "echo" is her actual voice rather than a
-stand-in. Playback level is modelled as plain attenuation, which is the part
-that is a simplification: a room adds reflections and colouring this does not.
-Treat the very-loud case as the honest edge of what energy alone can do.
-"""
+"""Barge-in: her own voice through the speakers shouldn't trigger the VAD,
+but someone talking over her should. Echo is modelled as plain attenuation."""
 import io
 import sys
 from pathlib import Path
@@ -52,7 +41,6 @@ def _detect(signal):
 
 
 def _over(echo, voice, at=2.5):
-    """Her voice through the speakers, with someone talking across it."""
     mixed = echo.copy()
     start = int(SAMPLERATE * at)
     segment = voice[:max(0, len(mixed) - start)]

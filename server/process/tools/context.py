@@ -1,18 +1,4 @@
-"""What is going on around her, without being asked.
-
-A companion that has to be told the time is not in the room with you. None of
-this needs a tool call or a round trip — it is a handful of cheap reads folded
-into the system prompt, so she simply knows.
-
-What it deliberately does not do: read window titles, read what is on screen,
-or look at documents. macOS hands out the frontmost application's *name*
-without any permission prompt, and that is the whole of it — "they are in
-Firefox", never which page. Screen content stays behind the explicit
-screenshot in `vision/look.py`, which only ever runs when you ask it to.
-
-Every signal is individually switchable in `context:`, and a failed read is
-simply left out rather than raised.
-"""
+"""Time, frontmost app name and battery, for the prompt."""
 import subprocess
 from datetime import datetime
 
@@ -51,12 +37,6 @@ def time_of_day(now=None):
 
 
 def frontmost_app():
-    """The app in front, by name only.
-
-    `lsappinfo` answers this without the accessibility permission that reading
-    a window title would need — which is the reason it is used here rather
-    than the AppleScript route.
-    """
     asn = _run(["lsappinfo", "front"])
     if not asn:
         return ""
@@ -89,7 +69,6 @@ def battery():
 
 
 def as_prompt_block():
-    """A line of ambient context, or nothing at all."""
     if not ENABLED:
         return ""
 
@@ -109,6 +88,6 @@ def as_prompt_block():
         return ""
     return (
         "\n\nAround you right now: " + "; ".join(bits) + ". "
-        "Use this only if it is actually relevant — do not read it back to "
+        "Use this only if it is actually relevant. Do not read it back to "
         "them or comment on it for its own sake."
     )

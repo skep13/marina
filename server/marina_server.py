@@ -1,18 +1,10 @@
-"""Local bridge between the Marina desktop app and the ASR / LLM / TTS pipeline.
-
-Run this from the repo root:
-
-    python -m uvicorn server.marina_server:app --host 127.0.0.1 --port 8765
-
-or just:
+"""HTTP bridge between the desktop app and the ASR / LLM / TTS pipeline.
 
     python server/marina_server.py
-
-Nothing here listens on a public interface. The heavy voice model
-(GPT-SoVITS) lives on your server and is reached over HTTP.
 """
 import base64
 import json
+import queue
 import sys
 import tempfile
 import threading
@@ -76,8 +68,7 @@ recorder = Recorder()
 
 
 def whisper():
-    """Load Whisper lazily so the server starts instantly and text-only
-    chat never pays for the model at all."""
+    """Load Whisper on first use."""
     global _whisper
     if _whisper is None:
         print("Loading Faster-Whisper...", flush=True)
@@ -92,7 +83,6 @@ class ChatIn(BaseModel):
 
 
 def llm_error_message(e):
-    """A readable reason, so a bad key never looks like the bridge being down."""
     msg = getattr(getattr(e, "response", None), "text", "") or str(e)
     if "invalid_api_key" in msg or "Incorrect API key" in msg:
         return "OpenAI rejected the API key. Set OPENAI_API_KEY in character_config.yaml."
@@ -158,7 +148,6 @@ def health():
 
 @app.post("/chat")
 def chat(body: ChatIn):
-    """Typed input."""
     text = body.text.strip()
     if not text:
         return {"transcript": "", "reply": "", "speech": "", "cues": [],
@@ -179,7 +168,6 @@ def _ndjson(event):
 
 
 def _speak_segment(segment, index, speak):
-    """One segment of a streamed reply, ready to play."""
     parts = split_reply(segment)
     event = {
         "type": "chunk",
@@ -205,25 +193,13 @@ def _speak_segment(segment, index, speak):
 
 def _stream_reply(user_text, speak=True, transcript=None, extra_system=None,
                   record=True):
-    """Generate, segment, synthesize and emit, one sentence at a time.
-
-    The whole point is the first sentence: the model is still writing and
-    Kokoro runs at 3-4x realtime once warm, so once the opening segment is
-    playing, synthesis stays ahead of playback for the rest of the reply.
-    """
+    """Stream the reply one sentence at a time, synthesizing as it goes."""
     with _stream_lock:
         _stream["id"] += 1
         _stream["stop_at"] = None
         stream_id = _stream["id"]
 
     def stop_after():
-        """How many segments were heard, or None to carry on.
-
-        Superseded is not the same as interrupted. A newer reply taking over
-        should stop this one generating, but everything it already emitted was
-        spoken out loud — recording zero of it would delete a turn the user
-        actually heard.
-        """
         with _stream_lock:
             if _stream["id"] != stream_id:
                 return index
@@ -240,7 +216,6 @@ def _stream_reply(user_text, speak=True, transcript=None, extra_system=None,
     generator = llm_stream(user_text, extra_system=extra_system)
 
     def emit(segment):
-        """None for a segment with nothing in it to say or perform."""
         nonlocal index
         event = _speak_segment(segment, index, speak)
         if not event["speech"] and not event["cues"]:
@@ -295,11 +270,6 @@ def _stream_reply(user_text, speak=True, transcript=None, extra_system=None,
 
 @app.post("/chat/stream")
 def chat_stream(body: ChatIn):
-    """Typed input, answered a sentence at a time.
-
-    Same conversation as /chat — the non-streaming endpoint stays for the
-    terminal client and for anything that would rather have one JSON object.
-    """
     text = body.text.strip()
     if not text:
         return StreamingResponse(
@@ -316,13 +286,7 @@ class InterruptIn(BaseModel):
 
 @app.post("/interrupt")
 def interrupt(body: InterruptIn):
-    """Stop her mid-reply, having heard `chunks` sentences of it.
-
-    The model runs well ahead of the speakers, so an interruption has to reach
-    the generator rather than the transcript: the stream stops pulling tokens
-    and records only the sentences that were actually heard. Otherwise she
-    answers follow-ups about points she never got to make.
-    """
+    """Stop the current reply. Only the first `chunks` sentences get saved."""
     with _stream_lock:
         _stream["stop_at"] = max(0, body.chunks)
         stream_id = _stream["id"]
@@ -331,7 +295,6 @@ def interrupt(body: InterruptIn):
 
 @app.post("/voice")
 def voice(audio: UploadFile = File(...), speak: bool = True):
-    """Spoken input: a recording from the app's microphone."""
     suffix = Path(audio.filename or "clip.webm").suffix or ".webm"
     with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
         tmp.write(audio.file.read())
@@ -355,10 +318,6 @@ def voice(audio: UploadFile = File(...), speak: bool = True):
 
 @app.post("/listen/start")
 def listen_start():
-    """Begin capturing the microphone. Whisper is warmed up in the
-    background so the model load overlaps with you talking."""
-    import threading
-
     threading.Thread(target=whisper, daemon=True).start()
     if recorder.is_monitoring:
         recorder.cancel()
@@ -368,7 +327,6 @@ def listen_start():
 
 @app.post("/listen/stop")
 def listen_stop(speak: bool = True):
-    """Stop capturing, transcribe, answer, and synthesize."""
     path = recorder.stop()
     if path is None:
         return {"transcript": "", "reply": "", "speech": "", "cues": [],
@@ -392,13 +350,6 @@ def listen_stop(speak: bool = True):
 
 @app.post("/listen/stop/stream")
 def listen_stop_stream():
-    """Stop capturing, transcribe, and stream the answer.
-
-    Voice is the main way in, so it gets the same sentence-at-a-time treatment
-    as typing — transcription is already a second of waiting, and following it
-    with the whole reply before she opens her mouth is the long version of
-    exactly what streaming is here to fix.
-    """
     def fail(message):
         return StreamingResponse(
             iter([_ndjson({"type": "error", "message": message})]),
@@ -445,16 +396,8 @@ def _make_vad():
 
 
 def _barge_stream(timeout):
-    """Listen while she talks, and turn talking over her into the next turn.
-
-    One stream does the whole thing. The client opens it when she starts
-    speaking; if nothing happens it closes quietly when she finishes. If you
-    do cut in, the same stream carries the speech event, then the transcript,
-    then her next reply — so from the client's side an interruption is just
-    the conversation continuing.
-    """
-    import queue as _queue
-
+    """Listen while she talks. If the user cuts in, transcribe it and stream
+    the next reply on the same connection."""
     started = recorder.start(_make_vad())
     if not started:
         yield _ndjson({"type": "error", "message": "Microphone already in use."})
@@ -472,7 +415,7 @@ def _barge_stream(timeout):
                 return
             try:
                 event = recorder.events.get(timeout=0.25)
-            except _queue.Empty:
+            except queue.Empty:
                 yield _ndjson({"type": "waiting"})
                 continue
 
@@ -507,11 +450,6 @@ def _barge_stream(timeout):
 
 @app.get("/barge/listen")
 def barge_listen(timeout: float = 45.0):
-    """Arm the microphone for the duration of a reply.
-
-    Disabled by config, or with no `barge_in` section, this returns a single
-    event and closes, so the client needs no special case.
-    """
     if not BARGE_ENABLED:
         return StreamingResponse(
             iter([_ndjson({"type": "disabled"})]),
@@ -530,18 +468,11 @@ class SeeIn(BaseModel):
 
 @app.post("/see")
 def see(body: SeeIn):
-    """Look at a screenshot and answer a question about it.
-
-    Only ever called when you explicitly ask her to look — the app never
-    captures the screen on its own.
-    """
-    import base64 as _b64
-
     out = {"transcript": body.question or "(looked at the screen)",
            "reply": "", "speech": "", "cues": [], "audio": None, "error": None}
 
     try:
-        raw = _b64.b64decode(body.image)
+        raw = base64.b64decode(body.image)
     except Exception:
         out["error"] = "Screenshot was not valid base64."
         return out
@@ -569,7 +500,7 @@ def see(body: SeeIn):
     if body.speak and out["speech"]:
         try:
             wav, visemes = synthesize(out["speech"])
-            out["audio"] = _b64.b64encode(wav).decode("ascii")
+            out["audio"] = base64.b64encode(wav).decode("ascii")
             out["visemes"] = visemes
         except TTSError as e:
             out["error"] = str(e)
@@ -578,7 +509,6 @@ def see(body: SeeIn):
 
 
 def _list_models(base_url, api_key):
-    """Ask an OpenAI-compatible endpoint what it can serve."""
     if not base_url:
         return []
     try:
@@ -592,8 +522,6 @@ def _list_models(base_url, api_key):
 
 @app.get("/models")
 def models_list():
-    """Everything selectable, grouped by backend. Unreachable backends come
-    back empty rather than erroring, so the picker still renders."""
     from process.llm_funcs.llm_scr import (
         API_KEY, BASE_URL, FALLBACK_BASE, FALLBACK_KEY,
     )
@@ -613,7 +541,6 @@ class ModelIn(BaseModel):
 
 @app.post("/model")
 def model_set(body: ModelIn):
-    """Pick a model, and switch to that backend at the same time."""
     try:
         backend.set_model(body.backend, body.model)
         backend.set_mode(body.backend)
@@ -639,7 +566,6 @@ def backend_get():
 
 @app.post("/backend")
 def backend_set(body: BackendIn):
-    """Switch brains. History and memory stay on this Mac either way."""
     try:
         backend.set_mode(body.mode)
     except ValueError as e:
@@ -654,14 +580,12 @@ class MemoryIn(BaseModel):
 
 @app.get("/memory")
 def memory_list():
-    """Everything she remembers, newest first."""
     facts = sorted(memory.all_facts(), key=lambda f: f.get("updated", ""), reverse=True)
     return {"count": len(facts), "facts": facts}
 
 
 @app.post("/memory")
 def memory_add(body: MemoryIn):
-    """Teach her something directly, rather than waiting for her to notice it."""
     fact = memory.add(body.text, source="manual")
     return {"ok": True, "added": fact, "duplicate": fact is None}
 
@@ -673,15 +597,12 @@ def memory_delete(fact_id: str):
 
 @app.delete("/memory")
 def memory_clear():
-    """Wipe long-term memory. Separate from /reset, which only clears the chat."""
     memory.clear()
     return {"ok": True}
 
 
 @app.post("/reset")
 def reset():
-    """Forget the current conversation. Long-term memory is untouched —
-    use DELETE /memory for that."""
     reset_history()
     return {"ok": True}
 
@@ -697,19 +618,13 @@ def idle_status():
 
 @app.post("/idle/mute")
 def idle_mute(body: MuteIn):
-    """One switch. Off means off — no openers until it is turned back on."""
     value = idle.set_muted(body.muted)
     print(f"[idle] openers {'muted' if value else 'unmuted'}", flush=True)
     return {"ok": True, "muted": value}
 
 
 def _idle_stream(timeout):
-    """Hold the line until she has something unprompted to say.
-
-    A long poll rather than a push: the client keeps one of these open and
-    reopens it when it returns, which needs no second channel and recovers
-    from a dropped bridge on its own.
-    """
+    """Long poll: returns when she has something unprompted to say."""
     waited = 0.0
     while waited < timeout:
         announcement = tools.pending_announcement()
@@ -743,13 +658,11 @@ def idle_listen(timeout: float = 120.0):
 
 @app.get("/voices")
 def voices():
-    """Available Kokoro voicepacks (empty when using GPT-SoVITS)."""
     return {"voices": kokoro_voices()}
 
 
 @app.post("/warmup")
 def warmup():
-    """Preload Whisper and the local voice while you decide what to say."""
     whisper()
     warmup_tts()
     return {"ok": True}

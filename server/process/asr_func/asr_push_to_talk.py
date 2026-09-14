@@ -1,9 +1,4 @@
-"""Speech-to-text with Faster-Whisper.
-
-Two entry points:
-  transcribe_file()      - used by the desktop app (audio arrives over HTTP)
-  record_and_transcribe() - used by the terminal client (push to talk)
-"""
+"""Speech-to-text with Faster-Whisper."""
 import os
 
 from faster_whisper import WhisperModel
@@ -12,17 +7,6 @@ from process.config import load_config
 
 
 def build_model():
-    """Load Whisper, preferring the copy already on disk.
-
-    faster-whisper resolves the model through the Hugging Face hub, which
-    contacts huggingface.co on every single load to check the cached copy is
-    current — even when it is. Nothing of yours is sent, but it is the only
-    outbound connection anywhere in the voice path, and voice is the part of
-    this that most deserves to be provably local.
-
-    So: try the cache first and go to the network only when there is nothing
-    cached to use, which is the first run and no other time.
-    """
     cfg = load_config().get("asr", {})
     name = cfg.get("model", "base.en")
     kwargs = {

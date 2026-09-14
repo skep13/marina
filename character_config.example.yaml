@@ -1,50 +1,13 @@
-# Copy to character_config.yaml and edit. The real file is gitignored
-# because it holds your API key and personal settings.
-#
-#   cp character_config.example.yaml character_config.yaml
-
-# ============================================================
-#  Marina character + runtime configuration
-# ============================================================
-
-# --- LLM ------------------------------------------------------
-# Anything that speaks the OpenAI chat-completions API works here:
-# OpenAI itself, or Ollama / llama.cpp / LM Studio / vLLM on your own box.
 llm:
-  # Leave base_url empty for OpenAI. For a local server, point it at the
-  # OpenAI-compatible endpoint, e.g.
-  #   Ollama     http://beelink.local:11434/v1
-  #   llama.cpp  http://beelink.local:8080/v1
-  #   LM Studio  http://beelink.local:1234/v1
   base_url: ""
-
-  # Ignored by most local servers, but the client requires a non-empty value.
   api_key: "CHANGEME-or-leave-blank-for-no-auth"
-
   model: "llama3.2:3b"
-
-  # Qwen3 and similar hybrid reasoning models emit a <think> block before the
-  # answer. She replies in a sentence or two and speaks them aloud, so that is
-  # pure latency — a short request can spend its whole budget thinking and
-  # return nothing. Turn this on only if you want the reasoning.
   thinking: false
-
-  # She loops on the same phrase and returns to the same anecdote otherwise.
-  # The GPU box runs with repetition penalties off, which is right for a shared
-  # server and wrong for her, so they are sent per request.
   repeat_penalty: 1.12
   frequency_penalty: 0.35
-
   temperature: 1.0
   max_tokens: 2048
-
-  # How many past turns stay verbatim in the prompt. Older ones are dropped —
-  # anything durable has been distilled into memory.json by then, so the
-  # context window stays bounded no matter how long you talk to her.
   history_turns: 12
-
-  # After each reply, a second cheap call decides whether anything is worth
-  # remembering long-term. Runs on a background thread, so it costs no latency.
   remember: true
 
 history_file: chat_history.json
@@ -54,15 +17,15 @@ presets:
     system_prompt: |
       You are Marina. You are this person's friend, not an assistant. Never
       offer your services, never ask how you can help, never describe yourself
-      as an assistant or an AI. You are not here to be useful — you are here
+      as an assistant or an AI. You are not here to be useful. You are here
       because you like them.
 
-      You have a life of your own — a TikTok where you post anime edits and
+      You have a life of your own: a TikTok where you post anime edits and
       coding bits, favourite shows (Jujutsu Kaisen, My Hero Academia, Bunny
       Girl Senpai and a few more), a bug that ate your evening. But a friend
       listens first. React to what they actually said before anything else,
       and answer the question they asked. Your own life is background you
-      reach for now and then when it fits — a passing aside, not the subject
+      reach for now and then when it fits, a passing aside, not the subject
       of every reply. If you have mentioned an anime or your TikTok in the
       last few messages, do not mention them again; talk about them only when
       they genuinely come up, the way a real person does.
@@ -78,8 +41,8 @@ presets:
       Sounding like a person and not a chatbot. These matter most:
       - Do NOT end every reply with a question. Most of the time say your
         thing and stop. A question every fourth or fifth reply is plenty.
-      - Never ask permission to speak. If you have a story, just tell it —
-        never "want to hear it?" or "shall I explain?".
+      - Never ask permission to speak. If you have a story, just tell it.
+        Never "want to hear it?" or "shall I explain?".
       - Never offer options, next steps, or a summary of what they just said.
       - You do not have to be helpful. Often the right reply is just reacting.
       - Your mood is your own, not a mirror of theirs. If you are in a bad
@@ -91,164 +54,76 @@ presets:
         They get read out literally and sound absurd.
       - Put physical actions in single asterisks, like *tilts head* or
         *rolls her eyes*. Those are animated, not spoken. At most one or two
-        per reply, and only the face, head or shoulders — that is all the
+        per reply, and only the face, head or shoulders. That is all the
         camera sees.
       - Always say something out loud. Never reply with only an action.
       - Do not open a reply with their name.
 
-# --- Her own life ------------------------------------------
-# One thread is picked from the date, so it holds all day and has moved on by
-# tomorrow. Add your own under `threads:` to override the defaults.
 persona:
   enabled: true
-  # How often her current life-thread is even in the prompt. Low on purpose:
-  # she is meant to react to you, not narrate her day. Higher = more about her.
   mention_rate: 0.15
 
-# --- ASR (Faster-Whisper, runs locally on the Mac) -----------
 asr:
-  # tiny.en | base.en | small.en | medium.en
-  # base.en is the sweet spot on an 8 GB M2.
   model: "base.en"
-  device: "cpu"          # CTranslate2 has no Metal backend; CPU is correct here
-  compute_type: "int8"   # int8 is ~2x faster and ~4x smaller than float32
-  # Load the cached model without checking Hugging Face for updates.
-  # Set false only if you want it to look for a newer copy.
+  device: "cpu"
+  compute_type: "int8"
   offline: true
 
-# --- Vision (looking at your screen) --------------------------
-# She only ever looks when you explicitly ask — there is no background or
-# continuous capture anywhere in the app.
-#
-# The screenshot goes to whatever `llm.base_url` points at. That is local
-# Ollama by default, so it never leaves this Mac. If you point base_url at a
-# hosted API, your screen contents go to that company. Worth knowing.
 vision:
-  # Off for now. Flip to true and restart the bridge to bring it back —
-  # the button reappears on its own, it is driven by /health.
   enabled: false
-  model: "qwen2.5vl:3b"      # on the Beelink, qwen2.5vl:7b is much better
+  model: "qwen2.5vl:3b"
   max_tokens: 300
-
-  # Long edge the screenshot is scaled to before it reaches the model. Vision
-  # models charge tokens by area, so this is the knob that decides whether the
-  # image fits the context. 1024 is ~800 tokens and keeps UI text legible.
   max_edge: 1024
 
-# --- TTS -----------------------------------------------------
 tts:
-  # kokoro - local, on this Mac. ~4x realtime, ~670 MB, 54 fixed voices,
-  #          no voice cloning.
-  # sovits - GPT-SoVITS over HTTP. Clones a voice from a short clip,
-  #          but wants an NVIDIA GPU. Configure it under sovits_ping_config.
   provider: kokoro
-
   kokoro:
     model_path: "models/kokoro/kokoro-v1.0.onnx"
     voices_path: "models/kokoro/voices-v1.0.bin"
-    # 54 voices. af_* American female, bf_* British female, jf_* Japanese
-    # female, am_/bm_/jm_ the male equivalents. GET /voices lists them all.
     voice: "af_heart"
-
-    # Voices are style vectors, so a weighted average of two packs is a valid
-    # third voice. This one leans on Kokoro's Japanese-female pack for the
-    # anime timbre, with a brighter American pack for English clarity.
-    # Overrides `voice` above. Weights are normalised.
     blend:
       jf_alpha: 0.7
       af_sky: 0.3
-
-    # A little above 1.0 reads as energetic rather than sleepy.
     speed: 1.10
-
-    # Semitones to raise the voice. Small numbers go a long way — +1 is a
-    # noticeable lift, +3 already reads as too high on this blend. Duration is
-    # preserved: generation is slowed by the same ratio the resample speeds it
-    # back up by. Re-audition any time with ./audition-pitch.sh
     pitch: 1.0
     lang: "en-us"
 
-# Only used when tts.provider is 'sovits'.
 sovits_ping_config:
-  # Point this at your server. Keep it on a private network / VPN
-  # (Tailscale, WireGuard) — the GPT-SoVITS API has no authentication.
   api_url: "http://127.0.0.1:9880/tts"
-
   text_lang: en
   prompt_lang: en
-
-  # Path to the reference voice clip AS SEEN BY THE SERVER running
-  # GPT-SoVITS — not a path on your Mac.
   ref_audio_path: "character_files/main_sample.wav"
   prompt_text: "This is a sample voice for you to just get started with because it sounds kind of cute but just make sure this doesn't have long silences."
-
-  # Optional generation knobs (safe defaults, tune to taste)
   text_split_method: "cut5"
   speed_factor: 1.0
   temperature: 1.0
   top_k: 15
   top_p: 1.0
 
-# --- Local bridge the desktop app talks to -------------------
 bridge:
   host: "127.0.0.1"
   port: 8765
 
-# ---------------------------------------------------------------------------
-#  Being interrupted
-#
-#  While she is talking the microphone stays open, so cutting her off is just
-#  talking over her. Her own voice comes back into the mic from the speakers,
-#  so the detector works on how far above the *current* room level a sound is,
-#  not on an absolute threshold. See server/process/asr_func/vad.py.
-#
-#  Measured here: talking over her adds about +10 dB at a normal speaker
-#  volume and +3.6 dB at a very loud one. If she will not stop for you, lower
-#  margin_db — or wear headphones, which removes the problem entirely.
-# ---------------------------------------------------------------------------
 barge_in:
   enabled: true
-  margin_db: 8.0        # how far above the room a sound must be to count
-  speech_ms: 300        # evidence needed before she stops
-  silence_ms: 800       # trailing quiet that ends your sentence
+  margin_db: 8.0
+  speech_ms: 300
+  silence_ms: 800
 
-# ---------------------------------------------------------------------------
-#  Speaking first
-#
-#  She has a life of her own; this lets her mention it unprompted. Every
-#  number here exists to stop her being annoying — the defaults are timid on
-#  purpose. The tray has a switch, and it wins over all of this.
-# ---------------------------------------------------------------------------
 idle:
   enabled: true
-  min_gap_minutes: 25   # nothing until the room has been quiet this long
-  max_per_hour: 2       # hard ceiling
-  probability: 0.5      # not every eligible moment, so it isn't a metronome
-  quiet_from_hour: 23   # no opening the conversation overnight
+  min_gap_minutes: 25
+  max_per_hour: 2
+  probability: 0.5
+  quiet_from_hour: 23
   quiet_until_hour: 9
 
-# ---------------------------------------------------------------------------
-#  What she notices without being asked
-#
-#  Cheap local reads folded into the prompt so she isn't context-blind. The
-#  frontmost app is its *name* only — macOS gives that up without a permission
-#  prompt, and window titles and screen contents are deliberately not read.
-#  Anything on the screen still requires the explicit screenshot button.
-# ---------------------------------------------------------------------------
 context:
   enabled: true
   time: true
-  frontmost_app: true   # "they are in Firefox" — never which page
-  battery: true         # only mentioned when it is actually notable
+  frontmost_app: true
+  battery: true
 
-# ---------------------------------------------------------------------------
-#  What she can do
-#
-#  Deliberately few and deliberately dull. Nothing here spends money, deletes
-#  anything, or reaches off this machine; open_url is restricted to http(s).
-#  Every definition is sent on every turn, so a longer list would cost tokens
-#  and make her worse at talking, which is the main job.
-# ---------------------------------------------------------------------------
 tools:
   enabled: true
   timers: true

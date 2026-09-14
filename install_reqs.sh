@@ -1,4 +1,3 @@
-
 pip install uv
 pip install torch==2.6.0 torchaudio --index-url https://download.pytorch.org/whl/cu126
 uv pip install -r extra-req.txt --no-deps

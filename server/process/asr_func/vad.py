@@ -1,40 +1,18 @@
-"""Deciding whether the microphone is hearing a person.
+"""Voice activity detection for barge-in.
 
-This exists so she can be interrupted. That turns out to be a harder listening
-problem than push-to-talk, for one reason: while she is talking, her own voice
-is coming out of the speakers and straight back into the microphone. A fixed
-threshold either triggers on every word she says, or is set so high it misses
-you entirely.
-
-macOS only applies echo cancellation to apps that ask for the voice-processing
-audio unit, which is not something sounddevice exposes. So instead of trying to
-remove her voice from the signal, the threshold *follows* it:
-
-  - The noise floor is a slow percentile of recent frames. When she starts
-    talking the floor rises to meet her within about a second, so her own
-    speech stops looking like an event and becomes the new normal.
-  - Triggering needs a margin above that floor, held for a sustained run of
-    frames. A person at a laptop is far closer to the microphone than the
-    speakers are, so genuine speech clears the margin comfortably.
-
-It is not perfect. On loud speakers in a small room it can still be fooled,
-which is what `barge_in.margin_db` is for — and headphones make the whole
-problem disappear.
+Her own voice comes back through the mic, so a fixed threshold doesn't work.
+The noise floor is a percentile of the last few seconds, which rises to meet
+her voice, and speech has to stay `margin_db` above it for `speech_ms`.
 """
 import math
 from collections import deque
 
 
 class VAD:
-    """Energy-based speech detection with a floor that tracks the room.
+    """Feed frames to `update`, which returns 'start', 'end' or None.
 
-    Frames go in one at a time; `update` returns 'start', 'end', or None.
-
-    Measured on this machine, against her own voice played back into the mic:
-    talking over her adds about +10 dB at a normal speaker level, +7 dB loud
-    and +3.6 dB very loud. That is the whole budget, which is why the margin
-    defaults to 8 rather than to something comfortable, and why the last of
-    those three cases wants headphones or a lower `margin_db`.
+    Talking over her measured about +10 dB at normal speaker volume and
+    +3.6 dB at very loud, hence the default margin of 8.
     """
 
     def __init__(self, samplerate, frame_seconds=0.03, margin_db=8.0,

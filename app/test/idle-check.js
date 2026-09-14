@@ -1,4 +1,3 @@
-
 const { app, BrowserWindow, ipcMain } = require('electron');
 const fs = require('fs'); const path = require('path');
 const ROOT = path.join(__dirname, '..');
@@ -21,7 +20,7 @@ app.whenReady().then(async () => {
   await new Promise(r=>setTimeout(r,14000));
 
   await win.webContents.executeJavaScript(`
-    window.__marinaVec = window.__marina.camera.position.constructor;   // THREE.Vector3
+    window.__marinaVec = window.__marina.camera.position.constructor;
     window.__samples = [];
     window.__sampler = setInterval(() => {
       const v = window.__marina.vrm; if (!v) return;
@@ -75,23 +74,18 @@ app.whenReady().then(async () => {
       for (let i=0;i<a.length;i++){ const x=a[i]-ma, y=b[i]-mb; n+=x*y; da+=x*x; db+=y*y; }
       return n/Math.sqrt(da*db || 1e-12);
     };
-    // blinks = rising edges
     let blinks=0; const bl=col('blink');
     for (let i=1;i<bl.length;i++) if (bl[i]>0.5 && bl[i-1]<=0.5) blinks++;
-    // Smoothness: how spiky is the motion? Compare the largest frame-to-frame
-    // acceleration against the typical one. A signal with jumps has a high
-    // ratio; smooth motion stays low.
     const DEG = 180 / Math.PI;
     const step = k => {
       const a = col(k); let mx = 0, sum = 0;
       for (let i = 1; i < a.length; i++) { const d = Math.abs(a[i]-a[i-1]); mx = Math.max(mx, d); sum += d; }
-      // sampled at 50ms; scale to a 16.7ms frame
       return { max: mx * DEG / 3, mean: (sum/(a.length-1)) * DEG / 3 };
     };
     const jerk = (k, quietOnly) => {
       const a = col(k), c = col('cues'); const acc = [];
       for (let i = 2; i < a.length; i++) {
-        if (quietOnly && (c[i] || c[i-1] || c[i-2])) continue;   // skip gestures
+        if (quietOnly && (c[i] || c[i-1] || c[i-2])) continue;
         acc.push(Math.abs(a[i] - 2*a[i-1] + a[i-2]));
       }
       if (!acc.length) return { peak: 0, mean: 0, n: 0 };
@@ -100,7 +94,6 @@ app.whenReady().then(async () => {
     };
     return {
       jerkYaw: jerk('hy'), jerkPitch: jerk('hx'),
-      // What the eye actually notices: the largest single-frame jump.
       stepYaw: step('hy'), stepPitch: step('hx'), stepRoll: step('hz'),
       driftYaw: jerk('hy', true), driftPitch: jerk('hx', true),
       body: (() => {

@@ -1,15 +1,10 @@
-"""What is worth keeping as a lasting fact, and what is not.
-
-Every rejected case is a shape the model actually stored as a "memory" before
-the validator existed: an instruction to itself, passing state, or its own
-narration. The accepted cases are ordinary facts about the user.
-"""
+"""The rejected cases are all things the model really tried to store."""
 import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from process.memory.store import _is_durable_fact  # noqa: E402
+from process.memory.store import _is_durable_fact
 
 REJECT = [
     "Say hello to elekryo, one of my TikTok followers.",

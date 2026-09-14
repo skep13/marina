@@ -1,4 +1,3 @@
-
 const { app, BrowserWindow, ipcMain } = require('electron');
 const fs = require('fs'); const path = require('path');
 const ROOT = path.join(__dirname, '..');
@@ -7,7 +6,7 @@ ipcMain.handle('load-vrm', async () => {
   return { name: 'model.vrm', buffer: buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength) };
 });
 ipcMain.handle('pick-vrm', async () => ({ canceled: true }));
-ipcMain.on('set-click-through', () => {}); ipcMain.on('quit', () => {}); ipcMain.on('minimize', () => {});
+ipcMain.on('click-through', () => {}); ipcMain.on('quit', () => {}); ipcMain.on('minimize', () => {});
 
 const CUES = ['nod','shake','tilt','shrug','lean','laugh','smile','wink','eyeroll',
               'sigh','pout','sad','surprised','blush','think','brow','stare','yawn','emote'];

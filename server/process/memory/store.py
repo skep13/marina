@@ -1,12 +1,7 @@
-"""Long-term memory: durable facts that outlive the conversation.
+"""Long-term memory: facts about the user, kept in memory.json.
 
-The conversation history is short-term — it gets trimmed so the context window
-stays bounded. Anything worth keeping past that gets distilled into a fact and
-stored here, then injected into the system prompt on every turn.
-
-Facts are plain text, one idea each, stored as JSON. No embeddings: at a few
-dozen facts, sending all of them costs less than retrieving the right ones, and
-it means the whole store is human-readable and hand-editable.
+All facts go into the system prompt. There are few enough that retrieval
+isn't needed.
 """
 import json
 import re
@@ -72,27 +67,22 @@ def all_facts():
     return load()["facts"]
 
 
-import re as _re
-
-# A durable fact is a plain statement about the user that stays true. These
-# patterns catch what the model kept storing instead: things it was told to do,
-# passing state that is only true this second, and its own narration of itself.
-_INSTRUCTION = _re.compile(
+_INSTRUCTION = re.compile(
     r"^(say|tell|ask|remind|greet|send|open|play|show|give|make sure|"
-    r"remember to|don'?t forget|note that|be sure|let|call)\b", _re.I)
-_EPHEMERAL = _re.compile(
+    r"remember to|don'?t forget|note that|be sure|let|call)\b", re.I)
+_EPHEMERAL = re.compile(
     r"\b(currently|right now|at the moment|just now|is talking to|"
-    r"is chatting|today|this (morning|afternoon|evening|session))\b", _re.I)
-# First word signalling the "fact" is about Marina or a third party, not the user.
-_SELF = _re.compile(r"^(i|i'?m|i'?ve|marina|my|we|us|our)\b", _re.I)
+    r"is chatting|today|this (morning|afternoon|evening|session))\b", re.I)
+_SELF = re.compile(r"^(i|i'?m|i'?ve|marina|my|we|us|our)\b", re.I)
 
 
 def _is_durable_fact(text):
-    """True if this is worth keeping as a lasting fact about the user."""
+    """Reject instructions, passing state, questions and the model talking
+    about itself."""
     t = text.strip()
     if len(t) < 8 or len(t) > 200:
         return False
-    if t[0] in "(\"'" or t[-1] in "!?":       # parenthetical dumps, chatter, questions
+    if t[0] in "(\"'" or t[-1] in "!?":
         return False
     if _INSTRUCTION.match(t):
         return False
@@ -151,7 +141,6 @@ def clear():
 
 
 def as_prompt_block():
-    """The memory section injected into the system prompt, or '' if empty."""
     facts = all_facts()
     if not facts:
         return ""

@@ -1,4 +1,4 @@
-"""Talk to a GPT-SoVITS API server (typically running on a remote box)."""
+"""GPT-SoVITS HTTP client."""
 import time
 
 import requests
@@ -40,7 +40,6 @@ def build_payload(in_text):
 
 
 def sovits_gen_bytes(in_text, timeout=120):
-    """Return WAV bytes for `in_text`, or raise SovitsError."""
     if not in_text or not in_text.strip():
         raise SovitsError("Refusing to synthesize empty text.")
 
@@ -61,7 +60,6 @@ def sovits_gen_bytes(in_text, timeout=120):
 
 
 def sovits_gen(in_text, output_wav_pth="output.wav"):
-    """Backwards-compatible helper: write the WAV to disk, return the path."""
     try:
         audio = sovits_gen_bytes(in_text)
     except SovitsError as e:
@@ -74,7 +72,6 @@ def sovits_gen(in_text, output_wav_pth="output.wav"):
 
 
 def play_audio(path):
-    """Only used by the terminal client; the desktop app plays audio itself."""
     import soundfile as sf
     import sounddevice as sd
 

@@ -1,12 +1,5 @@
-"""What Marina is doing with her own time.
-
-A friend exists between conversations. Without this she is a blank slate every
-session — which is one of the things that makes a character feel like software.
-
-The current thread is picked deterministically from the date, so it stays
-consistent all day and has moved on by tomorrow. No LLM call, no state file to
-corrupt, and it survives restarts for free.
-"""
+"""What's going on in Marina's life today. Picked from the date, so it
+stays the same all day."""
 import hashlib
 import random
 from datetime import date
@@ -44,7 +37,6 @@ def threads():
 
 
 def current_thread(when=None):
-    """The thing on her mind today. Same all day, different tomorrow."""
     pool = threads()
     if not pool:
         return ""

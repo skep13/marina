@@ -1,4 +1,3 @@
-
 const { app, BrowserWindow, ipcMain } = require('electron');
 const fs = require('fs');
 const path = require('path');
@@ -11,7 +10,6 @@ ipcMain.handle('load-vrm', async () => {
   return { name: 'model.vrm', buffer: buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength) };
 });
 ipcMain.handle('pick-vrm', async () => ({ canceled: true }));
-ipcMain.on('set-click-through', () => {});
 ipcMain.on('click-through', () => {});
 ipcMain.on('quit', () => {});
 ipcMain.on('minimize', () => {});
@@ -30,7 +28,7 @@ app.whenReady().then(async () => {
   const health = await win.webContents.executeJavaScript(
     `document.getElementById('status-text').textContent`);
   if (/down|starting/.test(health)) {
-    console.log(`bridge not ready ("${health}") — start it first`);
+    console.log(`bridge not ready ("${health}"), start it first`);
     app.quit();
     return;
   }
@@ -72,7 +70,7 @@ app.whenReady().then(async () => {
   console.log(errs.length ? `console errors:\n  ${errs.join('\n  ')}` : 'no console errors');
 
   const reasons = [];
-  if (!seen) reasons.push('no audio chunks arrived — is the bridge reachable?');
+  if (!seen) reasons.push('no audio chunks arrived, is the bridge reachable?');
   if (worstGap >= 0.001) reasons.push(`audible seam of ${(worstGap * 1000).toFixed(1)} ms between chunks`);
   if (errs.length) reasons.push(`${errs.length} console error(s)`);
   console.log(reasons.length ? `FAIL: ${reasons.join('; ')}` : 'PASS');

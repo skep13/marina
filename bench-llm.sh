@@ -25,10 +25,7 @@ def _post(url, payload):
         return json.load(r)
 
 def call(prompt, n_predict=120):
-    """Works with Ollama (/api/generate) and llama.cpp (/completion).
-
-    They report timings differently, so normalise both onto the same keys.
-    """
+    """Try Ollama's /api/generate, then llama.cpp's /completion."""
     t0 = time.time()
     try:
         d = _post(f"{base}/api/generate",
@@ -39,7 +36,6 @@ def call(prompt, n_predict=120):
         if e.code != 404:
             raise
 
-    # llama.cpp: timings are in seconds-per-token and tokens-per-second.
     d = _post(f"{base}/completion",
               {"prompt": prompt, "n_predict": n_predict, "stream": False})
     t = d.get("timings", {})
@@ -53,8 +49,6 @@ def call(prompt, n_predict=120):
 print(f"endpoint : {base}")
 print(f"model    : {model}\n")
 
-# A long prompt exposes prefill speed, which is what actually decides how long
-# you wait before she starts talking.
 long_prompt = ("You are a helpful assistant. " + "Context sentence. " * 120
                + "\n\nQuestion: name three colours.")
 
@@ -72,6 +66,5 @@ for label, prompt, n in [("short prompt", "Say hello.", 60),
     print(f"  generate : {ec:>5} tok in {ed:6.2f}s  = {ec/max(ed,1e-6):7.1f} tok/s")
     print(f"  wall     : {wall:.2f}s\n")
 
-print("Rule of thumb: under ~2s to first word feels conversational.")
-print("Prefill matters most — it is what you wait through before she speaks.")
+print("Under ~2s to first word feels conversational. Prefill is most of that.")
 PY

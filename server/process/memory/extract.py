@@ -1,9 +1,4 @@
-"""Decide what from an exchange is worth remembering.
-
-This runs as a second, cheap LLM call after the reply has already been sent, on
-a background thread — so it never adds latency to the conversation. If it fails,
-or a small model returns nonsense, memory simply doesn't grow that turn.
-"""
+"""Pull facts about the user out of each exchange, on a background thread."""
 import json
 import re
 import threading
@@ -17,7 +12,7 @@ hardware they own, projects they are building, where they live or work, what
 they prefer to be called, ongoing constraints.
 
 DO NOT RECORD:
-- anything you inferred rather than heard — if they did not say it, it does
+- anything you inferred rather than heard. If they did not say it, it does
   not go in. Never guess name, gender, age, location or job.
 - anything about you, the assistant, or anything from your own reply
 - passing context: questions, requests, opinions, greetings, thanks
@@ -54,7 +49,6 @@ _TRIVIAL = {
 
 
 def worth_extracting(user_text):
-    """Cheap pre-filter, so the expensive call only runs when it might pay off."""
     text = (user_text or "").strip().lower().rstrip("?!.,")
     if len(text) < MIN_USER_CHARS:
         return False
@@ -64,7 +58,6 @@ def worth_extracting(user_text):
 
 
 def _parse(raw):
-    """Pull a JSON array out of whatever the model actually returned."""
     if not raw:
         return []
     text = raw.strip()
@@ -91,7 +84,6 @@ def _parse(raw):
 
 
 def extract(client, model, user_text, assistant_text):
-    """Return a list of new fact strings. Never raises."""
     try:
         from process.llm_funcs.llm_scr import chat_completion
         completion = chat_completion(
@@ -139,7 +131,7 @@ def _conjugate(word):
 
 
 def _to_third_person(fact):
-    """Turn the user's first-person phrasing into a stored third-person fact."""
+    """"I live in Leeds" -> "The user lives in Leeds"."""
     fact = re.sub(r"^i\s+am\b", "the user is", fact, flags=re.I)
     fact = re.sub(r"^i'?m\b", "the user is", fact, flags=re.I)
     fact = re.sub(r"^my\b", "the user's", fact, flags=re.I)
@@ -158,7 +150,7 @@ def _to_third_person(fact):
 
 
 def explicit_fact(user_text):
-    """If the user plainly asked to be remembered, return the fact text."""
+    """The fact from "remember that ...", or None."""
     text = " ".join((user_text or "").split())
     for pattern in _EXPLICIT:
         m = pattern.search(text)
@@ -173,7 +165,6 @@ def explicit_fact(user_text):
 
 
 def remember_async(client, model, user_text, assistant_text):
-    """Fire-and-forget: runs after the reply is already on its way."""
     direct = explicit_fact(user_text)
     if direct:
         fact = store.add(direct, source="explicit")

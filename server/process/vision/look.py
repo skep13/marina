@@ -1,12 +1,4 @@
-"""Let Marina look at a screenshot.
-
-The chat model is text-only, so this uses a separate vision model over the same
-OpenAI-compatible endpoint. Ollama swaps models in and out as needed, which
-costs a few seconds on the first look but keeps memory bounded.
-
-Screenshots are held in memory and passed straight to the model — nothing is
-written to disk here.
-"""
+"""Send a screenshot to a vision model and get a spoken-style answer."""
 import base64
 
 from openai import OpenAI
@@ -28,7 +20,7 @@ DEFAULT_QUESTION = "What is on my screen right now?"
 SYSTEM = """You are looking at a screenshot of the user's screen.
 
 Answer their question about it in one to three short sentences, in a casual
-spoken register — your reply is read aloud by a text-to-speech voice.
+spoken register. Your reply is read aloud by a text-to-speech voice.
 
 Describe only what is actually visible. Never guess at content you cannot see,
 and say so plainly if the screen is unclear. No markdown, no lists, no emoji.
@@ -59,7 +51,6 @@ def describe_endpoint():
 
 
 def _shrink(image_bytes):
-    """Clamp the long edge so the image can't overflow the model's context."""
     try:
         import io
 
@@ -86,7 +77,6 @@ def _shrink(image_bytes):
 
 
 def describe(image_bytes, question=None, mime="image/png"):
-    """Return a spoken-style answer about the screenshot."""
     if not ENABLED:
         raise VisionError("Screen vision is disabled in character_config.yaml.")
     if not image_bytes:

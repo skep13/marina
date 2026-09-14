@@ -13,48 +13,23 @@ on a different machine.
 Everything apart from the language model runs on the Mac. The voice model is
 local and uses about 674 MB of RAM.
 
----
-
 ## What she can do
 
-- **She lives on your desktop.** 
-
-- **Type or talk.** 
-
-- **She starts talking before she's finished thinking.** 
-
-- **You can cut her off.** 
-
-- **Sometimes she speaks first.** 
-
-- **She can do a few small things.** 
-
-- **She has a rough idea of what's going on.** 
-
-- **She can look at your screen.** 
-
-- **Proper lip sync.** 
-
-- **Lip colour.** 
-
-- **Hair physics.** 
-
-- **Eyes that feel alive.** 
-
-- **Actions turn into animations.** 
-
-- **Clean speech.** 
-
-- **Long term memory.** 
-
-- **Local voice** 
-
-- **Local speech recognition** 
-
-- **Any OpenAI compatible model.** Ollama, llama.cpp, LM Studio, vLLM or OpenAI
-  itself.
-
----
+- Sits on your desktop in a transparent, always-on-top window
+- Talk to her or type
+- Starts speaking before the whole reply has been generated
+- You can cut her off by talking over her
+- Sometimes says something without being asked
+- Timers, reading the clipboard, opening links, remembering things
+- Knows what day and time of day it is
+- Can look at your screen when you ask (off by default)
+- Lip sync with five mouth shapes
+- Hair physics, blinking and eye movement
+- `*actions*` in her replies play as animations instead of being read out
+- Long-term memory
+- Local voice (Kokoro) and speech recognition (Faster-Whisper)
+- Works with any OpenAI-compatible model: Ollama, llama.cpp, LM Studio, vLLM
+  or OpenAI itself
 
 ## What leaves your Mac
 
@@ -64,17 +39,10 @@ Kokoro does the talking here. I checked this by watching the bridge's sockets
 through a full round trip, mic in and reply spoken, and the only connections
 open were loopback ones.
 
-
-Two things are worth knowing specifically.
-
-- **Reading the clipboard sends whatever is on it to the model.** That's how
-  "what do you make of this error" works, and it means that tool is only as
-  private as the endpoint behind it. You can turn it off with
-  `tools.clipboard`.
-- **`asr.offline: true`** stops Faster-Whisper checking in with Hugging Face to
-  revalidate the cached model every time it loads. None of your data was ever
-  in that request, but it was the only outbound connection in the voice path,
-  and the voice path is the part I most wanted to be provably local.
+- The clipboard tool sends whatever is on your clipboard to the model, so it's
+  only as private as your LLM endpoint. Turn it off with `tools.clipboard`.
+- `asr.offline: true` stops Faster-Whisper checking Hugging Face for model
+  updates every time it loads.
 
 The bridge only listens on `127.0.0.1`, so nothing else on your network can
 reach it.
@@ -101,9 +69,9 @@ This finds or installs Python 3.12 (macOS comes with 3.9, which is too old for
 voice model and installs the app's npm packages. It's fine to run it more than
 once.
 
-> The `requirements.txt` at the root of the repo is actually GPT-SoVITS's own
-> dependency list, with torch, funasr, modelscope and friends. You don't need
-> any of it. The Mac side uses `server/requirements-mac.txt`.
+The `requirements.txt` at the root is GPT-SoVITS's dependency list (torch,
+funasr, modelscope and so on). You don't need it on the Mac, which uses
+`server/requirements-mac.txt`.
 
 ### 2. Configure
 
@@ -170,8 +138,6 @@ Recording happens in the Python process, so macOS asks **the terminal you ran
 the first time. If you dismissed the prompt, go to System Settings > Privacy &
 Security > Microphone.
 
----
-
 ## Layout
 
 ```
@@ -202,20 +168,16 @@ app/
   preload.js                  IPC bridge
   renderer/app.js             three.js and three-vrm, lip sync, chat UI
   models/model.vrm            your avatar
-  test/                       render and transparency smoke tests
+  test/                       Electron scripts that load the avatar and check it
 ```
 
-
-While the bridge is running there are interactive docs at
-`http://127.0.0.1:8765/docs`.
-
+While the bridge is running there are API docs at `http://127.0.0.1:8765/docs`.
 
 ## Credits
 
 Built on top of **[rayenfeng/riko_project](https://github.com/rayenfeng/riko_project)**,
-which gave me the original terminal voice chat pipeline. Its `client/` folder was
-a placeholder and "VRM model frontend" was an unchecked TODO. That frontend and
-everything under it is what this repo adds.
+which had the original terminal voice chat pipeline. The avatar app and
+everything around it is new here.
 
 **Avatar and rendering**
 - [three-vrm](https://github.com/pixiv/three-vrm) for the VRM rig, expressions and spring bones
@@ -231,8 +193,7 @@ everything under it is what this repo adds.
 **Language model**
 - [Ollama](https://ollama.com), or any OpenAI compatible endpoint
 
-**Other backends that are wired up**
-- [GPT-SoVITS](https://github.com/RVC-Boss/GPT-SoVITS) for voice cloning
-- [Piper](https://github.com/OHF-voice/piper1-gpl) for training your own voice
+**Optional**
+- [GPT-SoVITS](https://github.com/RVC-Boss/GPT-SoVITS) as a voice cloning backend
 
 MIT licensed.

@@ -36,7 +36,7 @@ function projectRoot() {
     try {
       const p = fs.readFileSync(marker, 'utf8').trim();
       if (p && fs.existsSync(p)) return p;
-    } catch {   }
+    } catch {}
   }
   return path.join(__dirname, '..');
 }
@@ -135,7 +135,7 @@ function watchBridge() {
     if (bridge && Date.now() - lastHealthy > 45000) {
       console.log('Bridge is up but not responding; restarting it.');
       lastHealthy = Date.now();
-      try { bridge.kill('SIGKILL'); } catch {   }
+      try { bridge.kill('SIGKILL'); } catch {}
     }
   }, 5000);
 }
@@ -145,6 +145,7 @@ function stopBridge() {
   bridge.kill('SIGTERM');
   bridge = null;
 }
+
 const STATE_FILE = () => path.join(app.getPath('userData'), 'window-state.json');
 
 let win = null;
@@ -165,7 +166,7 @@ function writeState() {
   const [width, height] = win.getSize();
   try {
     fs.writeFileSync(STATE_FILE(), JSON.stringify({ x, y, width, height }));
-  } catch {   }
+  } catch {}
 }
 
 let ignoring = true;
@@ -195,13 +196,11 @@ function createWindow() {
     resizable: true,
     skipTaskbar: true,
     fullscreenable: false,
-
     titleBarStyle: 'customButtonsOnHover',
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
       nodeIntegration: false,
-
       backgroundThrottling: false,
     },
   });
@@ -301,7 +300,6 @@ app.on('will-quit', () => {
 app.on('window-all-closed', () => app.quit());
 
 ipcMain.handle('load-vrm', async () => {
-
   const found = findModel();
   if (!found) {
     return { error: `No .vrm found in ${userModelsDir()} or ${BUNDLED_MODELS_DIR}` };
@@ -329,9 +327,7 @@ ipcMain.handle('pick-vrm', async () => {
     fs.copyFileSync(src, dest);
     return { name: path.basename(src), buffer: readAsTransferable(dest) };
   } catch (e) {
-    dialog.showErrorBox('Could not save that model', `${dir}
-
-${e.message}`);
+    dialog.showErrorBox('Could not save that model', `${dir}\n\n${e.message}`);
     return { canceled: true };
   }
 });
@@ -352,7 +348,6 @@ ipcMain.handle('capture-screen', async () => {
   if (wasVisible) win.hide();
 
   try {
-
     await new Promise((r) => setTimeout(r, 220));
 
     const { width, height } = screen.getPrimaryDisplay().size;

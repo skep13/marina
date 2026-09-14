@@ -1,9 +1,4 @@
-"""Single source of truth for loading character_config.yaml.
-
-The upstream project did `open('character_config.yaml')` in three separate
-modules, which meant the whole thing only ran if your shell happened to be
-cwd'd into the repo root. This resolves the path relative to the repo instead.
-"""
+"""Loads character_config.yaml from the repo root."""
 from pathlib import Path
 import functools
 import yaml
@@ -19,6 +14,5 @@ def load_config():
 
 
 def resolve(path_str):
-    """Resolve a config path relative to the repo root if it isn't absolute."""
     p = Path(path_str)
     return p if p.is_absolute() else (REPO_ROOT / p)

@@ -1,14 +1,6 @@
-"""Non-blocking microphone recorder used by the desktop app.
+"""Microphone recorder for the bridge.
 
-The app sends "start", you talk, the app sends "stop", and we hand back a
-WAV path. Recording happens in this process (not in Electron) so the only
-microphone permission macOS ever asks about is the one for the terminal /
-Python that runs the bridge.
-
-It also runs in a second mode, `monitor`, which is how she can be interrupted:
-the microphone is armed while she is talking and a voice activity detector
-watches it, so cutting her off is just talking over her rather than reaching
-for a button. See `vad.py` for why that is harder than it sounds.
+Pass a VAD to start() to get speech start/end events, used for barge-in.
 """
 import queue
 import tempfile
@@ -41,7 +33,6 @@ class Recorder:
         return self._stream is not None and self._vad is not None
 
     def start(self, vad=None):
-        """Begin capturing. Pass a `VAD` to also emit speech start/end events."""
         import numpy as np
         import sounddevice as sd
 
@@ -74,11 +65,6 @@ class Recorder:
             return True
 
     def _analyse(self, mono):
-        """Run the detector over whatever whole frames have arrived.
-
-        Called on the audio thread, so it does no allocation beyond a slice and
-        never blocks — anything slow here shows up as dropped input.
-        """
         import numpy as np
 
         self._pending = np.concatenate((self._pending, mono))
@@ -93,12 +79,8 @@ class Recorder:
                 self.events.put(event)
 
     def stop(self, from_onset=False):
-        """Stop recording and return a path to the WAV, or None if empty.
-
-        `from_onset` trims everything before the detector heard speech, which
-        is what a barge-in wants — the buffer starts when she started talking,
-        and all of that is her voice, not yours.
-        """
+        """Return the WAV path, or None. `from_onset` drops audio from before
+        the VAD heard speech."""
         import numpy as np
         import soundfile as sf
 

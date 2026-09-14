@@ -1,14 +1,4 @@
-"""Text-to-speech dispatch.
-
-Two backends, chosen by `tts.provider` in character_config.yaml:
-
-  kokoro  - runs locally on the Mac. 82M params, ~4x realtime on an M2,
-            ~670 MB resident. Fixed voicepacks; cannot clone a voice.
-  sovits  - GPT-SoVITS over HTTP, wherever you run it. Clones a voice from
-            a short reference clip, but wants an NVIDIA GPU.
-
-Both return WAV bytes, so the rest of the pipeline doesn't care which is in use.
-"""
+"""Text-to-speech. `tts.provider` picks kokoro (local) or sovits (HTTP)."""
 import io
 import threading
 
@@ -33,7 +23,6 @@ def _kokoro_cfg():
 
 
 def _load_kokoro():
-    """Loaded lazily and only once — it costs ~0.8 s and ~500 MB."""
     global _kokoro
     with _kokoro_lock:
         if _kokoro is not None:
@@ -65,12 +54,7 @@ def _load_kokoro():
 
 
 def _resolve_voice(kokoro, cfg):
-    """Either a voicepack name, or a weighted blend of several.
-
-    Kokoro voices are style vectors, so a weighted average of two packs is
-    itself a valid voice. That's the closest thing to a custom voice this
-    backend offers — it can't clone a specific person.
-    """
+    """A voice name, or a weighted average of several voice style vectors."""
     blend = cfg.get("blend")
     if not blend:
         return cfg.get("voice", "af_heart")
@@ -87,15 +71,6 @@ def _resolve_voice(kokoro, cfg):
 
 
 def _pitch_shift(audio, semitones):
-    """Raise or lower pitch without changing duration.
-
-    Resampling alone changes pitch and duration together, so the generation
-    speed is pre-divided by the same ratio and the resample puts the duration
-    back. This shifts the formants along with the pitch, which is exactly what
-    makes a voice read as smaller and younger rather than as a slowed-down
-    adult — the opposite of what a formant-preserving shifter would do, and
-    the right choice here.
-    """
     if abs(semitones) < 0.01:
         return audio
 
@@ -159,12 +134,7 @@ _CLOSED = set("mbp")
 
 
 def visemes_from(timings, scale=1.0):
-    """Turn phoneme timings into a viseme track the renderer can play.
-
-    Returns [{t, v, w}] - time in seconds, viseme name, and how open. An empty
-    list is a valid answer: the model may not expose durations, and the
-    renderer still has its analyser to fall back on.
-    """
+    """Phoneme timings to [{t, v, w}]: time, viseme, weight."""
     track = []
     for timing in timings or []:
         raw = (timing.phoneme or "").strip()
@@ -186,7 +156,6 @@ def visemes_from(timings, scale=1.0):
 
 
 def kokoro_voices():
-    """Every voicepack name, for the /voices endpoint."""
     try:
         return sorted(_load_kokoro().get_voices())
     except TTSError:
@@ -198,12 +167,12 @@ def describe():
         cfg = _kokoro_cfg()
         if cfg.get("blend"):
             mix = "+".join(f"{n}:{w}" for n, w in cfg["blend"].items())
-            pitch = float(cfg.get('pitch', 0.0))
-            suffix = f" · pitch{pitch:+.1f}st" if pitch else ""
-            return f"kokoro (local) · blend={mix}{suffix}"
-        pitch = float(cfg.get('pitch', 0.0))
+            voice = f"blend={mix}"
+        else:
+            voice = f"voice={cfg.get('voice', 'af_heart')}"
+        pitch = float(cfg.get("pitch", 0.0))
         suffix = f" · pitch{pitch:+.1f}st" if pitch else ""
-        return f"kokoro (local) · voice={cfg.get('voice', 'af_heart')}{suffix}"
+        return f"kokoro (local) · {voice}{suffix}"
     if PROVIDER == "sovits":
         from process.tts_func.sovits_ping import API_URL
 
@@ -212,11 +181,7 @@ def describe():
 
 
 def synthesize(text):
-    """Return (WAV bytes, viseme track) for `text`, or raise TTSError.
-
-    The track is empty for engines that cannot report phoneme timings; the
-    renderer falls back to analysing the audio in that case.
-    """
+    """Return (wav_bytes, visemes). visemes is empty for sovits."""
     if not text or not text.strip():
         raise TTSError("Refusing to synthesize empty text.")
 
@@ -235,15 +200,6 @@ def synthesize(text):
 
 
 def warmup():
-    """Preload whichever backend is local, so the first reply isn't slow.
-
-    Loading the model is not enough. ONNX builds its execution plan on the
-    first inference, and that first call runs at roughly half the speed of
-    every one after it — measured at 1.6x realtime against 3.3x warm. With
-    replies streamed a sentence at a time, that penalty lands squarely on the
-    opening segment, which is the one thing the user is actually waiting for.
-    So burn a throwaway utterance here instead.
-    """
     if PROVIDER == "kokoro":
         _load_kokoro()
         try:
