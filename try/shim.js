@@ -1,7 +1,3 @@
-// Web preview shim. The desktop app talks to a Python bridge on this Mac and
-// to Electron through window.marina. Neither exists on a web page, so this
-// stands in for both. Replies are pre-recorded lines in her real voice, made
-// with the same Kokoro setup and the same reply splitter the bridge uses.
 (() => {
   const BRIDGE = 'http://127.0.0.1:8765';
   const MODEL = 'recorded preview';
@@ -28,7 +24,6 @@
 
   const json = (o) => new Response(JSON.stringify(o), { headers: { 'Content-Type': 'application/json' } });
 
-  // Crude on purpose. It only has a dozen lines to choose from.
   const RULES = [
     ['bye',      /\b(bye|goodbye|good night|gn|cya|see (you|ya)|later)\b/],
     ['doing',    /(what are you (doing|up to)|wyd|busy|working on|editing)/],
@@ -37,7 +32,6 @@
     ['help',     /(help|can you|could you|timer|remind|assist)/],
     ['joke',     /(joke|funny|make me laugh)/],
     ['nice',     /(cute|pretty|love you|like you|beautiful|nice hair|gorgeous)/],
-    // Last, so "hey what are you up to" gets the question and not a hello.
     ['greeting', /^\s*(hi|hey|hello|yo|hiya|sup|morning|evening|oi)\b/],
   ];
   let fallbackTurn = 0;
@@ -63,14 +57,12 @@
             await sleep(220, signal);
           }
           send({ type: 'done', chunks: chunks.length, reply: chunks.map((c) => c.reply).join(' ') });
-        } catch { /* aborted */ }
+        } catch {}
         ctrl.close();
       },
     }), { headers: { 'Content-Type': 'application/x-ndjson' } });
   }
 
-  // Speaking first. She waits until the visitor has touched the page (browsers
-  // will not play audio before that) and then has been quiet for a while.
   let touched = false;
   let lastActivity = Date.now();
   let openers = 0;
@@ -120,7 +112,6 @@
     }
   };
 
-  // What Electron's preload gives the real app.
   const noop = () => {};
   function pickFile() {
     return new Promise((resolve) => {

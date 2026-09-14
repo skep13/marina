@@ -3,224 +3,83 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Marina, a desktop companion</title>
-<meta name="description" content="An anime companion who lives on your Mac desktop. Talk or type, she answers in her own voice, lip syncs and acts out what she writes. Try her in the browser.">
+<title>Marina</title>
+<meta name="description" content="An anime character who sits on your Mac desktop and talks back. Try her in the browser.">
+<meta property="og:title" content="Marina">
+<meta property="og:description" content="An anime character who sits on your Mac desktop and talks back.">
+<meta property="og:image" content="https://skep13.github.io/marina/hero.png">
 <link rel="icon" href="icon.png">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=IBM+Plex+Mono:wght@400;500&family=Instrument+Sans:wght@400;500&display=swap" rel="stylesheet">
 <style>
-:root{
-  --ink:#090b10; --panel:#0f131b; --line:rgba(255,255,255,.085);
-  --line-2:rgba(255,255,255,.16); --text:#e9ecf3; --muted:#7e8798;
-  --accent:#79cfff; --accent-dim:rgba(121,207,255,.14);
-  --serif:"Instrument Serif",Georgia,serif;
-  --mono:"IBM Plex Mono",ui-monospace,monospace;
-  --sans:"Instrument Sans",system-ui,sans-serif;
+body {
+  margin: 0;
+  padding: 40px 20px 60px;
+  background: #fbfaf7;
+  color: #1f1f1f;
+  font: 18px/1.6 Charter, "Bitstream Charter", "Sitka Text", Cambria, Georgia, serif;
 }
-*{box-sizing:border-box;margin:0;padding:0}
-html{scroll-behavior:smooth}
-body{
-  background:var(--ink); color:var(--text); font-family:var(--sans);
-  font-size:16px; line-height:1.6; -webkit-font-smoothing:antialiased;
-  overflow-x:hidden;
+main { max-width: 700px; margin: 0 auto; }
+h1 { font-size: 40px; margin: 0; line-height: 1.1; }
+h2 { font-size: 22px; margin: 44px 0 8px; }
+p { margin: 0 0 16px; }
+a { color: #1f58b8; }
+a:hover { color: #0d3a85; }
+.sub { font-size: 20px; color: #555; margin: 6px 0 4px; }
+.links { font-size: 16px; color: #777; margin-bottom: 28px; }
+.demo {
+  height: 640px;
+  border: 1px solid #cfcfcf;
+  border-radius: 4px;
+  overflow: hidden;
+  background: conic-gradient(#e8e8e8 25%, #f7f7f7 0 50%, #e8e8e8 0 75%, #f7f7f7 0) 0 0 / 18px 18px;
 }
-/* grain + a cold wash bleeding from the top right, where she stands */
-body::before{
-  content:""; position:fixed; inset:0; pointer-events:none; z-index:0;
-  background:
-    radial-gradient(120% 90% at 78% -10%, rgba(121,207,255,.10), transparent 55%),
-    radial-gradient(80% 60% at 10% 105%, rgba(121,207,255,.05), transparent 60%);
-}
-body::after{
-  content:""; position:fixed; inset:0; pointer-events:none; z-index:1; opacity:.038;
-  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)'/%3E%3C/svg%3E");
-}
-.wrap{position:relative; z-index:2; max-width:1180px; margin:0 auto; padding:0 32px}
-.hero-grid{overflow:visible}
-.figure{contain:layout}
-
-/* ---------- shared type ---------- */
-.label{
-  font-family:var(--mono); font-size:11px; letter-spacing:.16em;
-  text-transform:uppercase; color:var(--muted);
-}
-.rule{height:1px; background:var(--line); border:0}
-h2{
-  font-family:var(--serif); font-weight:400; font-size:clamp(30px,4.2vw,50px);
-  line-height:1.08; letter-spacing:-.01em;
-}
-p{color:#c3cad8; max-width:62ch}
-a{color:var(--accent)}
-
-/* ---------- hero ---------- */
-.hero{position:relative; min-height:100svh; display:flex; align-items:center; padding:96px 0 64px}
-.hero-grid{display:grid; grid-template-columns:1.05fr .95fr; gap:40px; align-items:center; width:100%}
-.eyebrow{display:flex; align-items:center; gap:12px; margin-bottom:26px}
-.eyebrow .dot{width:6px;height:6px;border-radius:50%;background:var(--accent);
-  box-shadow:0 0 0 4px var(--accent-dim)}
-h1{
-  font-family:var(--serif); font-weight:400; letter-spacing:-.02em;
-  font-size:clamp(58px,9.5vw,132px); line-height:.9; margin-bottom:8px;
-}
-h1 em{font-style:italic; color:var(--accent)}
-.tag{font-family:var(--mono); font-size:13px; color:var(--muted); margin-bottom:30px}
-.lede{font-size:clamp(17px,1.5vw,20px); color:#ccd3e1; margin-bottom:38px; max-width:44ch}
-.cta{display:flex; gap:12px; flex-wrap:wrap}
-.btn{
-  display:inline-flex; align-items:center; gap:9px; padding:12px 20px;
-  border:1px solid var(--line-2); border-radius:2px; text-decoration:none;
-  font-family:var(--mono); font-size:12.5px; letter-spacing:.04em; color:var(--text);
-  transition:background .18s, border-color .18s, transform .18s;
-}
-.btn:hover{background:rgba(255,255,255,.05); border-color:var(--accent); transform:translateY(-1px)}
-.btn.primary{background:var(--accent); color:#05080d; border-color:var(--accent); font-weight:500}
-.btn.primary:hover{background:#9adcff}
-
-/* her, bleeding off the right edge, with spec callouts */
-.figure{position:relative; justify-self:end; width:100%; max-width:452px; margin-right:12px}
-.figure img{
-  display:block; width:100%; height:auto;
-  filter:drop-shadow(0 40px 90px rgba(0,0,0,.75));
-  animation:breathe 9s ease-in-out infinite;
-  -webkit-mask-image:linear-gradient(to bottom,#000 78%,transparent 99%);
-  mask-image:linear-gradient(to bottom,#000 78%,transparent 99%);
-}
-@keyframes breathe{0%,100%{transform:translateY(0)}50%{transform:translateY(-11px)}}
-.figure::before{ /* measurement grid behind her */
-  content:""; position:absolute; inset:-8% -12% -4% -12%; z-index:-1;
-  background-image:linear-gradient(var(--line) 1px,transparent 1px),
-                   linear-gradient(90deg,var(--line) 1px,transparent 1px);
-  background-size:44px 44px;
-  mask-image:radial-gradient(70% 60% at 50% 45%,#000 30%,transparent 78%);
-}
-.callout{position:absolute; font-family:var(--mono); font-size:10.5px; color:var(--muted); letter-spacing:.05em; white-space:nowrap}
-.callout span{color:var(--accent)}
-.callout::before{content:""; position:absolute; top:50%; height:1px; background:var(--line-2)}
-/* One annotation column on the left. Anything hanging off the right edge
-   overflows the viewport at this width and forces horizontal scroll. */
-.c1{top:22%; left:-34%}  .c1::before{right:-42px; width:36px}
-.c2{top:45%; left:-52%}  .c2::before{right:-42px; width:36px}
-.c3{top:68%; left:-31%}  .c3::before{right:-42px; width:36px}
-
-/* ---------- sections ---------- */
-section{padding:104px 0}
-.sec-head{display:flex; align-items:baseline; gap:18px; margin-bottom:14px}
-
-/* entrance */
-.rise{opacity:0; transform:translateY(18px); animation:rise .85s cubic-bezier(.2,.7,.3,1) forwards}
-@keyframes rise{to{opacity:1; transform:none}}
-.d1{animation-delay:.05s}.d2{animation-delay:.15s}.d3{animation-delay:.25s}
-.d4{animation-delay:.35s}.d5{animation-delay:.5s}
-
-
-/* ---------- try her ---------- */
-.try-grid{display:grid; grid-template-columns:minmax(0,1fr) 360px; gap:48px; align-items:start}
-.howto{list-style:none; display:grid; gap:12px; margin-top:22px}
-.howto li{display:grid; grid-template-columns:22px 1fr; gap:12px; font-size:14.5px; color:#c3cad8}
-.howto li span{font-family:var(--mono); font-size:11px; color:var(--accent); padding-top:3px}
-.desk{
-  position:relative; height:720px; border:1px solid var(--line-2); border-radius:10px; overflow:hidden;
-  background:
-    radial-gradient(90% 70% at 20% 10%, #2a3350 0%, transparent 60%),
-    radial-gradient(80% 80% at 90% 90%, #3b2a44 0%, transparent 60%),
-    linear-gradient(160deg,#141a28,#0b0e15);
-  box-shadow:0 40px 120px rgba(0,0,0,.55);
-}
-.menubar{height:26px; display:flex; align-items:center; gap:18px; padding:0 14px;
-  background:rgba(12,14,20,.55); backdrop-filter:blur(10px); border-bottom:1px solid var(--line);
-  font-family:var(--sans); font-size:12px; color:#cfd6e4}
-.menubar b{font-weight:500}
-.menubar .r{margin-left:auto; color:var(--muted); font-family:var(--mono); font-size:11px}
-.fakewin{position:absolute; left:22px; top:58px; width:62%; height:62%; border-radius:8px;
-  background:rgba(16,19,27,.92); border:1px solid var(--line); overflow:hidden}
-.fakewin .bar{height:26px; display:flex; gap:7px; align-items:center; padding:0 10px; border-bottom:1px solid var(--line)}
-.fakewin .bar i{width:10px; height:10px; border-radius:50%; background:#3a4152; display:block}
-.fakewin pre{margin:0; padding:14px 16px; font-family:var(--mono); font-size:11.5px; line-height:1.75; color:#7f8aa0; white-space:pre}
-.fakewin pre em{font-style:normal; color:#9ec9ff}
-.desk iframe{position:absolute; right:0; bottom:0; width:420px; max-width:100%; height:680px; border:0; background:transparent}
-@media (max-width:1000px){
-  .try-grid{grid-template-columns:1fr; gap:24px}
-  .try-grid > :last-child{order:-1}
-  .desk{height:640px}
-  .desk iframe{height:600px; width:100%}
-  .fakewin{display:none}
-}
-
-@media (max-width:900px){
-  .hero{min-height:auto; padding:72px 0 40px}
-  .hero-grid{grid-template-columns:1fr; gap:52px}
-  .figure{justify-self:center; max-width:380px}
-  .callout{display:none}
-}
-@media (prefers-reduced-motion:reduce){
-  *{animation:none!important; transition:none!important}
-  .rise{opacity:1; transform:none}
+.demo iframe { display: block; width: 100%; height: 100%; border: 0; }
+.caption { font-size: 15px; color: #666; margin-top: 8px; }
+code { font: 15px/1.5 Menlo, Consolas, monospace; background: #efece6; padding: 1px 4px; border-radius: 3px; }
+pre { background: #efece6; padding: 12px 14px; border-radius: 4px; overflow-x: auto; margin: 0 0 16px; }
+pre code { padding: 0; background: none; }
+footer { margin-top: 56px; padding-top: 14px; border-top: 1px solid #ddd; font-size: 15px; color: #777; }
+@media (max-width: 600px) {
+  body { padding-top: 24px; font-size: 17px; }
+  h1 { font-size: 32px; }
+  .demo { height: 540px; }
 }
 </style>
 </head>
 <body>
+<main>
+  <h1>Marina</h1>
+  <p class="sub">An anime character who sits on my Mac desktop and talks back.</p>
+  <p class="links"><a href="https://github.com/skep13/marina">Source on GitHub</a> · built on <a href="https://github.com/rayenfeng/riko_project">riko_project</a></p>
 
-<div class="wrap">
+  <div class="demo">
+    <iframe src="try/" title="Marina running in the browser" allow="autoplay"></iframe>
+  </div>
+  <p class="caption">This is the same renderer the app uses, running in your browser. Here she only
+    has a few pre-recorded lines, because the real app needs a language model and runs
+    the voice on your own machine. Type something, hover over her, or leave the page alone
+    for a bit and she'll talk first.</p>
 
-  <header class="hero">
-    <div class="hero-grid">
-      <div>
-        <div class="eyebrow rise d1"><span class="dot"></span><span class="label">Desktop companion for macOS</span></div>
-        <h1 class="rise d2">Mar<em>i</em>na</h1>
-        <div class="tag rise d2">VRM avatar, local voice, 8&nbsp;GB of RAM</div>
-        <p class="lede rise d3">She lives on your desktop in a transparent window. Talk to her or type,
-          and she answers in her own voice, lip syncing and acting out what she writes. You can cut her
-          off mid sentence, and sometimes she starts the conversation.</p>
-        <div class="cta rise d4">
-          <a class="btn primary" href="#try">Try her in your browser</a>
-          <a class="btn" href="https://github.com/skep13/marina">View the source</a>
-        </div>
-      </div>
+  <h2>What the app does</h2>
+  <p>On the desktop she lives in a transparent window that stays on top of everything else.
+    You can talk to her or type, and she answers out loud, lip syncs, and acts out anything
+    the model writes in asterisks, like <code>*rolls her eyes*</code>, instead of reading it out.</p>
+  <p>Speech recognition (Faster-Whisper) and her voice (Kokoro) run locally. The language model
+    can be anything with an OpenAI-compatible API, so Ollama on the same machine works fine.
+    I run it on a MacBook Air with 8 GB of RAM.</p>
+  <p>She starts talking as soon as the first sentence is ready, you can cut her off by talking
+    over her, and if it's been quiet for a while she'll sometimes start the conversation herself.
+    She also remembers things about you between conversations.</p>
 
-      <figure class="figure rise d5">
-        <img src="hero.png" alt="Marina, an anime character with long lilac hair, a black ribbon and a dark jacket, on a transparent background">
-        <div class="callout c1">blinks and holds your <span>gaze</span></div>
-        <div class="callout c2"><span>5 mouth shapes</span> from formants</div>
-        <div class="callout c3"><span>195</span> spring joints</div>
-      </figure>
-    </div>
-  </header>
+  <h2>Running it</h2>
+  <p>Clone the repo into <code>~/marina</code> on a Mac, then:</p>
+  <pre><code>./setup-mac.sh
+cp character_config.example.yaml character_config.yaml
+./build-app.sh</code></pre>
+  <p>Before building, set your model endpoint in <code>character_config.yaml</code> and put a
+    <code>.vrm</code> file at <code>app/models/model.vrm</code>. That puts Marina.app in
+    Applications. The <a href="https://github.com/skep13/marina#readme">README</a> has the rest.</p>
 
-  <section id="try">
-    <div class="try-grid">
-      <div class="desk" aria-label="A mock desktop with Marina standing in the corner">
-        <div class="menubar"><b>Finder</b><span>File</span><span>Edit</span><span>View</span><span class="r" id="clock">9:41</span></div>
-        <div class="fakewin" aria-hidden="true">
-          <div class="bar"><i></i><i></i><i></i></div>
-<pre><em>fn</em> main() {
-    <em>let</em> transition = edit(<em>"whip_pan"</em>);
-    <em>for</em> take <em>in</em> 1..=40 {
-        render(&amp;transition, take);
-    }
-    <span style="color:#5d6679">// the algorithm better appreciate this</span>
-}</pre>
-        </div>
-        <iframe id="her" src="try/" title="Marina, running in the browser" allow="autoplay"></iframe>
-      </div>
-
-      <div>
-        <div class="sec-head"><h2>Try her</h2></div>
-        <ul class="howto">
-          <li><span>01</span>Type in the box under her and press Enter.</li>
-          <li><span>02</span>Hover over her. Her eyes follow you and the buttons appear.</li>
-          <li><span>03</span>Stay quiet for a bit and she talks first.</li>
-          <li><span>04</span>Load your own .vrm with the person button.</li>
-        </ul>
-      </div>
-    </div>
-  </section>
-</div>
-
-<script>
-const clock = document.getElementById('clock');
-const tick = () => { clock.textContent = new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }); };
-tick(); setInterval(tick, 30000);
-</script>
+  <footer>Made by <a href="https://github.com/skep13">skep13</a>. MIT licensed.</footer>
+</main>
 </body>
 </html>
