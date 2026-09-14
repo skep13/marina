@@ -5,6 +5,8 @@ transparent window that stays on top of everything else, and you can either
 talk to her out loud or type. She answers in her own voice, lip syncs while
 she does it, and acts out the little stage directions she writes.
 
+![Marina on my desktop](screenshot.jpg)
+
 It started as a fork of [rayenfeng/riko_project](https://github.com/rayenfeng/riko_project).
 That project had the voice pipeline, but the avatar frontend was still an
 unchecked TODO, so I built it and split things up so the language model can run
