@@ -17,12 +17,13 @@ sys.path.insert(0, str(REPO_ROOT / "server"))
 from fastapi import FastAPI, File, UploadFile
 from fastapi.responses import StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
+from openai import APIConnectionError
 from pydantic import BaseModel
 
 from process.asr_func.asr_push_to_talk import build_model, transcribe_file
 from process.asr_func.recorder import Recorder
 from process.asr_func.vad import VAD
-from process.config import load_config
+from process.config import CONFIG_PATH, load_config
 from process.llm_funcs.llm_scr import (
     active_endpoint,
     active_model,
@@ -85,9 +86,15 @@ class ChatIn(BaseModel):
 def llm_error_message(e):
     msg = getattr(getattr(e, "response", None), "text", "") or str(e)
     if "invalid_api_key" in msg or "Incorrect API key" in msg:
-        return "OpenAI rejected the API key. Set OPENAI_API_KEY in character_config.yaml."
+        return f"That API key was rejected. Set llm.api_key in {CONFIG_PATH}."
     if "rate_limit" in msg or "429" in msg:
-        return "OpenAI rate-limited the request. Wait a moment and try again."
+        return "The endpoint rate-limited the request. Wait a moment and try again."
+    if isinstance(e, APIConnectionError) or "Connection" in type(e).__name__:
+        return (
+            f"No language model answered at {describe_endpoint()}. Marina needs "
+            "one to talk. Install Ollama and run 'ollama pull llama3.2:3b', or "
+            f"point llm.base_url at any OpenAI-compatible server in {CONFIG_PATH}."
+        )
     return f"LLM call failed: {type(e).__name__}: {str(e)[:200]}"
 
 

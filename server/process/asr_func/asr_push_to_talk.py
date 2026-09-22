@@ -3,7 +3,13 @@ import os
 
 from faster_whisper import WhisperModel
 
-from process.config import load_config
+from process.config import DATA_ROOT, load_config, resolve
+
+
+def _bundled(name):
+    """Marina.app ships the model, so a fresh Mac never has to download it."""
+    path = resolve(f"models/whisper/{name}")
+    return str(path) if (path / "model.bin").exists() else None
 
 
 def build_model():
@@ -13,6 +19,13 @@ def build_model():
         "device": cfg.get("device", "cpu"),
         "compute_type": cfg.get("compute_type", "int8"),
     }
+
+    bundled = _bundled(name)
+    if bundled:
+        return WhisperModel(bundled, **kwargs)
+
+    # Anything not bundled comes from Hugging Face, cached somewhere writable.
+    os.environ.setdefault("HF_HOME", str(DATA_ROOT / "cache" / "huggingface"))
 
     if cfg.get("offline", True):
         try:

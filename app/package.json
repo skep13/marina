@@ -37,14 +37,23 @@
     ],
     "extraResources": [
       {
-        "from": "build/project-root.txt",
-        "to": "project-root.txt"
+        "from": "build/backend",
+        "to": "backend",
+        "filter": [
+          "**/*"
+        ]
       }
     ],
     "mac": {
       "category": "public.app-category.productivity",
       "icon": "build/icon.icns",
       "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "arm64"
+          ]
+        },
         {
           "target": "dir",
           "arch": [
@@ -60,6 +69,27 @@
         "NSDocumentsFolderUsageDescription": "Marina needs to read her Python backend and avatar model from this folder.",
         "NSDownloadsFolderUsageDescription": "Marina needs to read her Python backend and avatar model from this folder."
       }
+    },
+    "dmg": {
+      "title": "Marina",
+      "artifactName": "Marina-${version}-arm64.dmg",
+      "window": {
+        "width": 540,
+        "height": 380
+      },
+      "contents": [
+        {
+          "x": 140,
+          "y": 200,
+          "type": "file"
+        },
+        {
+          "x": 400,
+          "y": 200,
+          "type": "link",
+          "path": "/Applications"
+        }
+      ]
     }
   },
   "author": "Jacob Matthews"

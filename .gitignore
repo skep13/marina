@@ -3,7 +3,8 @@
 .venv/
 __pycache__/
 app/build/icon.iconset/
-app/build/project-root.txt
+app/build/cache/
+app/build/backend/
 app/dist/
 app/test/icons.png
 app/test/idle-*.png

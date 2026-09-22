@@ -9,9 +9,9 @@ import threading
 import uuid
 from datetime import datetime, timezone
 
-from process.config import REPO_ROOT
+from process.config import resolve_data
 
-MEMORY_FILE = REPO_ROOT / "memory.json"
+MEMORY_FILE = resolve_data("memory.json")
 
 MAX_FACTS = 60
 

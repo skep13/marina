@@ -30,15 +30,29 @@ function readAsTransferable(file) {
   return buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength);
 }
 
-function projectRoot() {
+// Packaged, everything the backend needs ships inside the bundle and the
+// files it writes go to Application Support. In a checkout both are the repo.
+function backend() {
   if (app.isPackaged) {
-    const marker = path.join(process.resourcesPath, 'project-root.txt');
-    try {
-      const p = fs.readFileSync(marker, 'utf8').trim();
-      if (p && fs.existsSync(p)) return p;
-    } catch {}
+    const root = path.join(process.resourcesPath, 'backend');
+    return {
+      root,
+      data: app.getPath('userData'),
+      python: path.join(root, 'python', 'bin', 'python3.12'),
+      script: path.join(root, 'server', 'marina_server.py'),
+    };
   }
-  return path.join(__dirname, '..');
+  const root = path.join(__dirname, '..');
+  return {
+    root,
+    data: root,
+    python: path.join(root, '.venv', 'bin', 'python'),
+    script: path.join(root, 'server', 'marina_server.py'),
+  };
+}
+
+function configFile() {
+  return path.join(backend().data, 'character_config.yaml');
 }
 
 const BRIDGE_URL = 'http://127.0.0.1:8765';
@@ -58,18 +72,22 @@ async function startBridge() {
     return;
   }
 
-  const root = projectRoot();
-  const python = path.join(root, '.venv', 'bin', 'python');
-  const script = path.join(root, 'server', 'marina_server.py');
+  const { root, data, python, script } = backend();
 
   if (!fs.existsSync(python) || !fs.existsSync(script)) {
     dialog.showErrorBox(
       'Marina cannot find her backend',
       `Expected:\n  ${python}\n  ${script}\n\n` +
-      'Run ./setup-mac.sh in the project folder, or move the folder back.',
+      (app.isPackaged
+        ? 'This copy of Marina.app looks incomplete. Download it again.'
+        : 'Run ./setup-mac.sh in the project folder.'),
     );
     return;
   }
+
+  try {
+    fs.mkdirSync(data, { recursive: true });
+  } catch {}
 
   const logPath = path.join(app.getPath('userData'), 'bridge.log');
   let out = 'ignore';
@@ -84,7 +102,12 @@ async function startBridge() {
   bridge = spawn(python, [script], {
     cwd: root,
     stdio: ['ignore', out, out],
-    env: { ...process.env, PYTHONUNBUFFERED: '1' },
+    env: {
+      ...process.env,
+      PYTHONUNBUFFERED: '1',
+      MARINA_ROOT: root,
+      MARINA_DATA: data,
+    },
   });
   bridge.on('exit', (code) => {
     console.log(`Bridge exited (${code})`);
@@ -256,6 +279,7 @@ function buildTray() {
       { label: 'Change model…', click: () => { win?.show(); win?.webContents.send('pick-model'); } },
       { label: 'Reset position', click: () => { if (win) { win.setBounds({ x: 60, y: 60, width: 420, height: 680 }); win.show(); } } },
       { label: 'Reload', click: () => win?.reload() },
+      { label: 'Edit config…', click: () => shell.openPath(configFile()) },
       { label: 'Open bridge log', click: () => shell.openPath(path.join(app.getPath('userData'), 'bridge.log')) },
       { type: 'separator' },
       { label: 'Quit Marina', accelerator: 'Command+Shift+Q', click: () => app.quit() },

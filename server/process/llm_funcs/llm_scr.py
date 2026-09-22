@@ -15,7 +15,7 @@ from process.backend import current as backend_current
 from process.backend import mode as backend_mode
 from process.backend import model_for
 from process.backend import note_used
-from process.config import load_config, resolve
+from process.config import load_config, resolve_data
 from process.memory import extract as memory_extract
 from process.memory import persona
 from process.memory import store as memory
@@ -35,7 +35,7 @@ MAX_TOKENS = _llm.get("max_tokens", 2048)
 HISTORY_TURNS = int(_llm.get("history_turns", 12))
 REMEMBER = bool(_llm.get("remember", True))
 
-HISTORY_FILE = resolve(char_config["history_file"])
+HISTORY_FILE = resolve_data(char_config["history_file"])
 BASE_SYSTEM_PROMPT = char_config["presets"]["default"]["system_prompt"]
 
 

@@ -1,6 +1,8 @@
 llm:
-  base_url: ""
-  api_key: "CHANGEME-or-leave-blank-for-no-auth"
+  # Ollama on this Mac. Leave base_url empty to use OpenAI instead, and put
+  # your key in api_key. Any OpenAI-compatible server works here.
+  base_url: "http://127.0.0.1:11434/v1"
+  api_key: "ollama"
   model: "llama3.2:3b"
   thinking: false
   repeat_penalty: 1.12
