@@ -35,10 +35,9 @@ It is a big download, around 1 GB, because those models are inside it.
 
 ### Getting past Gatekeeper
 
-I don't pay Apple $99 a year, so the app is signed ad-hoc rather than notarized.
+I don't pay Apple £99 a year, so the app is signed ad-hoc rather than being notarized.
 macOS will refuse to open it the first time and say Marina "is damaged" or is
-from an unidentified developer. It isn't damaged, that is just what macOS says
-about any app it can't trace to a paid developer account.
+from an unidentified developer its not i just dont want to pay
 
 Open a terminal and run this once:
 
@@ -75,7 +74,7 @@ Her config, memory and chat history live in
 
 ## What she can do
 
-- Sits on your desktop in a transparent, always-on-top window
+- Sit on your desktop in a transparent, always-on-top window
 - Talk to her or type
 - Starts speaking before the whole reply has been generated
 - You can cut her off by talking over her
@@ -91,13 +90,7 @@ Her config, memory and chat history live in
 - Works with any OpenAI-compatible model: Ollama, llama.cpp, LM Studio, vLLM
   or OpenAI itself
 
-## What leaves your Mac
-
-Your voice never leaves the Mac, in either direction, and there's no code path
-that sends recorded audio anywhere. Faster-Whisper listens and
-Kokoro does the talking. I checked this by watching the bridge's sockets
-through a full trip, mic in and then when the reply was spoken, and the only connections
-open were loopback ones.
+  ## Clipboard
 
 - The clipboard tool sends whatever is on your clipboard to the model, so it's
   only as private as your LLM endpoint. Turn it off with `tools.clipboard`.
