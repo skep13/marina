@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Marina</title>
-<meta name="description" content="An anime character who sits on your Mac desktop and talks back. Try her in the browser.">
+<meta name="description" content="An anime character who sits on your Mac desktop and talks back. Try her in the browser, then download the app.">
 <meta property="og:title" content="Marina">
 <meta property="og:description" content="An anime character who sits on your Mac desktop and talks back.">
 <meta property="og:image" content="https://skep13.github.io/marina/hero.png">
@@ -25,6 +25,18 @@ a { color: #1f58b8; }
 a:hover { color: #0d3a85; }
 .sub { font-size: 20px; color: #555; margin: 6px 0 4px; }
 .links { font-size: 16px; color: #777; margin-bottom: 28px; }
+.get { margin: 26px 0 8px; }
+.btn {
+  display: inline-block;
+  background: #1f58b8;
+  color: #fff;
+  text-decoration: none;
+  font-size: 18px;
+  padding: 13px 26px;
+  border-radius: 5px;
+}
+.btn:hover { background: #0d3a85; color: #fff; }
+.meta { font-size: 15px; color: #666; margin: 0 0 32px; }
 .demo {
   height: 640px;
   border: 1px solid #cfcfcf;
@@ -35,13 +47,12 @@ a:hover { color: #0d3a85; }
 .demo iframe { display: block; width: 100%; height: 100%; border: 0; }
 .caption { font-size: 15px; color: #666; margin-top: 8px; }
 code { font: 15px/1.5 Menlo, Consolas, monospace; background: #efece6; padding: 1px 4px; border-radius: 3px; }
-pre { background: #efece6; padding: 12px 14px; border-radius: 4px; overflow-x: auto; margin: 0 0 16px; }
-pre code { padding: 0; background: none; }
 footer { margin-top: 56px; padding-top: 14px; border-top: 1px solid #ddd; font-size: 15px; color: #777; }
 @media (max-width: 600px) {
   body { padding-top: 24px; font-size: 17px; }
   h1 { font-size: 32px; }
   .demo { height: 540px; }
+  .btn { display: block; text-align: center; }
 }
 </style>
 </head>
@@ -51,33 +62,25 @@ footer { margin-top: 56px; padding-top: 14px; border-top: 1px solid #ddd; font-s
   <p class="sub">An anime character who sits on my Mac desktop and talks back.</p>
   <p class="links"><a href="https://github.com/skep13/marina">Source on GitHub</a> · built on <a href="https://github.com/rayenfeng/riko_project">riko_project</a></p>
 
+  <p>She lives in a transparent window that stays on top of everything else. You talk to her
+    or type, and she answers out loud, lip syncs, and acts out anything the model writes in
+    asterisks, like <code>*rolls her eyes*</code>, instead of reading it aloud. Her voice and
+    her hearing both run on your own machine.</p>
+
+  <p class="get"><a class="btn" href="https://github.com/skep13/marina/releases/download/v1.0.0/Marina-1.0.0-arm64.dmg">Download Marina for macOS</a></p>
+  <p class="meta">A ready-to-run app, 664 MB. Open the dmg, drag Marina to Applications, done —
+    no build step and nothing to install. Apple Silicon, macOS 13 or newer. It is signed ad-hoc
+    rather than notarized, so the first time you open it run
+    <code>xattr -dr com.apple.quarantine /Applications/Marina.app</code>.</p>
+
+  <h2>Try her here first</h2>
   <div class="demo">
     <iframe src="try/" title="Marina running in the browser" allow="autoplay"></iframe>
   </div>
-  <p class="caption">This is the same renderer the app uses, running in your browser. Here she only
-    has a few pre-recorded lines, because the real app needs a language model and runs
-    the voice on your own machine. Type something, hover over her, or leave the page alone
-    for a bit and she'll talk first.</p>
-
-  <h2>What the app does</h2>
-  <p>On the desktop she lives in a transparent window that stays on top of everything else.
-    You can talk to her or type, and she answers out loud, lip syncs, and acts out anything
-    the model writes in asterisks, like <code>*rolls her eyes*</code>, instead of reading it out.</p>
-  <p>Speech recognition (Faster-Whisper) and her voice (Kokoro) run locally. The language model
-    can be anything with an OpenAI-compatible API, so Ollama on the same machine works fine.
-    I run it on a MacBook Air with 8 GB of RAM.</p>
-  <p>She starts talking as soon as the first sentence is ready, you can cut her off by talking
-    over her, and if it's been quiet for a while she'll sometimes start the conversation herself.
-    She also remembers things about you between conversations.</p>
-
-  <h2>Running it</h2>
-  <p>Clone the repo into <code>~/marina</code> on a Mac, then:</p>
-  <pre><code>./setup-mac.sh
-cp character_config.example.yaml character_config.yaml
-./build-app.sh</code></pre>
-  <p>Before building, set your model endpoint in <code>character_config.yaml</code> and put a
-    <code>.vrm</code> file at <code>app/models/model.vrm</code>. That puts Marina.app in
-    Applications. The <a href="https://github.com/skep13/marina#readme">README</a> has the rest.</p>
+  <p class="caption">The same renderer the app uses, running in your browser. Here she only has a
+    few pre-recorded lines, because the real app needs a language model and runs the voice on your
+    own machine. Type something, hover over her, or leave the page alone for a bit and she'll
+    talk first.</p>
 
   <footer>Made by <a href="https://github.com/skep13">skep13</a>. MIT licensed.</footer>
 </main>
