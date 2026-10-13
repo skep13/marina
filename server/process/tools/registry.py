@@ -120,6 +120,26 @@ def remember(fact):
     return "Noted." if added else "Already knew that."
 
 
+def forget(fact):
+    found = memory.find(fact)
+    if not found:
+        return "Couldn't find anything like that in what you remember."
+    memory.remove(found["id"])
+    print(f"[tool] forgot: {found['text']}", flush=True)
+    return f"Forgot: {found['text']}"
+
+
+def note_to_self(note):
+    note = " ".join((note or "").split())
+    if not note:
+        return "Nothing to note."
+    if not note.lower().startswith("marina"):
+        note = "Marina: " + note  # so it reads as hers next to the facts about them
+    added = memory.add(note, source=memory.SELF)
+    print(f"[tool] noted about herself: {note}", flush=True)
+    return "Noted." if added else "You'd already noted that."
+
+
 SPECS = [
     ("set_timer", set_timer, lambda: _allowed("timers"), {
         "description": "Set a timer that will go off after a number of minutes. "
@@ -158,6 +178,24 @@ SPECS = [
             "properties": {"fact": {"type": "string"}},
             "required": ["fact"],
         }}),
+    ("forget", forget, _may_remember, {
+        "description": "Forget something you remembered about them or noted about "
+                       "yourself, when they say it's wrong or ask you to forget it. "
+                       "Describe it in a few words; the closest match is removed. To "
+                       "correct a fact, forget the old one and remember the new one.",
+        "parameters": {"type": "object", "properties": {
+            "fact": {"type": "string", "description": "What to forget, in a few words."}},
+            "required": ["fact"]}}),
+    ("note_to_self", note_to_self, _may_remember, {
+        "description": "Keep a short note about yourself so it lasts beyond this "
+                       "conversation: an opinion or taste of yours, something you've "
+                       "done or are working on (on your machine, say), how things are "
+                       "between you and them. One sentence starting with \"Marina\". "
+                       "Not facts about them (that's remember), not passing moods.",
+        "parameters": {"type": "object", "properties": {
+            "note": {"type": "string",
+                     "description": "e.g. \"Marina thinks Bunny Girl Senpai is the best anime\""}},
+            "required": ["note"]}}),
 ]
 
 SPECS += [(name, fn, _workspace_allowed, spec) for name, fn, spec in workspace.SPECS]

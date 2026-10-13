@@ -115,9 +115,18 @@ def add(text, source="auto"):
     return local_add(text, source)
 
 
+SELF = "self"  # the source of notes she keeps about herself
+MAX_SELF_IN_PROMPT = 20
+
+
+def _is_self_note(text):
+    t = text.strip()
+    return 8 <= len(t) <= 200 and t[-1] != "?"
+
+
 def local_add(text, source="auto"):
     text = " ".join((text or "").split())
-    if not _is_durable_fact(text):
+    if not (_is_self_note(text) if source == SELF else _is_durable_fact(text)):
         return None
 
     with _lock:
@@ -164,6 +173,20 @@ def local_remove(fact_id):
         return len(data["facts"]) < before
 
 
+def find(description):
+    """The remembered fact or note that best matches `description`, or None."""
+    want = " ".join((description or "").lower().split())
+    if not want:
+        return None
+    best, score = None, 0.0
+    for f in all_facts():
+        text = f["text"].lower()
+        s = 1.0 if want in text else _similar(f["text"], description)
+        if s > score:
+            best, score = f, s
+    return best if score >= 0.3 else None
+
+
 def clear():
     if shared.enabled():
         shared.call("DELETE", "/shared/memory")
@@ -208,15 +231,26 @@ def _for_today(facts, today):
 
 
 def as_prompt_block(today=None):
-    facts = _for_today(all_facts(), today or date.today())
-    if not facts:
-        return ""
-
-    facts = sorted(facts, key=lambda f: f.get("updated", ""), reverse=True)
-    lines = "\n".join(f"- {f['text']}" for f in facts)
-    return (
-        "\n\nYou remember these things about the user from earlier "
-        "conversations. Use them only when genuinely relevant, never recite "
-        "them back, and never open a reply with the user's name.\n"
-        f"{lines}"
-    )
+    everything = all_facts()
+    facts = _for_today([f for f in everything if f.get("source") != SELF], today or date.today())
+    mine = [f for f in everything if f.get("source") == SELF]
+    out = ""
+    if facts:
+        facts = sorted(facts, key=lambda f: f.get("updated", ""), reverse=True)
+        lines = "\n".join(f"- {f['text']}" for f in facts)
+        out += (
+            "\n\nYou remember these things about the user from earlier "
+            "conversations. Use them only when genuinely relevant, never recite "
+            "them back, and never open a reply with the user's name.\n"
+            f"{lines}"
+        )
+    if mine:
+        mine = sorted(mine, key=lambda f: f.get("updated", ""), reverse=True)[:MAX_SELF_IN_PROMPT]
+        lines = "\n".join(f"- {f['text']}" for f in reversed(mine))
+        out += (
+            "\n\nNotes you've kept about yourself: your own opinions, tastes and "
+            "what you've been up to. They're yours, so stay true to them, but "
+            "don't announce them.\n"
+            f"{lines}"
+        )
+    return out
