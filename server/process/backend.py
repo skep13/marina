@@ -4,7 +4,7 @@ Backends are tried in this order in auto mode:
 
   server  llm.base_url, the main machine
   ...     anything under llm.extra_backends, in the order listed
-  local   llm.fallback_base_url, usually Ollama on this Mac
+  local   llm.fallback_base_url, usually Ollama on this computer
 
   auto    the first of those that answers
   <name>  that backend only
@@ -49,7 +49,7 @@ def _build():
     if local:
         out.append({
             "name": "local",
-            "label": _llm.get("fallback_label") or "This Mac",
+            "label": _llm.get("fallback_label") or "This computer",
             "base_url": local,
             "api_key": _llm.get("fallback_api_key") or "not-needed",
             "model": _llm.get("fallback_model") or out[0]["model"],

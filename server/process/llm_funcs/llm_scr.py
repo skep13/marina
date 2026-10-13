@@ -104,7 +104,7 @@ def _tool_rounds():
 class Activity(str):
     """Yielded by llm_stream around tool use. It is an empty string, so a
     caller that only joins up her words is unaffected; one that wants to show
-    what she is doing reads `label` and `where` ("vm" for her machine, "mac"
+    what she is doing reads `label` and `where` ("vm" for her machine, "computer"
     for theirs). With `confirm` set it is a question for them, answered at
     POST /confirm."""
 

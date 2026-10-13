@@ -7,7 +7,7 @@ from process.config import DATA_ROOT, load_config, resolve
 
 
 def _bundled(name):
-    """Marina.app ships the model, so a fresh Mac never has to download it."""
+    """The packaged app ships the model, so it never has to download it."""
     path = resolve(f"models/whisper/{name}")
     return str(path) if (path / "model.bin").exists() else None
 

@@ -12,7 +12,7 @@ from process import config
 BASE = """llm:
   model: "marina"   # the brain
 
-mac:
+computer:
   enabled: false   # off by default
 
 tools:
@@ -30,18 +30,18 @@ def write(tmp_path, monkeypatch, text):
 
 def test_changes_a_value_in_place(tmp_path, monkeypatch):
     path = write(tmp_path, monkeypatch, BASE)
-    config.set_value("mac", "enabled", True)
+    config.set_value("computer", "enabled", True)
     text = path.read_text()
-    assert yaml.safe_load(text)["mac"]["enabled"] is True
+    assert yaml.safe_load(text)["computer"]["enabled"] is True
     assert '  model: "marina"   # the brain' in text
     assert yaml.safe_load(text)["tools"] == {"timers": True}
 
 
 def test_adds_a_missing_key_and_section(tmp_path, monkeypatch):
     path = write(tmp_path, monkeypatch, BASE)
-    config.set_value("tools", "mac", False)
+    config.set_value("tools", "computer", False)
     config.set_value("wake", "listen_seconds", 12)
     d = yaml.safe_load(path.read_text())
-    assert d["tools"] == {"timers": True, "mac": False}
+    assert d["tools"] == {"timers": True, "computer": False}
     assert d["wake"] == {"listen_seconds": 12}
-    assert d["mac"]["enabled"] is False
+    assert d["computer"]["enabled"] is False

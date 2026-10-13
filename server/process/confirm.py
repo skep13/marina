@@ -1,4 +1,4 @@
-"""Asking them before she does something risky on their Mac.
+"""Asking them before she does something risky on their computer.
 
 The reply loop opens a request, the app shows it with Allow and Deny, and
 POST /confirm answers it. No answer within the time limit counts as no, as

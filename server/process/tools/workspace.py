@@ -43,8 +43,8 @@ def available():
 
 def _ssh(command, stdin=None, timeout=None):
     """Run a shell command on the workspace. Returns (exit code, output)."""
-    # Socket paths are capped at 104 bytes on macOS, which Application
-    # Support plus the 40-character %C hash would overrun.
+    # Socket paths are capped at 108 bytes on Linux, which a long data folder
+    # plus the 40-character %C hash could overrun.
     control = f"/tmp/marina-ws-{os.getuid()}-%C"
     args = [
         "ssh", "-T",

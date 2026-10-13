@@ -1,8 +1,9 @@
 """Time, frontmost app name and battery, for the prompt."""
-import subprocess
 from datetime import datetime
+from pathlib import Path
 
 from process.config import load_config
+from process.tools import session
 
 _config = load_config()
 _ctx = _config.get("context") or {}
@@ -12,16 +13,7 @@ SHOW_TIME = bool(_ctx.get("time", True))
 SHOW_APP = bool(_ctx.get("frontmost_app", True))
 SHOW_BATTERY = bool(_ctx.get("battery", True))
 
-TIMEOUT = 0.6
-
-
-def _run(args):
-    try:
-        out = subprocess.run(args, capture_output=True, text=True,
-                             timeout=TIMEOUT)
-        return out.stdout.strip() if out.returncode == 0 else ""
-    except Exception:
-        return ""
+POWER_SUPPLY = Path("/sys/class/power_supply")
 
 
 def time_of_day(now=None):
@@ -37,34 +29,32 @@ def time_of_day(now=None):
 
 
 def frontmost_app():
-    asn = _run(["lsappinfo", "front"])
-    if not asn:
+    """The app in front, or "" where the desktop won't say (Wayland, mostly)."""
+    front = session.front_window()
+    return front[0] if front else ""
+
+
+def battery_state(percent, status):
+    """What is worth saying about a battery, or "" if nothing."""
+    if status == "Charging":
+        return "on charge" if percent < 95 else ""
+    if status != "Discharging":
         return ""
-    raw = _run(["lsappinfo", "info", "-only", "name", asn])
-    if "=" not in raw:
-        return ""
-    return raw.rsplit("=", 1)[-1].strip().strip('"')
+    if percent <= 15:
+        return f"on battery, down to {percent}% and not charging"
+    if percent <= 35:
+        return f"on battery, {percent}% left"
+    return ""
 
 
 def battery():
-    raw = _run(["pmset", "-g", "batt"])
-    if not raw:
-        return ""
-    charging = "AC Power" in raw
-    percent = ""
-    for token in raw.replace(";", " ").split():
-        if token.endswith("%"):
-            percent = token.rstrip("%;")
-            break
-    if not percent:
-        return ""
-    level = int(percent)
-    if charging:
-        return "on charge" if level < 95 else ""
-    if level <= 15:
-        return f"on battery, down to {level}% and not charging"
-    if level <= 35:
-        return f"on battery, {level}% left"
+    for supply in sorted(POWER_SUPPLY.glob("BAT*")):
+        try:
+            percent = int((supply / "capacity").read_text())
+            status = (supply / "status").read_text().strip()
+        except (OSError, ValueError):
+            continue
+        return battery_state(percent, status)
     return ""
 
 

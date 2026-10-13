@@ -18,7 +18,7 @@ sys.path.insert(0, str(REPO_ROOT / "server"))
 from fastapi import FastAPI, File, UploadFile
 from fastapi.responses import JSONResponse, StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
-from openai import APIConnectionError
+from openai import APIConnectionError, APITimeoutError
 from pydantic import BaseModel
 
 from process.asr_func.asr_push_to_talk import build_model, transcribe_audio, transcribe_file
@@ -99,6 +99,10 @@ def llm_error_message(e):
         return f"That API key was rejected. Set llm.api_key in {CONFIG_PATH}."
     if "rate_limit" in msg or "429" in msg:
         return "The endpoint rate-limited the request. Wait a moment and try again."
+    if isinstance(e, APITimeoutError):
+        return (f"The language model at {describe_endpoint()} is up but didn't answer in time. "
+                f"It may still be loading or reading her prompt: try again, or raise "
+                f"llm.timeout_seconds in {CONFIG_PATH}.")
     if isinstance(e, APIConnectionError) or "Connection" in type(e).__name__:
         if backend.mode() == "auto" and len(backend.BACKENDS) > 1:
             tried = ", ".join(f"{b['label']} ({b['base_url'] or 'OpenAI'})"
@@ -331,37 +335,30 @@ class ConfirmIn(BaseModel):
 
 @app.post("/confirm")
 def confirm_answer(body: ConfirmIn):
-    """Their answer to something she asked before doing it on their Mac."""
+    """Their answer to something she asked before doing it on their computer."""
     known = confirm.answer(body.id, body.ok)
-    print(f"[mac] they {'allowed' if body.ok else 'refused'} it", flush=True)
+    print(f"[computer] they {'allowed' if body.ok else 'refused'} it", flush=True)
     return {"ok": known}
 
 
-class MacIn(BaseModel):
+class ComputerIn(BaseModel):
     enabled: bool
 
 
-def _mac_status():
-    from process.tools import mac
-    return {"available": sys.platform == "darwin", "enabled": mac.available(),
-            "screen": mac.can_see(), "control": mac.can_control()}
+@app.get("/computer")
+def computer_get():
+    from process.tools import computer
+    return computer.status()
 
 
-@app.get("/mac")
-def mac_get():
-    return _mac_status()
-
-
-@app.post("/mac")
-def mac_set(body: MacIn):
-    """Let her use this Mac, or stop. Saved to the config."""
-    cfg.set_value("mac", "enabled", body.enabled)
-    if body.enabled:
-        from process.tools import mac
-        mac.ask_for_permissions()
-    print(f"[mac] {'she can use this Mac' if body.enabled else 'she can no longer use this Mac'}",
+@app.post("/computer")
+def computer_set(body: ComputerIn):
+    """Let her use this computer, or stop. Saved to the config."""
+    from process.tools import computer
+    cfg.set_value("computer", "enabled", body.enabled)
+    print(f"[computer] {'she can use this computer' if body.enabled else 'she can no longer use this computer'}",
           flush=True)
-    return _mac_status()
+    return computer.status()
 
 
 @app.post("/voice")
@@ -712,6 +709,21 @@ class SeeIn(BaseModel):
     mime: str = "image/jpeg"
     question: str = ""
     speak: bool = True
+
+
+@app.get("/screenshot")
+def screenshot():
+    """The screen as a JPEG, for the app's "look at my screen" button, taken here
+    because Electron can't capture a Wayland screen."""
+    from process.tools import computer
+
+    if not computer.can_see():
+        return {"error": f"Can't capture the screen: {computer.why_no_screen()}."}
+    try:
+        image, _width, _height = computer.screenshot()
+    except Exception as e:
+        return {"error": f"Screen capture failed: {e}"}
+    return {"image": image, "mime": "image/jpeg"}
 
 
 @app.post("/see")

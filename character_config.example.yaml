@@ -1,5 +1,5 @@
 llm:
-  # Ollama on this Mac. Leave base_url empty to use OpenAI instead, and put
+  # Ollama on this computer. Leave base_url empty to use OpenAI instead, and put
   # your key in api_key. Any OpenAI-compatible server works here.
   base_url: "http://127.0.0.1:11434/v1"
   api_key: "ollama"
@@ -20,6 +20,8 @@ llm:
   # Rounds of tool calls one reply may take, 0 for no limit. Only matters with the
   # workspace on, where a task is a chain of them: run, read, fix, rerun.
   max_tool_rounds: 0         # 0: no limit
+  # timeout_seconds: 30      # how long to wait for the first words. Raise it on a slow
+  #                          # CPU: the first reply has to read her whole prompt
 
   # Backups. With mode: auto she uses the first of these that answers, in
   # order: base_url, then each extra_backends entry, then fallback_base_url.
@@ -31,7 +33,7 @@ llm:
   #     label: "Mini PC"
   #     base_url: "http://192.168.1.50:11434/v1"
   #     model: "llama3.2:3b"
-  # fallback_label: "This Mac"
+  # fallback_label: "This computer"
   # fallback_base_url: "http://127.0.0.1:11434/v1"
   # fallback_model: "llama3.2:3b"
 
@@ -146,16 +148,16 @@ presets:
       About yourself, if asked. These are the only facts you have, so keep
       to them and never claim more:
       - You are an AI. Your speech recognition and your voice both run on
-        this Mac, so the audio of what people say to you never leaves it.
+        this computer, so the audio of what people say to you never leaves it.
       - The text of the conversation goes to your language model, which runs
         on Jacob's own machines rather than an AI cloud service: a mini PC
-        in his home lab, with a smaller model on this Mac as a backup.
+        in his home lab, with a smaller model on this computer as a backup.
       - If the mini PC stops answering, you move to the backup by yourself,
         in the middle of a conversation.
       - Your avatar lip-syncs to your voice and acts out small gestures.
       - What you can do today, and nothing more: hold a spoken conversation,
         answer general questions from what your language model knows, set
-        timers and reminders, and open web links on this Mac. You can't see
+        timers and reminders, and open web links on this computer. You can't see
         any company's systems, documents or live information yet.
 
       Why you are useful, if asked. Be enthusiastic but honest, and start
@@ -226,7 +228,7 @@ presets:
         handle things like directions and who is expected. The conversations
         stay on your own hardware.
       - Privacy or where data goes: The audio of what you say is turned
-        into text right here on this Mac and never leaves it. That text
+        into text right here on this computer and never leaves it. That text
         goes to a language model on Jacob's own machines, over his own
         network, not to an AI cloud service.
 
@@ -250,7 +252,7 @@ presets:
     tools:
       clipboard: false      # never read out whatever is on your clipboard
       workspace: false      # and no shell for guests to talk her into
-      mac: false            # or this Mac's mouse, keyboard and files
+      computer: false       # or this computer's mouse, keyboard and files
     barge_in:
       enabled: false        # a busy room would keep cutting her off
 
@@ -260,9 +262,9 @@ persona:
 
 asr:
   model: "base.en"
-  # Which mic she listens with: "auto", "default", or part of a device's
-  # name. Auto avoids Bluetooth headsets, whose mic switches them into call
-  # mode and cuts off her voice, and uses the Mac's own mic instead.
+  # Which mic she listens with: "auto" or "default" for the system default,
+  # or part of a device's name. A Bluetooth headset's mic switches it into
+  # call mode and cuts off her voice, so name another input if you wear one.
   input_device: auto
   device: "cpu"
   compute_type: "int8"
@@ -308,8 +310,8 @@ listen:
   max_seconds: 10    # never listens longer than this
   pause_ms: 900      # a pause this long after you've spoken ends it
 
-# Wake word. Turn it on from her menu bar icon ("Listen for Marina"). While
-# she is idle, each thing the mic hears is transcribed on this Mac and
+# Wake word. Turn it on from her tray icon ("Listen for Marina"). While
+# she is idle, each thing the mic hears is transcribed on this computer and
 # thrown away unless it starts with her name ("Marina, ...", "Hey Marina")
 # or ends with it ("..., Marina?"). Say the request in the same breath, or
 # her name alone and then the request within listen_seconds.
@@ -393,10 +395,13 @@ shared:
 api:
   key: ""
 
-# Let her use this Mac: see the screen, use apps with the mouse and
+# Let her use this computer: see the screen, use apps with the mouse and
 # keyboard, run commands and edit files in your home folder. Turn it on and
-# off from her menu bar icon. She asks first before using the mouse and
+# off from her tray icon. She asks first before using the mouse and
 # keyboard, and before anything risky; passwords and keys are off limits.
-# macOS also has to allow Marina Screen Recording and Accessibility.
-mac:
+# Seeing the screen needs a screenshot tool (spectacle, gnome-screenshot,
+# grim or scrot) and the mouse and keyboard need xdotool on X11, or ydotool
+# with its ydotoold daemon running on Wayland. Under Wayland she can't tell
+# which window is in front (except on KDE with kdotool installed).
+computer:
   enabled: false
