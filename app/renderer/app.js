@@ -440,7 +440,7 @@ function ensureAudio() {
     audioCtx = new (window.AudioContext || window.webkitAudioContext)();
     const ctx = audioCtx;
     ctx.onstatechange = () => {
-      // macOS suspends or interrupts output when the route changes.
+      // The output is suspended or interrupted when the route changes.
       if (ctx === audioCtx && (ctx.state === 'suspended' || ctx.state === 'interrupted')) {
         ctx.resume().catch(() => {});
       }
@@ -1342,7 +1342,7 @@ function tick() {
   }
 
   renderer.render(scene, camera);
-  updateClickThrough();
+  updateShape(dt);
 }
 
 const gl = renderer.getContext();
@@ -1371,31 +1371,131 @@ function overAvatar(x, y) {
   return probe[3] > 12;
 }
 
-let solid = null;
-let cursor = null;
-
-window.addEventListener('mousemove', (e) => {
-  cursor = [e.clientX, e.clientY];
-
-  document.body.classList.add('near');
+// Where KDE won't drag her window (see main.js), the strip at the top does it.
+// The pointer is captured so the drag carries on if it outruns the window.
+window.marina.onSetDragMode?.((on) => document.documentElement.classList.toggle('page-drag', on));
+let pageDrag = null;
+el('drag-strip').addEventListener('pointerdown', (e) => {
+  if (!document.documentElement.classList.contains('page-drag') || e.button !== 0) return;
+  pageDrag = { x: e.screenX, y: e.screenY };
+  try { e.target.setPointerCapture(e.pointerId); } catch {}
+  e.preventDefault();
 });
-window.addEventListener('mouseleave', () => {
-  cursor = null;
-  document.body.classList.remove('near');
-  setSolid(false);
+el('drag-strip').addEventListener('pointermove', (e) => {
+  if (!pageDrag) return;
+  window.marina.moveBy(e.screenX - pageDrag.x, e.screenY - pageDrag.y);
+  pageDrag = { x: e.screenX, y: e.screenY };
 });
+const endPageDrag = () => { pageDrag = null; };
+el('drag-strip').addEventListener('pointerup', endPageDrag);
+el('drag-strip').addEventListener('pointercancel', endPageDrag);
 
-function setSolid(next) {
-  if (next === solid) return;
-  solid = next;
-  window.marina.clickThrough(!next);
+window.addEventListener('mousemove', () => document.body.classList.add('near'));
+window.addEventListener('mouseleave', () => document.body.classList.remove('near'));
+
+// Only she and her controls can be seen or clicked; the rest of the window
+// is cut away, so clicks fall through to what is behind it. This works out
+// that area (her silhouette, grown by a margin, plus every control showing)
+// as rectangles for the window to take as its shape. The margin keeps a
+// quick gesture from being clipped before the next update catches up.
+const SHAPE_CELL = 8;
+const SHAPE_MARGIN = 4;
+const SHAPE_EVERY = 0.1;
+const silhouette = document.createElement('canvas');
+// Left to the browser to keep on the GPU: the avatar is copied into it small, so
+// only a few thousand pixels are ever read back, not the whole window.
+const silhouetteCtx = silhouette.getContext('2d');
+let shapeClock = 0;
+let sentShape = '';
+
+function uiRects() {
+  const rects = [];
+  for (const sel of UI) {
+    const box = document.querySelector(sel);
+    if (!box) continue;
+    const style = getComputedStyle(box);
+    if (style.display === 'none' || parseFloat(style.opacity) <= 0.05) continue;
+    const r = box.getBoundingClientRect();
+    if (r.width > 0 && r.height > 0) rects.push({ x: r.left, y: r.top, width: r.width, height: r.height });
+  }
+  return rects;
 }
 
-function updateClickThrough() {
-  if (document.documentElement.classList.contains('stage')) return;
-  if (!cursor) return;
-  const [x, y] = cursor;
-  setSolid(overUI(x, y) || overAvatar(x, y));
+function grow(grid, w, h, by) {
+  let out = grid;
+  for (let pass = 0; pass < by; pass++) {
+    const next = new Uint8Array(w * h);
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        if (!out[y * w + x]) continue;
+        for (let dy = -1; dy <= 1; dy++) {
+          for (let dx = -1; dx <= 1; dx++) {
+            const nx = x + dx, ny = y + dy;
+            if (nx >= 0 && ny >= 0 && nx < w && ny < h) next[ny * w + nx] = 1;
+          }
+        }
+      }
+    }
+    out = next;
+  }
+  return out;
+}
+
+function avatarRects() {
+  const w = Math.ceil(window.innerWidth / SHAPE_CELL);
+  const h = Math.ceil(window.innerHeight / SHAPE_CELL);
+  if (w < 1 || h < 1) return [];
+  if (silhouette.width !== w || silhouette.height !== h) {
+    silhouette.width = w;  // resizing resets the context's settings
+    silhouette.height = h;
+    silhouetteCtx.imageSmoothingQuality = 'high';
+  }
+  silhouetteCtx.clearRect(0, 0, w, h);
+  silhouetteCtx.drawImage(canvas, 0, 0, w, h);
+  const pixels = silhouetteCtx.getImageData(0, 0, w, h).data;
+  const solidCells = new Uint8Array(w * h);
+  for (let i = 0; i < solidCells.length; i++) solidCells[i] = pixels[i * 4 + 3] > 2 ? 1 : 0;
+  const grid = grow(solidCells, w, h, SHAPE_MARGIN);
+
+  // Runs along each row, joined to the run above when they line up.
+  const rects = [];
+  let growing = new Map();
+  for (let y = 0; y < h; y++) {
+    const next = new Map();
+    for (let x = 0; x < w;) {
+      if (!grid[y * w + x]) { x++; continue; }
+      const start = x;
+      while (x < w && grid[y * w + x]) x++;
+      const key = `${start}:${x}`;
+      let rect = growing.get(key);
+      if (rect) {
+        rect.height += SHAPE_CELL;
+      } else {
+        rect = { x: start * SHAPE_CELL, y: y * SHAPE_CELL, width: (x - start) * SHAPE_CELL, height: SHAPE_CELL };
+        rects.push(rect);
+      }
+      next.set(key, rect);
+    }
+    growing = next;
+  }
+  return rects;
+}
+
+function updateShape(dt) {
+  shapeClock -= dt;
+  if (shapeClock > 0) return;
+  shapeClock = SHAPE_EVERY;
+
+  const rects = document.documentElement.classList.contains('stage')
+    ? [{ x: 0, y: 0, width: window.innerWidth, height: window.innerHeight }]
+    : [...uiRects(), ...avatarRects()];
+  const whole = rects.map((r) => ({
+    x: Math.round(r.x), y: Math.round(r.y), width: Math.round(r.width), height: Math.round(r.height),
+  }));
+  const key = JSON.stringify(whole);
+  if (key === sentShape) return;
+  sentShape = key;
+  window.marina.setShape(whole);
 }
 
 tick();
@@ -1555,7 +1655,7 @@ async function playChunk(ev, req) {
 
 // What she is doing while she works, and on whose computer.
 function showActivity(ev) {
-  const where = ev.where === 'mac' ? 'your Mac' : 'her machine';
+  const where = ev.where === 'computer' ? 'your computer' : 'her machine';
   document.body.classList.add('working');
   el('status').dataset.where = ev.where || '';
   setStatus('busy', `${where} \u00b7 ${ev.text}`);
@@ -1566,13 +1666,13 @@ function clearActivity() {
   delete el('status').dataset.where;
 }
 
-// She wants to do something on this Mac that needs their OK.
+// She wants to do something on this computer that needs their OK.
 let askId = null;
 
 function askConfirm(ev) {
   showActivity({ where: ev.where, text: 'waiting for you' });
   askId = ev.id;
-  el('ask-where').textContent = ev.where === 'mac' ? 'On your Mac' : 'On her machine';
+  el('ask-where').textContent = ev.where === 'computer' ? 'On your computer' : 'On her machine';
   el('ask-text').textContent = ev.text;
   el('ask').classList.remove('hidden');
   el('ask-allow').focus();
@@ -1772,7 +1872,7 @@ async function interrupt() {
   return heard;
 }
 
-// The Mac app records through the bridge. A browser has to record itself
+// The desktop app records through the bridge. A browser has to record itself
 // and upload the clip.
 let webRec = null;
 
@@ -2020,7 +2120,6 @@ window.marina.onSetPreset?.((name) => { switchPreset(name); });
 
 window.marina.onSetStage?.((on) => {
   document.documentElement.classList.toggle('stage', on);
-  if (on) setSolid(true);
   resize();
 });
 
@@ -2057,7 +2156,7 @@ window.marina.onSetOpeners?.((on) => {
 let brainMode = 'auto';
 let personality = { preset: 'default', presets: [] };
 // Filled in from the bridge; these are only what to show before it answers.
-let brainLabels = { server: 'Server', local: 'This Mac' };
+let brainLabels = { server: 'Server', local: 'This computer' };
 let brainOrder = ['server', 'local'];
 
 function brainLabel(name) { return brainLabels[name] || name || '?'; }
@@ -2119,27 +2218,25 @@ async function openPicker() {
     }
   }
 
-  const mac = await fetch(`${BRIDGE}/mac`).then((r) => r.json()).catch(() => null);
-  if (mac?.available) {
-    pickGroup(list, 'This Mac');
-    const missing = mac.enabled && !(mac.screen && mac.control);
+  const computer = await fetch(`${BRIDGE}/computer`).then((r) => r.json()).catch(() => null);
+  if (computer) {
+    pickGroup(list, 'This computer');
+    const missing = computer.enabled && computer.missing?.length;
     list.appendChild(pickItem(
-      missing ? 'Let her use it (needs permissions)' : 'Let her use it',
-      mac.enabled
+      missing ? 'Let her use it (needs setup)' : 'Let her use it',
+      computer.enabled
         ? 'She can see your screen and use your apps, asking you first. Click to turn off.'
         : 'Let her see your screen and use your apps, asking you first',
-      mac.enabled,
+      computer.enabled,
       async () => {
-        const res = await post('/mac', { enabled: !mac.enabled }).catch(() => null);
-        if (res?.enabled && !(res.screen && res.control)) {
-          showNotice('Allow Marina under System Settings → Privacy & Security → '
-            + 'Screen Recording and Accessibility, then reopen her.');
-        }
+        const res = await post('/computer', { enabled: !computer.enabled }).catch(() => null);
+        if (res?.enabled && res.missing?.length) showNotice(res.missing.join('\n'));
+        paintComputer(res);
         openPicker();
       },
     ));
   }
-  if (data.presets?.length > 1 || mac?.available) pickGroup(list, 'Brain');
+  if (data.presets?.length > 1 || computer) pickGroup(list, 'Brain');
 
   list.appendChild(pickItem(
     'Automatic', `Try ${backends.map((b) => b.label).join(', then ')}`,
@@ -2217,6 +2314,34 @@ async function refreshBrain() {
   } catch {}
 }
 
+function paintComputer(info) {
+  const b = el('btn-computer');
+  if (!b || !info) return;
+  const needsSetup = info.enabled && info.missing?.length;
+  b.classList.toggle('on', !!info.enabled);
+  b.setAttribute('aria-pressed', String(!!info.enabled));
+  b.title = !info.enabled
+    ? 'Let her use this computer (off)'
+    : `She can use this computer, asking you first${needsSetup ? ' (needs setup)' : ''}. Click to turn off.`;
+}
+
+async function refreshComputer() {
+  try {
+    paintComputer(await (await fetch(`${BRIDGE}/computer`)).json());
+  } catch {}
+}
+
+async function toggleComputer() {
+  try {
+    const current = await (await fetch(`${BRIDGE}/computer`)).json();
+    const res = await post('/computer', { enabled: !current.enabled });
+    paintComputer(res);
+    if (res.enabled && res.missing?.length) showNotice(res.missing.join('\n'));
+  } catch (e) {
+    showNotice(`Could not change computer control: ${e.message}`);
+  }
+}
+
 function togglePicker() {
   el('picker').classList.contains('hidden') ? openPicker() : closePicker();
 }
@@ -2224,6 +2349,7 @@ el('status').addEventListener('click', togglePicker);
 el('status').addEventListener('keydown', (e) => {
   if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); togglePicker(); }
 });
+el('btn-computer').addEventListener('click', toggleComputer);
 el('btn-brain').addEventListener('click', () => {
   togglePicker();
 });
@@ -2311,6 +2437,7 @@ async function pollForBridge({ quietFor = 16000 } = {}) {
         hideNotice('bridge');
 
         post('/warmup').catch(() => {});
+        refreshComputer();
         bargeEnabled = info.barge_in !== false;
         if (info.idle) idleMuted = !!info.idle.muted || info.idle.enabled === false;
         startOpenerPoll();

@@ -5,8 +5,8 @@
   "main": "main.js",
   "scripts": {
     "start": "electron .",
-    "dist": "electron-builder --mac --dir",
-    "dmg": "electron-builder --mac"
+    "dist": "electron-builder --linux dir",
+    "appimage": "electron-builder --linux AppImage"
   },
   "license": "MIT",
   "dependencies": {},
@@ -44,54 +44,30 @@
         ]
       }
     ],
-    "mac": {
-      "category": "public.app-category.productivity",
-      "icon": "build/icon.icns",
+    "linux": {
+      "executableName": "marina",
+      "category": "Utility",
+      "icon": "build/icon.png",
+      "synopsis": "Transparent desktop VRM avatar assistant",
       "target": [
         {
-          "target": "dmg",
+          "target": "AppImage",
           "arch": [
-            "arm64"
+            "x64"
           ]
         },
         {
           "target": "dir",
           "arch": [
-            "arm64"
+            "x64"
           ]
         }
-      ],
-      "identity": null,
-      "extendInfo": {
-        "NSMicrophoneUsageDescription": "Marina uses the microphone so you can talk to her.",
-        "LSUIElement": false,
-        "NSDesktopFolderUsageDescription": "Marina needs to read her Python backend and avatar model from this folder.",
-        "NSDocumentsFolderUsageDescription": "Marina needs to read her Python backend and avatar model from this folder.",
-        "NSDownloadsFolderUsageDescription": "Marina needs to read her Python backend and avatar model from this folder.",
-        "NSAppleEventsUsageDescription": "Marina controls other apps on this Mac when you let her, to work on what's on your screen."
-      }
-    },
-    "dmg": {
-      "title": "Marina",
-      "artifactName": "Marina-${version}-arm64.dmg",
-      "window": {
-        "width": 540,
-        "height": 380
-      },
-      "contents": [
-        {
-          "x": 140,
-          "y": 200,
-          "type": "file"
-        },
-        {
-          "x": 400,
-          "y": 200,
-          "type": "link",
-          "path": "/Applications"
-        }
       ]
-    }
+    },
+    "appImage": {
+      "artifactName": "Marina-${version}-${arch}.AppImage"
+    },
+    "afterPack": "build/afterPack.js"
   },
   "author": "Jacob Matthews"
 }
