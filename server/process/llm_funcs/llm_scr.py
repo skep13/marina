@@ -79,19 +79,6 @@ LET_IT_GO = (
 )
 
 
-# She once answered "I don't want to live" with a birthday greeting. This
-# comes before her character, her jokes and everything else.
-LOOK_AFTER_THEM = (
-    "\n\nIf they ever say they want to die, want to hurt themselves, don't "
-    "have long left or can't go on, that comes before everything else: drop "
-    "the jokes and the teasing, take it seriously, and stay with them. Ask if "
-    "they're safe right now. Gently make sure they reach a real person too: "
-    "in the UK, Samaritans on 116 123 (free, any time) or text SHOUT to "
-    "85258, and 999 if they might act on it. Don't change the subject or "
-    "bring up anything else until they're OK."
-)
-
-
 def system_message():
     return {
         "role": "system",
@@ -100,8 +87,7 @@ def system_message():
                     + tools.prompt_addition()
                     + _stable_context()
                     + (ambient.NOTE_EXPLAINED if ambient.ENABLED else "")
-                    + LET_IT_GO
-                    + LOOK_AFTER_THEM),
+                    + LET_IT_GO),
     }
 
 

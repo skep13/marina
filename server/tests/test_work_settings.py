@@ -58,6 +58,3 @@ def test_speaking_first_never_ends_on_her_own_message(monkeypatch):
     assert roles == ["system", "user", "assistant", "user"]
     assert "night!" in sent[0][2]["content"] and "you up?" in sent[0][2]["content"]
 
-
-def test_her_prompt_always_says_to_look_after_them():
-    assert "116 123" in llm_scr.system_message()["content"]
