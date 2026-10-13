@@ -1,8 +1,8 @@
 """Loads character_config.yaml.
 
 In a checkout the repo is both the asset root and the writable root. Inside
-Marina.app the two come apart: the voice model, the avatar and the Python
-source ship read-only in the bundle, while the config, the memory and the
+the packaged app (an AppImage, whose files are read-only) the two come apart:
+the voice model, the avatar and the Python source ship in the bundle, while the config, the memory and the
 chat history have to live somewhere the user can actually write. Electron
 sets MARINA_ROOT and MARINA_DATA to keep the two apart; without them
 everything falls back to the repo and development works as it always did.

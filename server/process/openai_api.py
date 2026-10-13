@@ -48,7 +48,7 @@ _STEP_LINES = re.compile(r"^> \u2699\ufe0f .*\n*", re.M)
 
 
 def _step(activity):
-    where = "on her machine" if activity.where == "vm" else "on your Mac"
+    where = "on her machine" if activity.where == "vm" else "on your computer"
     return f"{_STEP}*{where}:* {activity.label}\n\n"
 
 
