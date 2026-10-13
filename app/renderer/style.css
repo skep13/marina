@@ -17,7 +17,7 @@ html, body {
   height: 100%;
   background: transparent;
   overflow: hidden;
-  font: 13px/1.45 -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
+  font: 13px/1.45 system-ui, "Noto Sans", "DejaVu Sans", sans-serif;
   color: var(--text);
   user-select: none;
   cursor: default;
@@ -33,6 +33,9 @@ html, body {
   -webkit-app-region: drag;
   z-index: 5;
 }
+
+.page-drag #drag-strip { -webkit-app-region: no-drag; cursor: grab; }
+.page-drag #drag-strip:active { cursor: grabbing; }
 
 #chrome {
   position: fixed;
@@ -66,6 +69,7 @@ body.reveal #chrome { opacity: 1; }
   -webkit-backdrop-filter: blur(12px);
 }
 .chip:hover { background: var(--panel-strong); }
+#btn-computer.on { background: var(--accent); color: #0b1017; }
 
 #stage {
   position: fixed;
@@ -302,8 +306,6 @@ html.web, .web body {
 }
 #heard.hidden { opacity: 0; pointer-events: none; }
 
-/* Stage view (Cmd+Shift+F): full screen on a backdrop, for showing her to a
-   room. Her reply becomes large subtitles; what she heard sits at the top. */
 html.stage, .stage body {
   background: radial-gradient(ellipse at 50% 30%, #2a3040 0%, #161a23 55%, #0d0f14 100%);
 }
@@ -337,13 +339,11 @@ html.stage, .stage body {
 .stage #status { bottom: 14px; font-size: 12px; }
 .stage #notice { bottom: 110px; font-size: 15px; width: min(640px, calc(100% - 80px)); }
 
-/* Where she is working: her own machine, or this Mac. */
 body.working #status { opacity: 1; }
 #status[data-where="vm"] #status-text { color: #9ad7ff; }
-#status[data-where="mac"] #status-text { color: #ffcf7a; }
-#status[data-where="mac"] #dot { background: #ffb43a; }
+#status[data-where="computer"] #status-text { color: #ffcf7a; }
+#status[data-where="computer"] #dot { background: #ffb43a; }
 
-/* Asking before she does something on this Mac. */
 #ask {
   position: fixed;
   left: 50%;

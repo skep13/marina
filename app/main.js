@@ -1,7 +1,13 @@
-const { app, BrowserWindow, Menu, Tray, desktopCapturer, ipcMain, globalShortcut, nativeImage, screen, shell, systemPreferences, dialog } = require('electron');
+const { app, BrowserWindow, Menu, Tray, desktopCapturer, ipcMain, globalShortcut, nativeImage, screen, shell, dialog } = require('electron');
 const fs = require('fs');
 const path = require('path');
-const { spawn } = require('child_process');
+const { spawn, execFile } = require('child_process');
+
+const insideAppImage = /\/\.mount_/.test(process.execPath);
+if (app.commandLine.getSwitchValue('ozone-platform') === 'wayland' && !process.env.MARINA_WAYLAND && !insideAppImage) {
+  app.relaunch({ args: [...process.argv.slice(1), '--ozone-platform=x11'] });
+  app.exit(0);
+}
 
 const BUNDLED_MODELS_DIR = path.join(__dirname, 'models');
 
@@ -79,8 +85,8 @@ async function startBridge() {
       'Marina cannot find her backend',
       `Expected:\n  ${python}\n  ${script}\n\n` +
       (app.isPackaged
-        ? 'This copy of Marina.app looks incomplete. Download it again.'
-        : 'Run ./setup-mac.sh in the project folder.'),
+        ? 'This copy of Marina looks incomplete. Build it again.'
+        : 'Run ./setup-linux.sh in the project folder.'),
     );
     return;
   }
@@ -184,31 +190,106 @@ function readState() {
 }
 
 function writeState() {
-  if (!win || win.isDestroyed()) return;
+  if (!win || win.isDestroyed() || stage) return;
   const [x, y] = win.getPosition();
-  const [width, height] = win.getSize();
   try {
-    fs.writeFileSync(STATE_FILE(), JSON.stringify({ x, y, width, height }));
+    fs.writeFileSync(STATE_FILE(), JSON.stringify({ x, y, overFullScreen }));
   } catch {}
 }
 
-let ignoring = true;
-ipcMain.on('click-through', (_e, ignore) => {
-  if (!win || win.isDestroyed() || stage || ignore === ignoring) return;
-  ignoring = ignore;
-  win.setIgnoreMouseEvents(ignore, { forward: true });
+const OVER_FULLSCREEN_TYPE = '_KDE_NET_WM_WINDOW_TYPE_CRITICAL_NOTIFICATION';
+const ORDINARY_TYPE = '_NET_WM_WINDOW_TYPE_NORMAL';
+let overFullScreen = readState()?.overFullScreen ?? true;
+
+function canLayerOverFullScreen() {
+  return process.platform === 'linux' && /KDE/.test(process.env.XDG_CURRENT_DESKTOP || '')
+    && app.commandLine.getSwitchValue('ozone-platform') !== 'wayland';
+}
+
+function setWindowType(type) {
+  return new Promise((resolve) => {
+    if (!win || win.isDestroyed()) return resolve(false);
+    const id = '0x' + win.getNativeWindowHandle().readUInt32LE(0).toString(16);
+    execFile('xprop', ['-id', id, '-f', '_NET_WM_WINDOW_TYPE', '32a', '-set', '_NET_WM_WINDOW_TYPE', type], (err) => {
+      if (err) console.log(`Could not set the window type (${err.message}). Is xprop installed?`);
+      resolve(!err);
+    });
+  });
+}
+
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+const WINDOW_SIZE = { width: 420, height: 680 };
+const SETTLE_MS = 300;
+let pinnedSize = null;
+let positionOffset = { x: 0, y: 0 };
+
+function pinSize() {
+  if (!win || win.isDestroyed()) return;
+  pinnedSize = pinnedSize || win.getSize();
+  win.setMinimumSize(...pinnedSize);
+  win.setMaximumSize(...pinnedSize);
+}
+
+function unpinSize() {
+  if (!win || win.isDestroyed()) return;
+  win.setMinimumSize(0, 0);
+  win.setMaximumSize(0, 0);
+}
+
+async function placeExactly(x, y) {
+  win.setPosition(x, y);
+  await sleep(SETTLE_MS);
+  const [actualX, actualY] = win.getPosition();
+  positionOffset = { x: x - actualX, y: y - actualY };
+  if (positionOffset.x || positionOffset.y) win.setPosition(x + positionOffset.x, y + positionOffset.y);
+}
+
+async function applyLayer() {
+  const above = overFullScreen && canLayerOverFullScreen() && !stage;
+  const done = canLayerOverFullScreen() ? await setWindowType(above ? OVER_FULLSCREEN_TYPE : ORDINARY_TYPE) : false;
+  if (win && !win.isDestroyed()) win.webContents.send('set-drag-mode', above && done);
+}
+
+const MAX_SHAPE_RECTS = 2000;
+
+ipcMain.on('shape', (_e, rects) => {
+  if (!win || win.isDestroyed() || !Array.isArray(rects)) return;
+  const shape = rects.slice(0, MAX_SHAPE_RECTS)
+    .map((r) => ({ x: Math.round(r.x), y: Math.round(r.y), width: Math.round(r.width), height: Math.round(r.height) }))
+    .filter((r) => [r.x, r.y, r.width, r.height].every(Number.isFinite) && r.width > 0 && r.height > 0);
+  win.setShape(shape);
+});
+
+const DRAG_PAUSE_MS = 300;
+let lastMove = null;
+
+ipcMain.on('move-by', (_e, dx, dy) => {
+  if (!win || win.isDestroyed() || stage || !Number.isFinite(dx) || !Number.isFinite(dy)) return;
+  const dragging = lastMove && Date.now() - lastMove.at < DRAG_PAUSE_MS;
+  const [x, y] = win.getPosition();
+  const from = dragging ? lastMove : { x, y };
+  const next = { x: from.x + Math.round(dx), y: from.y + Math.round(dy) };
+  win.setPosition(next.x + positionOffset.x, next.y + positionOffset.y);
+  lastMove = { ...next, at: Date.now() };
 });
 
 // Stage view: full screen on a solid backdrop, for turning the laptop round
 // to show her to people. The renderer paints the backdrop.
 let stage = false;
 
-function setStage(on) {
+async function setStage(on) {
   if (!win) return;
   stage = !!on;
-  win.setSimpleFullScreen(stage);
-  win.setIgnoreMouseEvents(!stage, { forward: true });
-  ignoring = !stage;
+  if (stage) {
+    await applyLayer();
+    unpinSize();
+  }
+  win.setFullScreen(stage);
+  if (!stage) {
+    await sleep(SETTLE_MS * 2);
+    pinSize();
+    await applyLayer();
+  }
   win.webContents.send('set-stage', stage);
   if (stage) { win.show(); win.focus(); }
 }
@@ -216,14 +297,15 @@ function setStage(on) {
 function createWindow() {
   const saved = readState();
   const { workArea } = screen.getPrimaryDisplay();
-  const width = saved?.width ?? 420;
-  const height = saved?.height ?? 680;
+  const { width, height } = WINDOW_SIZE;
+  const x = saved?.x ?? workArea.x + workArea.width - width - 24;
+  const y = saved?.y ?? workArea.y + workArea.height - height - 24;
 
   win = new BrowserWindow({
     width,
     height,
-    x: saved?.x ?? workArea.x + workArea.width - width - 24,
-    y: saved?.y ?? workArea.y + workArea.height - height - 24,
+    x,
+    y,
 
     transparent: true,
     frame: false,
@@ -232,8 +314,8 @@ function createWindow() {
     alwaysOnTop: true,
     resizable: true,
     skipTaskbar: true,
-    fullscreenable: false,
-    titleBarStyle: 'customButtonsOnHover',
+    fullscreenable: true,
+    icon: path.join(__dirname, 'assets', 'icon.png'),
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
@@ -242,18 +324,20 @@ function createWindow() {
     },
   });
 
-  win.setIgnoreMouseEvents(true, { forward: true });
-
-  win.setAlwaysOnTop(true, 'floating');
-  win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+  win.setAlwaysOnTop(true);
+  win.setVisibleOnAllWorkspaces(true);
 
   win.webContents.setBackgroundThrottling(false);
+  win.webContents.on('did-finish-load', applyLayer);
+  win.webContents.once('did-finish-load', async () => {
+    pinSize();
+    await placeExactly(x, y);
+  });
   win.loadFile(path.join(__dirname, 'renderer', 'index.html'));
 
-  ignoring = true;
-
-  win.on('moved', () => { if (!stage) writeState(); });
-  win.on('resized', () => { if (!stage) writeState(); });
+  let saveTimer = null;
+  const saveSoon = () => { clearTimeout(saveTimer); saveTimer = setTimeout(writeState, 400); };
+  win.on('move', saveSoon);
   win.on('closed', () => { win = null; });
 
   win.webContents.setWindowOpenHandler(({ url }) => {
@@ -265,27 +349,25 @@ function createWindow() {
 let openersOn = true;
 let wakeOn = false;
 
-// The personalities the bridge offers, for the menu bar. Fetched when the
 // menu is about to show, since the bridge owns the current choice.
 let presetState = { preset: null, presets: [] };
 
-// Whether she may use this Mac, and what macOS lets her do.
-let macState = { available: false, enabled: false, screen: false, control: false };
+let computerState = { available: false, enabled: false, screen: false, control: false };
 
-async function fetchMac() {
+async function fetchComputer() {
   try {
-    const res = await fetch(`${BRIDGE_URL}/mac`, { signal: AbortSignal.timeout(1500) });
-    if (res.ok) macState = await res.json();
+    const res = await fetch(`${BRIDGE_URL}/computer`, { signal: AbortSignal.timeout(1500) });
+    if (res.ok) computerState = { ...(await res.json()), available: true };
   } catch {}
 }
 
-async function setMac(enabled) {
+async function setComputer(enabled) {
   try {
-    const res = await fetch(`${BRIDGE_URL}/mac`, {
+    const res = await fetch(`${BRIDGE_URL}/computer`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ enabled }), signal: AbortSignal.timeout(5000),
     });
-    if (res.ok) macState = await res.json();
+    if (res.ok) computerState = { ...(await res.json()), available: true };
   } catch {}
 }
 
@@ -297,8 +379,8 @@ async function fetchPresets() {
 }
 
 function buildTray() {
-  const icon = nativeImage.createFromPath(path.join(__dirname, 'assets', 'trayTemplate.png'));
-  icon.setTemplateImage(true);
+  const icon = nativeImage.createFromPath(path.join(__dirname, 'assets', 'icon.png'))
+    .resize({ width: 32, height: 32 });
   tray = new Tray(icon);
   tray.setToolTip('Marina');
 
@@ -321,13 +403,19 @@ function buildTray() {
           win?.webContents.send('set-openers', openersOn);
         },
       },
-      ...(macState.available ? [{
-        label: macState.enabled && !(macState.screen && macState.control)
-          ? 'Let her use this Mac (needs permissions)'
-          : 'Let her use this Mac',
+      ...(canLayerOverFullScreen() ? [{
+        label: 'Show over full-screen apps',
         type: 'checkbox',
-        checked: macState.enabled,
-        click: (item) => { setMac(item.checked).then(refresh); },
+        checked: overFullScreen,
+        click: (item) => { overFullScreen = item.checked; writeState(); applyLayer(); },
+      }] : []),
+      ...(computerState.available ? [{
+        label: computerState.enabled && !(computerState.screen && computerState.control)
+          ? 'Let her use this computer (needs setup)'
+          : 'Let her use this computer',
+        type: 'checkbox',
+        checked: computerState.enabled,
+        click: (item) => { setComputer(item.checked).then(refresh); },
       }] : []),
       {
         label: 'Listen for \u201cMarina\u201d',
@@ -353,32 +441,24 @@ function buildTray() {
         label: 'Stage view (full screen)',
         type: 'checkbox',
         checked: stage,
-        accelerator: 'Command+Shift+F',
+        accelerator: 'CommandOrControl+Shift+F',
         click: (item) => setStage(item.checked),
       },
       { type: 'separator' },
       { label: 'Change model…', click: () => { win?.show(); win?.webContents.send('pick-model'); } },
-      { label: 'Reset position', click: () => { if (win) { win.setBounds({ x: 60, y: 60, width: 420, height: 680 }); win.show(); } } },
+      { label: 'Reset position', click: () => { if (win) { placeExactly(60, 60); win.show(); } } },
       { label: 'Reload', click: () => win?.reload() },
       { label: 'Edit config…', click: () => shell.openPath(configFile()) },
       { label: 'Open bridge log', click: () => shell.openPath(path.join(app.getPath('userData'), 'bridge.log')) },
       { type: 'separator' },
-      { label: 'Quit Marina', accelerator: 'Command+Shift+Q', click: () => app.quit() },
+      { label: 'Quit Marina', accelerator: 'CommandOrControl+Shift+Q', click: () => app.quit() },
     ]));
   };
 
   refresh();
-  tray.on('mouse-move', () => {
-    refresh();
-    Promise.all([fetchPresets(), fetchMac()]).then(refresh);
-  });
-  fetchPresets().then(refresh);
-  // The bridge takes a while to start, so keep asking until it answers.
-  const poll = setInterval(async () => {
-    await fetchMac();
-    if (macState.available) { clearInterval(poll); fetchPresets().then(refresh); }
-  }, 2000);
-  setTimeout(() => clearInterval(poll), 120000);
+  const update = () => Promise.all([fetchPresets(), fetchComputer()]).then(refresh);
+  update();
+  setInterval(update, 5000);
   return refresh;
 }
 
@@ -448,41 +528,46 @@ ipcMain.handle('pick-vrm', async () => {
   }
 });
 
-ipcMain.handle('capture-screen', async () => {
-  if (process.platform === 'darwin') {
-    const status = systemPreferences.getMediaAccessStatus('screen');
-    if (status !== 'granted') {
-      return {
-        error: 'macOS has not granted screen recording permission.\n\n'
-             + 'System Settings > Privacy & Security > Screen & System Audio '
-             + 'Recording > enable Marina, then restart her.',
-      };
-    }
+async function bridgeScreenshot() {
+  try {
+    const res = await fetch(`${BRIDGE_URL}/screenshot`, { signal: AbortSignal.timeout(20000) });
+    return await res.json();
+  } catch (e) {
+    return { error: `Screen capture failed: ${e.message}` };
   }
+}
 
+async function electronScreenshot() {
+  const { width, height } = screen.getPrimaryDisplay().size;
+  const scale = Math.min(1, 1400 / width);
+  const sources = await desktopCapturer.getSources({
+    types: ['screen'],
+    thumbnailSize: {
+      width: Math.round(width * scale),
+      height: Math.round(height * scale),
+    },
+  });
+
+  if (!sources.length) return { error: 'No screen source available.' };
+  const shot = sources[0].thumbnail;
+  if (shot.isEmpty()) return { error: 'Screen capture came back empty.' };
+  return { image: shot.toJPEG(72).toString('base64'), mime: 'image/jpeg' };
+}
+
+ipcMain.handle('capture-screen', async () => {
   const wasVisible = win && !win.isDestroyed() && win.isVisible();
   if (wasVisible) win.hide();
 
   try {
     await new Promise((r) => setTimeout(r, 220));
 
-    const { width, height } = screen.getPrimaryDisplay().size;
-    const scale = Math.min(1, 1400 / width);
-    const sources = await desktopCapturer.getSources({
-      types: ['screen'],
-      thumbnailSize: {
-        width: Math.round(width * scale),
-        height: Math.round(height * scale),
-      },
-    });
-
-    if (!sources.length) return { error: 'No screen source available.' };
-    const shot = sources[0].thumbnail;
-    if (shot.isEmpty()) return { error: 'Screen capture came back empty.' };
-
-    return { image: shot.toJPEG(72).toString('base64'), mime: 'image/jpeg' };
-  } catch (e) {
-    return { error: `Screen capture failed: ${e.message}` };
+    let shot = await bridgeScreenshot();
+    if (!shot.image) {
+      await sleep(1000);
+      shot = await bridgeScreenshot();
+    }
+    if (shot.image || process.env.XDG_SESSION_TYPE === 'wayland') return shot;
+    return await electronScreenshot().catch((e) => ({ error: `Screen capture failed: ${e.message}` }));
   } finally {
     if (wasVisible) win.show();
   }
