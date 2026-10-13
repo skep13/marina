@@ -2,7 +2,7 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 PY="$(pwd)/.venv/bin/python"
-[ -x "$PY" ] || { echo "No venv. Run ./setup-mac.sh" >&2; exit 1; }
+[ -x "$PY" ] || { echo "No venv. Run ./setup-linux.sh" >&2; exit 1; }
 
 HOST="${1:-}"
 MODEL="${2:-}"

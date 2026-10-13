@@ -1,16 +1,26 @@
 #!/usr/bin/env bash
-# Builds Marina.app and a mountable Marina.dmg.
+# Builds Marina as an AppImage.
 #
-# The .app is self-contained: it carries its own Python 3.12, the backend's
+# The AppImage is self-contained: it carries its own Python 3.12, the backend's
 # dependencies, the Kokoro voice, the Whisper model and a starter config, so
-# it runs on a Mac that has never seen this repo.
+# it runs on a machine that has never seen this repo. The one thing it can't
+# carry is PortAudio (sudo apt install libportaudio2), which is a system
+# library on Linux.
 set -euo pipefail
 cd "$(dirname "$0")"
 ROOT="$(pwd)"
 
+command -v rsync >/dev/null || { echo "rsync is needed to build." >&2; exit 1; }
+
+case "$(uname -m)" in
+  x86_64)  PY_ARCH="x86_64";  BUILD_ARCH="x64";   UNPACKED="linux-unpacked" ;;
+  aarch64) PY_ARCH="aarch64"; BUILD_ARCH="arm64"; UNPACKED="linux-arm64-unpacked" ;;
+  *) echo "Can't build for $(uname -m): only x86_64 and aarch64." >&2; exit 1 ;;
+esac
+
 PY_VERSION="3.12.14"
 PY_RELEASE="20260901"
-PY_ASSET="cpython-${PY_VERSION}+${PY_RELEASE}-aarch64-apple-darwin-install_only.tar.gz"
+PY_ASSET="cpython-${PY_VERSION}+${PY_RELEASE}-${PY_ARCH}-unknown-linux-gnu-install_only.tar.gz"
 PY_URL="https://github.com/astral-sh/python-build-standalone/releases/download/${PY_RELEASE}/${PY_ASSET}"
 
 WHISPER_MODEL="base.en"
@@ -45,7 +55,7 @@ tar -xzf "$CACHE/$PY_ASSET" -C "$STAGE"
 
 echo "==> Installing backend dependencies"
 "$PY" -m pip install --quiet --no-cache-dir --upgrade pip
-"$PY" -m pip install --quiet --no-cache-dir -r server/requirements-mac.txt
+"$PY" -m pip install --quiet --no-cache-dir -r server/requirements-linux.txt
 
 echo "==> Fetching Whisper $WHISPER_MODEL"
 mkdir -p "$STAGE/models/whisper"
@@ -75,41 +85,19 @@ rsync -a --exclude '__pycache__' --exclude 'tests' server "$STAGE/"
 rsync -a models/kokoro "$STAGE/models/"
 cp character_config.example.yaml "$STAGE/character_config.example.yaml"
 
-echo "==> Building Marina.app"
-( cd app && npx electron-builder --mac dir )
+echo "==> Packing the app"
+( cd app && npx electron-builder --linux dir "--$BUILD_ARCH" )
 
-APP="app/dist/mac-arm64/Marina.app"
+echo "==> Building the AppImage"
+( cd app && npx electron-builder --linux AppImage "--$BUILD_ARCH" --prepackaged "dist/$UNPACKED" )
 
-# Sign before the dmg is built, or the dmg ships an unsigned copy. With a real
-# signing identity, macOS keeps Screen Recording and Accessibility across
-# rebuilds; an ad-hoc signature changes every build, so they'd be asked for
-# again each time. Set MARINA_SIGN_IDENTITY to choose one; otherwise the first
-# Apple Development identity in the keychain is used, or ad-hoc if there's none.
-IDENTITY="${MARINA_SIGN_IDENTITY:-$(security find-identity -v -p codesigning 2>/dev/null \
-  | awk -F'"' '/Apple Development/ {print $2; exit}')}"
-echo "==> Signing (${IDENTITY:-ad-hoc})"
-xattr -cr "$APP"
-codesign --force --deep --sign "${IDENTITY:--}" "$APP"
-codesign --verify --deep "$APP" && echo "    signature verified"
-xattr -cr "$APP"
-
-echo "==> Building the dmg from the signed app"
-( cd app && npx electron-builder --mac dmg --prepackaged dist/mac-arm64/Marina.app )
-
-DMG="$(ls -t app/dist/Marina-*-arm64.dmg 2>/dev/null | head -1 || true)"
-
-echo "==> Installing to /Applications"
-rm -rf /Applications/Marina.app
-cp -R "$APP" /Applications/Marina.app
-xattr -cr /Applications/Marina.app
+APPIMAGE="$(ls -t app/dist/Marina-*.AppImage 2>/dev/null | head -1 || true)"
 
 echo
 echo "Done."
-echo "  Marina.app is in /Applications ($(du -sh "$APP" | cut -f1))."
-if [ -n "$DMG" ]; then
-  echo "  $DMG ($(du -h "$DMG" | cut -f1))"
+if [ -n "$APPIMAGE" ]; then
+  echo "  $APPIMAGE ($(du -h "$APPIMAGE" | cut -f1))"
+  echo "  Run it with: $APPIMAGE"
 else
-  echo "  No dmg was produced." >&2
+  echo "  No AppImage was produced." >&2
 fi
-echo
-echo "Open it once, then right-click its Dock icon -> Options -> Keep in Dock."
