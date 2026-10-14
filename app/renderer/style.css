@@ -116,14 +116,15 @@ body.reveal #chrome { opacity: 1; }
 .pick-item.dim { color: var(--muted); cursor: default; }
 .pick-item.dim:hover { background: none; }
 
+/* Just above what she heard and the input bar, two lines at most, so it
+   never grows up over her; app.js pages longer text through it. */
 #bubble {
   position: fixed;
-  top: 40px;
+  bottom: 118px;
   left: 50%;
   transform: translateX(-50%);
   width: min(420px, calc(100% - 28px));
-  max-height: 34%;
-  overflow-y: auto;
+  line-height: 1.4;
   padding: 10px 13px;
   border-radius: 14px;
   background: var(--panel);
@@ -135,9 +136,8 @@ body.reveal #chrome { opacity: 1; }
   user-select: text;
   transition: opacity .2s ease, transform .2s ease;
 }
-#bubble.hidden { opacity: 0; transform: translateX(-50%) translateY(-6px); pointer-events: none; }
-#bubble::-webkit-scrollbar { width: 5px; }
-#bubble::-webkit-scrollbar-thumb { background: rgba(255,255,255,.18); border-radius: 3px; }
+#bubble-text { display: block; max-height: 2.8em; overflow: hidden; }
+#bubble.hidden { opacity: 0; transform: translateX(-50%) translateY(6px); pointer-events: none; }
 
 #notice {
   position: fixed;
@@ -316,7 +316,6 @@ html.stage, .stage body {
   top: auto;
   bottom: 120px;
   width: min(980px, calc(100% - 80px));
-  max-height: 30%;
   padding: 16px 24px;
   font-size: 24px;
   line-height: 1.4;

@@ -511,9 +511,11 @@ async function enqueueChunk(base64, cues) {
   utterance.nextStart = start + buffer.duration;
 
   appendCues(cues, start - utterance.epoch, buffer.duration);
+  return { start, duration: buffer.duration };
 }
 
 function stopSpeaking() {
+  clearCaptions();
   if (utterance.epoch < 0) return 0;
   const spoken = chunksSpoken();
   for (const c of utterance.chunks) {
@@ -1452,12 +1454,46 @@ function showHeard(text) {
   heardTimer = setTimeout(() => h.classList.add('hidden'), 5000 + text.length * 50);
 }
 
+// The bubble holds two lines at most, so it never grows over her. Text
+// types out word by word; when the lines are full it clears and carries on
+// from the top, and it fades once she's done.
 let bubbleTimer = null;
-function say(text) {
-  bubbleText.textContent = text;
-  bubble.classList.remove('hidden');
+let typeTimer = null;
+let captionTimers = [];
+
+function clearCaptions() {
+  for (const t of captionTimers) clearTimeout(t);
+  captionTimers = [];
+}
+
+function caption(text, seconds, hold = 2500) {
   clearTimeout(bubbleTimer);
-  bubbleTimer = setTimeout(() => bubble.classList.add('hidden'), 6000 + text.length * 45);
+  clearTimeout(typeTimer);
+  const words = text.split(/\s+/).filter(Boolean);
+  const step = words.length > 1 ? (seconds * 1000) / words.length : 0;
+  bubbleText.textContent = '';
+  bubble.classList.remove('hidden');
+
+  let i = 0;
+  const next = () => {
+    if (i >= words.length) {
+      bubbleTimer = setTimeout(() => bubble.classList.add('hidden'), hold);
+      return;
+    }
+    const before = bubbleText.textContent;
+    bubbleText.textContent = before ? `${before} ${words[i]}` : words[i];
+    if (before && bubbleText.scrollHeight > bubbleText.clientHeight + 1) {
+      bubbleText.textContent = words[i];
+    }
+    i++;
+    typeTimer = setTimeout(next, step);
+  };
+  next();
+}
+
+function say(text) {
+  clearCaptions();
+  caption(text, Math.max(0.3, text.length / 16), 6000);
 }
 
 const BRIDGE_DOWN = `Marina's bridge isn't running.\nIn the project folder:  python server/marina_server.py`;
@@ -1537,14 +1573,19 @@ async function playChunk(ev, req) {
   noteBackendUsed(ev);
   if (ev.error) showNotice(ev.error, 'bridge');
 
-  if (ev.speech) {
-    req.text = (req.text ? req.text + ' ' : '') + ev.speech;
-    say(req.text);
-  }
+  if (ev.speech) req.text = (req.text ? req.text + ' ' : '') + ev.speech;
   if (ev.audio) {
     if (!req.chunks) setStatus('busy', 'speaking');
-    await enqueueChunk(ev.audio, ev.cues);
-  } else if (ev.cues && ev.cues.length) {
+    const { start, duration } = await enqueueChunk(ev.audio, ev.cues);
+    // Type each sentence out while she says it, not when it arrives.
+    if (ev.speech) {
+      const delay = Math.max(0, (start - audioCtx.currentTime) * 1000);
+      captionTimers.push(setTimeout(() => caption(ev.speech, duration), delay));
+    }
+  } else if (ev.speech) {
+    say(ev.speech);
+  }
+  if (!ev.audio && ev.cues && ev.cues.length) {
     appendCues(ev.cues, 0, Math.max(1.5, (ev.speech || '').length / 14));
     if (cueEpoch < 0 && cueClock < 0) cueClock = 0;
   }
