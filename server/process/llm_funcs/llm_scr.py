@@ -91,6 +91,27 @@ def system_message():
     }
 
 
+# Asked to introduce Hack Club, she gives this word for word instead of asking
+# the model, so a live demo always gets the same intro.
+INTRODUCTION = (
+    "*waves* Hi everyone, I'm Marina. I was built as a Hack Club project for "
+    "Stardance, sponsored by NASA, AMD and GitHub. Hack Club is a nonprofit "
+    "that helps teenagers learn to code by building real projects, through "
+    "school clubs, hackathons and big events like Outpost and Phantom."
+)
+
+_INTRODUCE = re.compile(r"\bintroduce hack ?club\b")
+
+
+def scripted_reply(user_input):
+    """The fixed reply for this message, if it has one."""
+    if not isinstance(user_input, str):
+        return None
+    text = re.sub(r"[^a-z ]+", " ", user_input.lower())
+    text = re.sub(r"\s+", " ", text)
+    return INTRODUCTION if _INTRODUCE.search(text) else None
+
+
 def _tool_rounds():
     """How many rounds of tool calls one reply may take before she has to
     answer. Work on her machine is a chain of them: run, read, fix, rerun.
@@ -379,8 +400,10 @@ def llm_response(user_input):
     history = _window(load_history())
     history.append({"role": "user", "content": user_input})
 
-    completion = get_reply([system_message()] + history)
-    reply = (completion.choices[0].message.content or "").strip()
+    reply = scripted_reply(user_input)
+    if reply is None:
+        completion = get_reply([system_message()] + history)
+        reply = (completion.choices[0].message.content or "").strip()
 
     append_history([{"role": "user", "content": user_input},
                     {"role": "assistant", "content": reply}])
@@ -488,6 +511,10 @@ def llm_stream(user_input=None, extra_system=None, use_tools=True, history=None)
     `history` replaces her own conversation, for a chat that keeps its own
     threads, like Open WebUI.
     """
+    scripted = scripted_reply(user_input)
+    if scripted is not None:
+        yield scripted
+        return
     history = _window(load_history()) if history is None else list(history)
     if user_input is not None:
         # The clock goes on this message only, never into the saved history
