@@ -341,6 +341,7 @@ context:
 tools:
   enabled: true
   timers: true
+  reminders: true         # "remind me Thursday at 3", kept in reminders.json
   web: true               # web search and reading pages
   weather: true
   clipboard: true

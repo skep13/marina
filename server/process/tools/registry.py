@@ -16,6 +16,7 @@ from process.config import load_config, setting
 from process.memory import store as memory
 from process.tools import lookup
 from process.tools import mac
+from process.tools import reminders
 from process.tools import workspace
 
 _config = load_config()
@@ -201,6 +202,9 @@ SPECS = [
 
 SPECS += [(name, fn, lambda key=key: _allowed(key), spec)
           for name, fn, key, spec in lookup.SPECS]
+SPECS += [(name, fn, lambda: _allowed("reminders"), spec)
+          for name, fn, spec in reminders.SPECS]
+reminders.start(_announce)
 
 SPECS += [(name, fn, _workspace_allowed, spec) for name, fn, spec in workspace.SPECS]
 
