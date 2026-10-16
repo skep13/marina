@@ -9,6 +9,7 @@ contextBridge.exposeInMainWorld('marina', {
   onToggleListen: (cb) => ipcRenderer.on('toggle-listen', () => cb()),
   onPickModel: (cb) => ipcRenderer.on('pick-model', () => cb()),
   captureScreen: () => ipcRenderer.invoke('capture-screen'),
+  cameraAccess: () => ipcRenderer.invoke('camera-access'),
   onLookAtScreen: (cb) => ipcRenderer.on('look-at-screen', () => cb()),
   onBridgeDown: (cb) => ipcRenderer.on('bridge-down', (_e, msg) => cb(msg)),
   onBridgeUp: (cb) => ipcRenderer.on('bridge-up', () => cb()),

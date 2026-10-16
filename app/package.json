@@ -64,6 +64,7 @@
       "identity": null,
       "extendInfo": {
         "NSMicrophoneUsageDescription": "Marina uses the microphone so you can talk to her.",
+        "NSCameraUsageDescription": "Marina takes a single photo with the camera when you ask her to look at you.",
         "LSUIElement": false,
         "NSDesktopFolderUsageDescription": "Marina needs to read her Python backend and avatar model from this folder.",
         "NSDocumentsFolderUsageDescription": "Marina needs to read her Python backend and avatar model from this folder.",

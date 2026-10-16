@@ -28,6 +28,25 @@ If you notice something sensitive like a password or private message, say that
 you would rather not read it out."""
 
 
+# A photo of them, taken when they asked her to look. She is herself here,
+# not a captioning service, and she doesn't rate how anyone looks.
+CAMERA_QUESTION = "Look at me. What do you see?"
+
+CAMERA_SYSTEM = """You are Marina, the person's friend, and they just let you
+see them through their camera. This photo is what you see right now.
+
+React to it the way a friend on a video call would, in one to three short,
+casual spoken sentences: what they seem to be up to, their mood, something in
+the room or something they're holding up to show you. Answer their question if
+they asked one. Be warm or teasing, never cruel.
+
+Describe only what is actually there, and say so plainly if the picture is
+too dark or blurry to make out. Don't rate their looks or body, and don't try
+to say who anyone else in the picture is. No markdown, no lists, no emoji; your
+words are read aloud. You may add one small gesture in single asterisks, like
+*waves* or *smiles*."""
+
+
 class VisionError(RuntimeError):
     pass
 
@@ -76,21 +95,22 @@ def _shrink(image_bytes):
     return buf.getvalue(), "image/jpeg"
 
 
-def describe(image_bytes, question=None, mime="image/png"):
+def describe(image_bytes, question=None, mime="image/png", source="screen"):
+    camera = source == "camera"
     if not ENABLED:
         raise VisionError("Screen vision is disabled in character_config.yaml.")
     if not image_bytes:
-        raise VisionError("No screenshot was captured.")
+        raise VisionError("No picture was captured.")
 
     image_bytes, mime = _shrink(image_bytes)
     b64 = base64.b64encode(image_bytes).decode("ascii")
-    question = (question or "").strip() or DEFAULT_QUESTION
+    question = (question or "").strip() or (CAMERA_QUESTION if camera else DEFAULT_QUESTION)
 
     try:
         completion = client().chat.completions.create(
             model=MODEL,
             messages=[
-                {"role": "system", "content": SYSTEM},
+                {"role": "system", "content": CAMERA_SYSTEM if camera else SYSTEM},
                 {
                     "role": "user",
                     "content": [

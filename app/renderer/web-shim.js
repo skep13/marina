@@ -15,6 +15,7 @@
     minimize: noop,
     clickThrough: noop,
     captureScreen: async () => null,
+    cameraAccess: async () => true,
     openersChanged: noop,
     onToggleListen: noop,
     onPickModel: noop,

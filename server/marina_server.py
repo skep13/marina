@@ -164,6 +164,7 @@ def health():
         "recording": recorder.is_recording,
         "memories": len(memory.all_facts()),
         "vision": VISION_MODEL if VISION_ENABLED else None,
+        "camera": bool(cfg.setting("tools", "camera", True)),
         "barge_in": _barge_enabled(),
         "idle": idle.status(),
     }
@@ -712,11 +713,16 @@ class SeeIn(BaseModel):
     mime: str = "image/jpeg"
     question: str = ""
     speak: bool = True
+    source: str = "screen"  # or "camera", a photo of them
 
 
 @app.post("/see")
 def see(body: SeeIn):
-    out = {"transcript": body.question or "(looked at the screen)",
+    camera = body.source == "camera"
+    if camera and not cfg.setting("tools", "camera", True):
+        return {"transcript": "", "reply": "", "speech": "", "cues": [], "audio": None,
+                "error": "Looking through the camera is switched off."}
+    out = {"transcript": body.question or ("(looked at you)" if camera else "(looked at the screen)"),
            "reply": "", "speech": "", "cues": [], "audio": None, "error": None}
 
     try:
@@ -725,10 +731,11 @@ def see(body: SeeIn):
         out["error"] = "Screenshot was not valid base64."
         return out
 
-    print(f"[see] {len(raw)/1024:.0f} KB screenshot", flush=True)
+    print(f"[see] {len(raw)/1024:.0f} KB {'photo' if camera else 'screenshot'}", flush=True)
 
     try:
-        answer = describe_screen(raw, body.question, body.mime)
+        answer = describe_screen(raw, body.question, body.mime,
+                                 source="camera" if camera else "screen")
     except VisionError as e:
         out["error"] = str(e)
         print(f"[see] {e}", flush=True)
@@ -742,8 +749,11 @@ def see(body: SeeIn):
     out["cues"] = parts["cues"]
     print(f"[marina] {parts['speech']}", flush=True)
 
-    note_exchange(body.question or "What is on my screen?",
-                  f"(looked at your screen) {answer}")
+    if camera:
+        note_exchange(body.question or "Look at me.", f"(looked at you through the camera) {answer}")
+    else:
+        note_exchange(body.question or "What is on my screen?",
+                      f"(looked at your screen) {answer}")
 
     if body.speak and out["speech"]:
         try:

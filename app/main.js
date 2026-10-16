@@ -448,6 +448,13 @@ ipcMain.handle('pick-vrm', async () => {
   }
 });
 
+// Asks macOS the first time; after that it answers from the saved choice.
+ipcMain.handle('camera-access', async () => {
+  if (process.platform !== 'darwin') return true;
+  if (systemPreferences.getMediaAccessStatus('camera') === 'granted') return true;
+  return systemPreferences.askForMediaAccess('camera');
+});
+
 ipcMain.handle('capture-screen', async () => {
   if (process.platform === 'darwin') {
     const status = systemPreferences.getMediaAccessStatus('screen');

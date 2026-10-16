@@ -250,6 +250,7 @@ presets:
     tools:
       clipboard: false      # never read out whatever is on your clipboard
       calendar: false       # or your calendar
+      camera: false         # and no photos of guests
       workspace: false      # and no shell for guests to talk her into
       mac: false            # or this Mac's mouse, keyboard and files
     barge_in:
@@ -347,6 +348,7 @@ tools:
   weather: true
   calendar: true          # read their calendar (Mac only)
   media: true             # see and control Spotify or Music (Mac only)
+  camera: true            # the "look at me" button: one photo, when you press it
   clipboard: true
   open_url: true
   clipboard_chars: 2000

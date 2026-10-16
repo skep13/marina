@@ -2049,7 +2049,65 @@ async function lookAtScreen() {
   }
 }
 
+// One frame from the camera, taken and let go straight away: the light comes
+// on for about a second, and nothing is recorded or kept.
+async function takePhoto() {
+  if (!(await window.marina.cameraAccess())) {
+    throw new Error('macOS has not let Marina use the camera.\n\n'
+      + 'System Settings > Privacy & Security > Camera > enable Marina.');
+  }
+  const stream = await navigator.mediaDevices.getUserMedia({
+    video: { width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false,
+  });
+  try {
+    const video = document.createElement('video');
+    video.muted = true;
+    video.playsInline = true;
+    video.srcObject = stream;
+    await video.play();
+    // The first frames are dark while the sensor adjusts its exposure.
+    await new Promise((r) => setTimeout(r, 700));
+    const canvas = document.createElement('canvas');
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    canvas.getContext('2d').drawImage(video, 0, 0);
+    return canvas.toDataURL('image/jpeg', 0.8).split(',')[1];
+  } finally {
+    stream.getTracks().forEach((t) => t.stop());
+  }
+}
+
+async function lookAtMe() {
+  if (busy) return;
+  setBusy(true, 'looking…');
+  hideNotice('bridge');
+
+  let image;
+  try {
+    image = await takePhoto();
+  } catch (e) {
+    setBusy(false);
+    showNotice(e.name === 'NotFoundError' ? 'No camera was found.' : e.message, 'vision');
+    return;
+  }
+
+  const question = input.value.trim();
+  input.value = '';
+  say(question || 'Let me see you…');
+
+  setBusy(true, 'thinking');
+  try {
+    await handleResult(await post('/see', {
+      image, mime: 'image/jpeg', question, source: 'camera',
+    }));
+  } catch {
+    setBusy(false);
+    bridgeLost();
+  }
+}
+
 el('btn-see').addEventListener('click', lookAtScreen);
+el('btn-cam').addEventListener('click', lookAtMe);
 window.marina.onLookAtScreen(lookAtScreen);
 
 btnMic.addEventListener('click', toggleListen);
@@ -2345,6 +2403,8 @@ async function pollForBridge({ quietFor = 16000 } = {}) {
 
         const see = el('btn-see');
         if (see) see.hidden = !info.vision;
+        const cam = el('btn-cam');
+        if (cam) cam.hidden = !info.vision || !info.camera || !navigator.mediaDevices?.getUserMedia;
         learnBrains(info.llm_labels);
         if (info.preset) markPresenting(info.preset);
         paintBrain(info.llm_mode || 'auto', info.llm_using, info.model);
