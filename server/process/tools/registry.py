@@ -1,5 +1,7 @@
-"""Tools the model can call: timers, clipboard, opening links, remembering,
-and her workspace machine (see process.tools.workspace).
+"""Tools the model can call: timers and reminders, clipboard, opening links,
+remembering, looking things up (process.tools.lookup), their calendar and
+music (process.tools.desk), and her workspace machine (see
+process.tools.workspace).
 
 open_url only accepts http and https. The clipboard and open_url need a Mac,
 so a headless bridge on Linux leaves them out.
@@ -14,6 +16,7 @@ from urllib.parse import urlparse
 
 from process.config import load_config, setting
 from process.memory import store as memory
+from process.tools import desk
 from process.tools import lookup
 from process.tools import mac
 from process.tools import reminders
@@ -204,6 +207,7 @@ SPECS += [(name, fn, lambda key=key: _allowed(key), spec)
           for name, fn, key, spec in lookup.SPECS]
 SPECS += [(name, fn, lambda: _allowed("reminders"), spec)
           for name, fn, spec in reminders.SPECS]
+SPECS += [(name, fn, _mac_only(key), spec) for name, fn, key, spec in desk.SPECS]
 reminders.start(_announce)
 
 SPECS += [(name, fn, _workspace_allowed, spec) for name, fn, spec in workspace.SPECS]

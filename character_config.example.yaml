@@ -249,6 +249,7 @@ presets:
       enabled: false        # no speaking up unprompted mid-meeting
     tools:
       clipboard: false      # never read out whatever is on your clipboard
+      calendar: false       # or your calendar
       workspace: false      # and no shell for guests to talk her into
       mac: false            # or this Mac's mouse, keyboard and files
     barge_in:
@@ -344,6 +345,8 @@ tools:
   reminders: true         # "remind me Thursday at 3", kept in reminders.json
   web: true               # web search and reading pages
   weather: true
+  calendar: true          # read their calendar (Mac only)
+  media: true             # see and control Spotify or Music (Mac only)
   clipboard: true
   open_url: true
   clipboard_chars: 2000
@@ -354,6 +357,11 @@ tools:
 weather:
   location: ""
   units: metric
+
+# Calendars to leave out, by part of their name. Subscribed holiday calendars
+# are slow to read, so they're out unless you take "Holiday" off this list.
+calendar:
+  skip: ["Holiday", "Siri Suggestions", "Scheduled Reminders"]
 
 # Her own Linux machine, where she runs commands and edits code with you.
 # She reaches it over SSH with a key of her own: generate one with
