@@ -199,6 +199,7 @@ def _speak_segment(segment, index, speak):
         "reply": parts["display"],
         "speech": parts["speech"],
         "cues": parts["cues"],
+        "mood": parts["mood"],
         "audio": None,
         "visemes": [],
         "backend": active_endpoint(),

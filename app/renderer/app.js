@@ -375,6 +375,16 @@ let moodTimer = 0;
 let mood = 0;
 let moodTarget = 0;
 
+// The feel of each sentence (from the bridge) held lightly on her face while
+// she says it, in audio-clock time. Cues still play on top of it.
+let moodSpans = [];
+const sentenceMood = { happy: 0, sad: 0, angry: 0, relaxed: 0, surprised: 0 };
+
+function holdMood(m, start, duration) {
+  if (!m || !m.weight || !(m.name in sentenceMood)) return;
+  moodSpans.push({ name: m.name, weight: m.weight, start, end: start + duration + 0.5 });
+}
+
 const AVERSIONS = [
   { x: -0.38, y:  0.27, hold: [1.1, 2.4] },
   { x:  0.36, y:  0.25, hold: [1.1, 2.4] },
@@ -527,6 +537,7 @@ function stopSpeaking() {
   playing = 0;
   cueEpoch = -1;
   pendingCues = [];
+  moodSpans = [];
   return spoken;
 }
 
@@ -1110,12 +1121,22 @@ function updateMood(dt) {
   }
   mood += (moodTarget - mood) * Math.min(1, dt * 1.3);
 
+  const now = audioCtx ? audioCtx.currentTime : 0;
+  moodSpans = moodSpans.filter((s) => s.end > now);
+  const span = moodSpans.find((s) => s.start <= now);
+  for (const name in sentenceMood) {
+    const target = span && span.name === name ? span.weight : 0;
+    // In quickly, out slowly, so a feeling lingers into the next sentence.
+    const rate = target > sentenceMood[name] ? 3 : 1.2;
+    sentenceMood[name] += (target - sentenceMood[name]) * Math.min(1, dt * rate);
+  }
+
   const idleHappy = mood * (1 - Math.min(1, mouthOpen * 1.4));
-  em.setValue('happy', Math.max(idleHappy, cueOut.expr.happy));
-  em.setValue('sad', cueOut.expr.sad);
-  em.setValue('angry', cueOut.expr.angry);
-  em.setValue('relaxed', cueOut.expr.relaxed);
-  em.setValue('surprised', cueOut.expr.surprised);
+  em.setValue('happy', Math.max(idleHappy, sentenceMood.happy, cueOut.expr.happy));
+  em.setValue('sad', Math.max(sentenceMood.sad, cueOut.expr.sad));
+  em.setValue('angry', Math.max(sentenceMood.angry, cueOut.expr.angry));
+  em.setValue('relaxed', Math.max(sentenceMood.relaxed, cueOut.expr.relaxed));
+  em.setValue('surprised', Math.max(sentenceMood.surprised, cueOut.expr.surprised));
 }
 
 // What she is doing shapes her whole posture: leaning in to listen, glancing
@@ -1577,6 +1598,7 @@ async function playChunk(ev, req) {
   if (ev.audio) {
     if (!req.chunks) setStatus('busy', 'speaking');
     const { start, duration } = await enqueueChunk(ev.audio, ev.cues);
+    holdMood(ev.mood, start, duration);
     // Type each sentence out while she says it, not when it arrives.
     if (ev.speech) {
       const delay = Math.max(0, (start - audioCtx.currentTime) * 1000);
@@ -1584,6 +1606,9 @@ async function playChunk(ev, req) {
     }
   } else if (ev.speech) {
     say(ev.speech);
+  }
+  if (!ev.audio && ev.speech) {
+    if (audioCtx) holdMood(ev.mood, audioCtx.currentTime, Math.max(1.5, ev.speech.length / 14));
   }
   if (!ev.audio && ev.cues && ev.cues.length) {
     appendCues(ev.cues, 0, Math.max(1.5, (ev.speech || '').length / 14));
@@ -2379,6 +2404,9 @@ window.__marina = {
     };
   },
   get pendingCues() { return pendingCues.slice(); },
+  holdMood,
+  ensureAudio,
+  get sentenceMood() { return { ...sentenceMood }; },
   audioState: () => (audioCtx ? audioCtx.state : 'none'),
   THREE,
 };

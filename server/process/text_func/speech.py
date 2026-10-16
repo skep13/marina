@@ -3,6 +3,7 @@
   display - text for the speech bubble
   speech  - cleaned text for TTS (no markdown, emoji or *actions*)
   cues    - the *actions*, mapped to animations, with their position in speech
+  mood    - how the sentence feels, for her face
 """
 import re
 
@@ -103,12 +104,57 @@ def _is_action(inner, kind):
     return bool(_VERBISH.match(first))
 
 
+# How a sentence feels, read from her *actions* first and her words second.
+# It sets a light expression under the whole sentence; a cue like *laughs*
+# still plays on top at full strength.
+_CUE_MOODS = {
+    "laugh": "happy", "smile": "happy", "wink": "happy", "wave": "happy",
+    "blush": "happy", "sad": "sad", "sigh": "sad", "pout": "angry",
+    "eyeroll": "angry", "surprised": "surprised", "yawn": "relaxed",
+}
+
+_MOOD_WORDS = [
+    ("surprised", re.compile(
+        r"\b(wait|what|whoa|woah|no way|seriously|really|wow|omg|huh)\b[^.]*[?!]"
+        r"|\b(no way|wait what|holy)\b", re.I)),
+    ("angry", re.compile(
+        r"\b(ugh|annoying|annoyed|hate|stupid|cursed|ridiculous|furious|"
+        r"unbelievable|rude|ugh+)\b", re.I)),
+    ("sad", re.compile(
+        r"\b(sorry|sad|miss(ed)?|lonely|unfortunately|rough|awful|terrible|"
+        r"hurts?|cry|crying|oh no|that sucks|heartbreaking)\b", re.I)),
+    ("happy", re.compile(
+        r"\b(love|loved|yay|nice|great|amazing|awesome|glad|happy|haha+|lol|"
+        r"cute|perfect|congrats|congratulations|excited|fun|yes!|brilliant|"
+        r"thank(s| you))\b", re.I)),
+    ("relaxed", re.compile(r"\b(calm|cosy|cozy|relax|chill|sleepy|peaceful)\b", re.I)),
+]
+
+
+def mood(speech, cues=()):
+    """{name, weight} for one sentence."""
+    name, weight = "neutral", 0.0
+    for cue in cues:
+        found = _CUE_MOODS.get(cue.get("animation"))
+        if found:
+            name, weight = found, 0.4
+            break
+    if name == "neutral":
+        for candidate, pattern in _MOOD_WORDS:
+            if pattern.search(speech or ""):
+                name, weight = candidate, 0.25
+                break
+    if name != "neutral" and (speech or "").rstrip().endswith("!"):
+        weight += 0.1
+    return {"name": name, "weight": round(weight, 2)}
+
+
 def split_reply(text):
     """Return {display, speech, cues} for an LLM reply."""
     display = (text or "").strip()
 
     if not display:
-        return {"display": "", "speech": "", "cues": []}
+        return {"display": "", "speech": "", "cues": [], "mood": mood("")}
 
     body = _FENCE.sub(" ", display)
     body = _INLINE_CODE.sub(r"\1", body)
@@ -165,7 +211,8 @@ def split_reply(text):
     else:
         shown = _WS.sub(" ", display.translate(_RESIDUAL)).strip()
 
-    return {"display": shown, "speech": speech, "cues": cues}
+    return {"display": shown, "speech": speech, "cues": cues,
+            "mood": mood(speech, cues)}
 
 
 FIRST_MIN_CHARS = 12

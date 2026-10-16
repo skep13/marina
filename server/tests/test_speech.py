@@ -87,3 +87,18 @@ def run():
 
 if __name__ == "__main__":
     raise SystemExit(run())
+
+
+def test_mood_comes_from_actions_before_words():
+    assert split_reply("*laughs* ugh, you're the worst.")["mood"]["name"] == "happy"
+    assert split_reply("ugh, this build again.")["mood"]["name"] == "angry"
+    assert split_reply("oh no, i'm sorry.")["mood"]["name"] == "sad"
+    assert split_reply("wait, seriously?")["mood"]["name"] == "surprised"
+    calm = split_reply("the meeting is at three.")["mood"]
+    assert calm == {"name": "neutral", "weight": 0.0}
+
+
+def test_an_exclamation_strengthens_the_mood():
+    plain = split_reply("that's great.")["mood"]
+    loud = split_reply("that's great!")["mood"]
+    assert loud["weight"] > plain["weight"]
