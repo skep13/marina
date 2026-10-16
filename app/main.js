@@ -1,4 +1,4 @@
-const { app, BrowserWindow, Menu, Tray, desktopCapturer, ipcMain, globalShortcut, nativeImage, screen, shell, systemPreferences, dialog } = require('electron');
+const { app, BrowserWindow, Menu, Notification, Tray, desktopCapturer, ipcMain, globalShortcut, nativeImage, screen, shell, systemPreferences, dialog } = require('electron');
 const fs = require('fs');
 const path = require('path');
 const { spawn } = require('child_process');
@@ -296,6 +296,44 @@ async function fetchPresets() {
   } catch {}
 }
 
+// Checks GitHub for a newer release once a day. The app isn't signed, so
+// macOS won't let it replace itself: this only says so and links the dmg.
+const RELEASES = 'https://api.github.com/repos/skep13/marina/releases/latest';
+let update = null;
+let refreshTray = () => {};
+
+function newerVersion(latest, current) {
+  const parts = (v) => String(v).replace(/^v/, '').split(/[.-]/).slice(0, 3).map((n) => parseInt(n, 10) || 0);
+  const a = parts(latest);
+  const b = parts(current);
+  for (let i = 0; i < 3; i++) if (a[i] !== b[i]) return a[i] > b[i];
+  return false;
+}
+
+async function checkForUpdate() {
+  if (!app.isPackaged) return;
+  try {
+    const res = await fetch(RELEASES, {
+      headers: { Accept: 'application/vnd.github+json' }, signal: AbortSignal.timeout(10000),
+    });
+    if (!res.ok) return;
+    const release = await res.json();
+    if (release.draft || release.prerelease || !newerVersion(release.tag_name, app.getVersion())) return;
+    const dmg = (release.assets || []).find((a) => a.name.endsWith('.dmg'));
+    const first = !update;
+    update = { version: String(release.tag_name).replace(/^v/, ''), url: release.html_url, dmg: dmg?.browser_download_url };
+    refreshTray();
+    if (first && Notification.isSupported()) {
+      const note = new Notification({
+        title: `Marina ${update.version} is out`,
+        body: 'Click to download it. Your settings and memories stay as they are.',
+      });
+      note.on('click', () => shell.openExternal(update.dmg || update.url));
+      note.show();
+    }
+  } catch {}
+}
+
 function buildTray() {
   const icon = nativeImage.createFromPath(path.join(__dirname, 'assets', 'trayTemplate.png'));
   icon.setTemplateImage(true);
@@ -304,6 +342,11 @@ function buildTray() {
 
   const refresh = () => {
     tray.setContextMenu(Menu.buildFromTemplate([
+      ...(update ? [
+        { label: `Download Marina ${update.version}…`, click: () => shell.openExternal(update.dmg || update.url) },
+        { label: 'What\u2019s new', click: () => shell.openExternal(update.url) },
+        { type: 'separator' },
+      ] : []),
       {
         label: win && win.isVisible() ? 'Hide Marina' : 'Show Marina',
         click: () => {
@@ -379,6 +422,7 @@ function buildTray() {
     if (macState.available) { clearInterval(poll); fetchPresets().then(refresh); }
   }, 2000);
   setTimeout(() => clearInterval(poll), 120000);
+  refreshTray = refresh;
   return refresh;
 }
 
@@ -387,6 +431,8 @@ app.whenReady().then(() => {
   watchBridge();
   createWindow();
   buildTray();
+  setTimeout(checkForUpdate, 30000);
+  setInterval(checkForUpdate, 24 * 60 * 60 * 1000);
 
   globalShortcut.register('CommandOrControl+Shift+Q', () => app.quit());
   globalShortcut.register('CommandOrControl+Shift+H', () => {
