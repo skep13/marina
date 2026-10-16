@@ -14,6 +14,7 @@ from urllib.parse import urlparse
 
 from process.config import load_config, setting
 from process.memory import store as memory
+from process.tools import lookup
 from process.tools import mac
 from process.tools import workspace
 
@@ -197,6 +198,9 @@ SPECS = [
                      "description": "e.g. \"Marina thinks Bunny Girl Senpai is the best anime\""}},
             "required": ["note"]}}),
 ]
+
+SPECS += [(name, fn, lambda key=key: _allowed(key), spec)
+          for name, fn, key, spec in lookup.SPECS]
 
 SPECS += [(name, fn, _workspace_allowed, spec) for name, fn, spec in workspace.SPECS]
 

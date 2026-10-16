@@ -341,10 +341,18 @@ context:
 tools:
   enabled: true
   timers: true
+  web: true               # web search and reading pages
+  weather: true
   clipboard: true
   open_url: true
   clipboard_chars: 2000
   workspace: true         # her own machine, if `workspace` below is set up
+
+# Where "what's the weather" means when they don't say. Units are metric or
+# imperial.
+weather:
+  location: ""
+  units: metric
 
 # Her own Linux machine, where she runs commands and edits code with you.
 # She reaches it over SSH with a key of her own: generate one with
