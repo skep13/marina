@@ -333,6 +333,9 @@ idle:
   probability: 0.5
   quiet_from_hour: 23
   quiet_until_hour: 9
+  # Mac only: bring it up when you come back after 20+ minutes away, or have
+  # been in one app for two hours straight. Counts toward max_per_hour.
+  notice: false
 
 context:
   enabled: true

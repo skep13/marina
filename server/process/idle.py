@@ -91,6 +91,18 @@ def status():
     }
 
 
+def may_notice(now=None):
+    """Whether she may bring up something she noticed. The same limits as
+    openers, except the gap since the last word: noticing is the reason."""
+    if not enabled():
+        return False
+    now = now or time.time()
+    with _lock:
+        if _muted or (MAX_PER_HOUR and _recent_count(now) >= MAX_PER_HOUR):
+            return False
+    return not in_quiet_hours()
+
+
 def due(now=None, roll=None):
     if not enabled():
         return False

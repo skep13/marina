@@ -54,6 +54,7 @@ from process import openai_api
 from process import shared
 from process import config as cfg
 from process import idle
+from process import notice
 from process.tools import registry as tools
 from process.memory import store as memory
 from process.vision.look import (
@@ -1005,6 +1006,13 @@ def _idle_stream(timeout):
             print("[idle] a timer went off", flush=True)
             yield from _stream_reply(None, True, transcript="",
                                      extra_system="\n\n" + announcement)
+            return
+
+        noticed = notice.poll()
+        if noticed and idle.may_notice():
+            idle.note_spoken()
+            print("[idle] bringing up something she noticed", flush=True)
+            yield from _stream_reply(None, True, transcript="", extra_system=noticed)
             return
 
         if idle.due():
