@@ -1,0 +1,3 @@
+# These hold the live HMAC secret and broker passwords - never commit them.
+bridge/config.py
+device/config.py

@@ -1,0 +1,38 @@
+# Run the bridge UNPRIVILEGED. Ideally install this on the isolated Kali box
+# (lab2 ct113) so approved commands execute there, not next to the model on
+# lab3. The Kali box reaches the broker over the Funnel (internet), so set the
+# bridge config's MQTT_BROKER to homelab.tail35b6c6.ts.net:10000.
+#
+#   sudo useradd --system --no-create-home --shell /usr/sbin/nologin songbird
+#   sudo cp -r songbird-token /opt/songbird-token
+#   sudo chown -R songbird:songbird /opt/songbird-token
+#   # point ExecStart at YOUR harness entrypoint that imports
+#   #   bridge.handle_tool_call / bridge.run_action and feeds Songbird's tool calls
+#   sudo cp songbird-bridge.service /etc/systemd/system/
+#   sudo systemctl enable --now songbird-bridge
+
+[Unit]
+Description=Songbird approval-token bridge
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=songbird
+Group=songbird
+WorkingDirectory=/opt/songbird-token/bridge
+ExecStart=/usr/bin/python3 /opt/songbird-token/bridge/runner.py
+Restart=on-failure
+
+# hardening - the executor runs model-proposed commands, so cage it
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadWritePaths=/opt/songbird-token
+RestrictSUIDSGID=true
+RestrictNamespaces=true
+LockPersonality=true
+MemoryDenyWriteExecute=true
+
+[Install]
+WantedBy=multi-user.target
