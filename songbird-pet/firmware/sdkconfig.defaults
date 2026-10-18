@@ -1,0 +1,11 @@
+# ESP32-S3 target for the Songbird pet firmware
+CONFIG_IDF_TARGET="esp32s3"
+
+# 4 MB is the smallest flash S3 modules ship with; the app is ~1 MB
+CONFIG_ESPTOOLPY_FLASHSIZE_4MB=y
+CONFIG_PARTITION_TABLE_SINGLE_APP_LARGE=y
+
+# Console on the S3's native USB (the same port mpremote used)
+CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG=y
+# Avoid GCC-12+ new warnings being promoted to errors
+CONFIG_COMPILER_DISABLE_GCC12_WARNINGS=y

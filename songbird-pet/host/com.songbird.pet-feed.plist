@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- Runs pet_feed.py at login and keeps it running.
+     Install: cp com.songbird.pet-feed.plist ~/Library/LaunchAgents/ &&
+              launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.songbird.pet-feed.plist
+     Log:     ~/Library/Logs/songbird-pet-feed.log -->
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.songbird.pet-feed</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/Library/Frameworks/Python.framework/Versions/3.9/bin/python3</string>
+        <string>-u</string>
+        <string>/Users/jacobmatthews/marina/songbird-pet/host/pet_feed.py</string>
+    </array>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <true/>
+    <key>ThrottleInterval</key>
+    <integer>10</integer>
+    <key>StandardOutPath</key>
+    <string>/Users/jacobmatthews/Library/Logs/songbird-pet-feed.log</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/jacobmatthews/Library/Logs/songbird-pet-feed.log</string>
+</dict>
+</plist>

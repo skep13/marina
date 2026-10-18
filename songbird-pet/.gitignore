@@ -1,0 +1,3 @@
+# Live Wi-Fi and broker passwords - never commit them.
+firmware/main/songbird_config.h
+host/feed_config.json
