@@ -18,24 +18,33 @@ Regenerate any of them after swapping an image in `assets/`:
 
 ## Proxmox (lab1 / lab2 / lab3)
 
-Proxmox serves its UI from a template. Inject the stylesheet once per node and
-it themes the whole UI including the login screen. Run on each node:
+These nodes already run a managed **uplink** theme: `/usr/local/sbin/uplink-pve-theme`
+(re-run after apt via `/etc/apt/apt.conf.d/99-uplink-pve-theme`) builds
+`/pve2/css/uplink.css` from `/usr/local/share/uplink-pve/uplink.css` plus an
+optional per-host layer `uplink-host.css`, and injects a version-fingerprinted
+`<link>` into `index.html.tpl`. A standalone `<link>` of our own gets covered by
+uplink's own `body::before` wallpaper and reset on upgrade, so we ride uplink's
+per-host layer instead — it's concatenated after uplink.css (so it overrides),
+fingerprinted (so browsers refetch), and re-applied on every upgrade.
+
+`uplink-host-b42.css` is that layer: it re-points uplink's `--ul-*` variables and
+`body::before` wallpaper to the B42 look. On each node:
 
 ```bash
-TPL=/usr/share/pve-manager/index.html.tpl
-cp "$TPL" "$TPL.bak.$(date +%s)"                      # backup
-cp proxmox-b42.css /usr/share/pve-manager/css/proxmox-b42.css
-# add the <link> once, just before </head>
-grep -q proxmox-b42.css "$TPL" || sed -i \
-  's#</head>#<link rel="stylesheet" href="/pve2/css/proxmox-b42.css">\n</head>#' "$TPL"
-systemctl restart pveproxy
+# generate from the image first:  python3 gen_uplink_host.py
+install -m 0644 uplink-host-b42.css /usr/local/share/uplink-pve/uplink-host.css
+/usr/local/sbin/uplink-pve-theme          # rebuilds uplink.css, bumps ?v=, reloads pveproxy
 ```
+
+A node without uplink (lab3 was one) first needs the infra cloned from a themed
+node: `/usr/local/sbin/uplink-pve-theme`, `/usr/local/share/uplink-pve/`
+(`uplink.css`, `uplink.js`, `uplink-bg.svg`) and `/etc/apt/apt.conf.d/99-uplink-pve-theme`.
 
 Then hard-reload the browser (Ctrl/Cmd-Shift-R).
 
-> A `pve-manager` package upgrade rewrites `index.html.tpl` and drops the line —
-> re-run the `sed` step after upgrades (or add it to an APT post-invoke hook).
-> To revert: restore the `.bak` file and `systemctl restart pveproxy`.
+> To revert: `rm /usr/local/share/uplink-pve/uplink-host.css` and re-run
+> `uplink-pve-theme` (restores plain uplink). `proxmox-b42.css` / `gen_prox.py`
+> remain for a node that has **no** uplink theme — link it directly in that case.
 
 ## Open WebUI + other custom-CSS containers
 
