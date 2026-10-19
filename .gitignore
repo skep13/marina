@@ -29,3 +29,5 @@ app/renderer/vendor/
 character_config.yaml
 reminders.json
 reminders.tmp
+songbird-kali/agent/kali_agent.py
+songbird-kali/webui/kali_tool.py
