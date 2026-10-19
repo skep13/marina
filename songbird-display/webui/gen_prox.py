@@ -42,42 +42,65 @@ CSS = """/* ============================================================
              ui-monospace,Menlo,monospace;
 }
 
-/* ---- wallpaper + scrim on the body ---------------------------- */
-body, .x-body, .x-viewport {
+/* ---- wallpaper + scrim ---------------------------------------- */
+/* PVE paints the whole screen with .x-viewport>.x-body (#1a1a1a) and
+   .x-border-layout-ct, so the wallpaper goes on THOSE (the real base
+   layers), not just <body>, or it is covered. */
+html, body { background-color: var(--px-black) !important;
+  color: var(--px-ink) !important; font-family: var(--px-font) !important; }
+
+.x-viewport > .x-body, .x-body {
   background-color: var(--px-black) !important;
   background-image:
-    linear-gradient(180deg, rgba(8,8,9,.48) 0%, rgba(8,8,9,.58) 55%, rgba(8,8,9,.72) 100%),
+    linear-gradient(180deg, rgba(8,8,9,.42) 0%, rgba(8,8,9,.52) 55%, rgba(8,8,9,.66) 100%),
     url("__IMG__") !important;
   background-size: auto, cover !important;
   background-position: center, center !important;
   background-repeat: no-repeat, no-repeat !important;
   background-attachment: fixed, fixed !important;
-  color: var(--px-ink) !important;
-  font-family: var(--px-font) !important;
+}
+/* the layout container and login window sit transparent over the wallpaper */
+body.x-border-layout-ct, div.x-border-layout-ct,
+.pve-login-window, .pve-login-window .x-window-body-default,
+.x-mask { background-color: transparent !important; }
+
+/* ---- panel bodies: transparent so the wallpaper reads through -- */
+.x-panel-body-default, .x-panel-body, .x-autocontainer-body,
+.x-container-default, .x-box-inner, .x-autocontainer-innerCt,
+.x-tab-panel-default, .x-grid-view, .x-tree-view, .x-grid-empty,
+.x-panel-default { background-color: transparent !important; }
+
+/* ---- surfaces that hold text get a translucent dark backing ---- */
+.x-grid-item, .x-column-header-default, .x-grid-cell-row-numberer,
+.x-grid-group-hd, .x-treelist-item, .x-treelist-pve-nav {
+  background-color: color-mix(in srgb, var(--px-panel) 58%, transparent) !important;
+  color: var(--px-ink) !important; border-color: var(--px-bezel) !important;
+}
+.x-grid-item-alt { background-color: color-mix(in srgb, var(--px-black) 52%, transparent) !important; }
+.x-toolbar, .x-toolbar-default, .x-tab-bar-default, .x-grid-header-ct,
+.x-menu-body-default, .x-window-body-default, .x-window-header,
+.x-panel-header, .x-panel-header-default {
+  background-color: color-mix(in srgb, var(--px-panel2) 74%, transparent) !important;
+  color: var(--px-white) !important; border-color: var(--px-bezel) !important;
+  backdrop-filter: blur(5px);
+}
+.x-panel-header-title, .x-column-header-text, .x-window-header-title,
+.x-panel-header-title-default { color: var(--px-white) !important; letter-spacing: .04em; }
+
+/* the top PVE header bar gets the iridescent underline */
+#pveloginbar, .x-docked-top.x-toolbar, .pve-toolbar-top {
+  border-bottom: 2px solid transparent !important;
+  border-image: var(--px-iris) 1 !important;
 }
 
-/* the login screen lets the wallpaper breathe */
-body.x-border-layout-ct,
-.pve-login-window, .x-mask { background: transparent !important; }
-
-/* ---- generic ExtJS surfaces ----------------------------------- */
-.x-panel, .x-panel-body, .x-grid, .x-grid-body, .x-tree-panel,
-.x-tab-panel, .x-container, .x-box-inner, .x-autocontainer-innerCt,
-.x-grid-view, .x-tree-view {
-  background-color: color-mix(in srgb, var(--px-panel) 64%, transparent) !important;
-  color: var(--px-ink) !important;
-  border-color: var(--px-bezel) !important;
-  backdrop-filter: blur(3px);
+/* recolor the theme's blue selection to our cyan, hover to translucent */
+.x-treelist-item-selected > .x-treelist-row,
+.x-grid-item-selected, .x-grid-row-selected {
+  background-color: color-mix(in srgb, var(--px-blue) 34%, transparent) !important;
+  box-shadow: inset 2px 0 0 var(--px-cyan); color: var(--px-white) !important;
 }
-.x-panel-header, .x-header, .x-window-header, .x-grid-header-ct,
-.x-column-header, .x-toolbar {
-  background: color-mix(in srgb, var(--px-panel2) 80%, transparent) !important;
-  color: var(--px-white) !important;
-  border-color: var(--px-bezel) !important;
-  backdrop-filter: blur(4px);
-}
-.x-panel-header-title, .x-column-header-text, .x-window-header-title {
-  color: var(--px-white) !important; letter-spacing: .04em;
+.x-grid-item-over, .x-treelist-row-over {
+  background-color: color-mix(in srgb, var(--px-cyan) 16%, transparent) !important;
 }
 
 /* the top PVE header bar gets the iridescent underline */
@@ -86,23 +109,8 @@ body.x-border-layout-ct,
   border-image: var(--px-iris) 1 !important;
 }
 
-/* ---- the resource tree (left sidebar) ------------------------- */
-.x-tree-view .x-grid-item, .x-tree-panel .x-grid-row {
-  background: transparent !important; color: var(--px-ink) !important;
-}
-.x-grid-item-over, .x-tree-view .x-grid-item-over {
-  background: color-mix(in srgb, var(--px-blue) 14%, transparent) !important;
-}
-.x-grid-item-selected, .x-grid-row-selected, .x-tree-view .x-grid-item-selected {
-  background: color-mix(in srgb, var(--px-blue) 22%, transparent) !important;
-  box-shadow: inset 2px 0 0 var(--px-cyan);
-  color: var(--px-white) !important;
-}
-
-/* ---- grid rows / tables --------------------------------------- */
-.x-grid-item { color: var(--px-ink) !important; border-color: var(--px-bezel) !important; }
-.x-grid-row-alt .x-grid-cell { background: rgba(255,255,255,.015) !important; }
-.x-grid-cell, .x-grid-cell-inner { color: var(--px-ink) !important; }
+/* ---- grid cell text ------------------------------------------- */
+.x-grid-cell, .x-grid-cell-inner, .x-tree-node-text { color: var(--px-ink) !important; }
 
 /* ---- tabs ----------------------------------------------------- */
 .x-tab { background: var(--px-panel2) !important; color: var(--px-ink-dim) !important;
