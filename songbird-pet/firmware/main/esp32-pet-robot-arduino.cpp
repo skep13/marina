@@ -775,7 +775,7 @@ void songbirdTick() {
     if (act == RoboEyesManager::FeedMusic) {
         String line = f.track;
         if (f.artist[0]) line += String(" - ") + f.artist;
-        roboEyesManager.setMusic(line, f.playing, f.pos, f.dur);
+        roboEyesManager.setMusic(line, f.playing, f.pos, f.dur, f.art, f.artW, f.artH);
     }
 
     // Gone for the night: let her sleep instead of looking for them
@@ -896,12 +896,8 @@ void setup() {
 
     bool oledOK = (detectedOLEDAddr != 0);   // trust the scan, NOT begin()
     if (oledOK) {
-        display.setTextSize(1);
-        display.setTextColor(SSD1306_WHITE);
-        display.clearDisplay();
-        display.setCursor(0, 0);
-        display.print("Booting...");
-        display.display();
+        RetroUI::splash(display);          // Songbird: retro boot screen
+        delay(1500);
         Serial.println("OLED ready!");
     } else {
         Serial.println("*** OLED NOT detected on I2C bus ***");

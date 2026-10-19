@@ -13,6 +13,7 @@
 #         python3 pet_feed.py --once     (print one reading and exit)
 #  Config: feed_config.json next to this file (see feed_config.example.json)
 # ====================================================================
+import base64
 import json
 import os
 import ssl
@@ -94,6 +95,36 @@ def _ascii(s):
     return " ".join(s.split())
 
 
+# The song line is drawn here, in a real Japanese font, and sent as a 1-bit
+# picture: the pet's own font is ASCII only and has no room for kanji.
+ART_FONT = "/System/Library/Fonts/ヒラギノ角ゴシック W3.ttc"   # Hiragino Kaku Gothic
+ART_SIZE = 12        # px; the most legible weight/size for kanji on the OLED
+ART_H = 12           # rows sent (the yellow strip is 16, the LED bar sits under it)
+ART_MAX_W = 640      # px, keeps the message well under the pet's buffer
+_art_font = None
+
+
+def render_line(text):
+    """{'w','h','b'}: `text` as packed 1-bit rows (MSB first, rows padded to a
+    byte, base64) - the layout Adafruit's drawBitmap takes. None if Pillow
+    or the font isn't there; the pet then falls back to its ASCII line."""
+    global _art_font
+    try:
+        from PIL import Image, ImageDraw, ImageFont
+        if _art_font is None:
+            _art_font = ImageFont.truetype(ART_FONT, ART_SIZE)
+    except (ImportError, OSError):
+        return None
+    w = min(int(_art_font.getlength(text)) + 1, ART_MAX_W)
+    if w <= 1:
+        return None
+    im = Image.new("1", (w, ART_H))
+    d = ImageDraw.Draw(im)
+    d.fontmode = "1"                       # no anti-aliasing on a 1-bit screen
+    d.text((0, 0), text, font=_art_font, fill=1)
+    return {"w": w, "h": ART_H, "b": base64.b64encode(im.tobytes()).decode()}
+
+
 def now_playing():
     """{'player','playing','track','artist','pos','dur'} for the first music
     app that's open, or None. Open counts even with nothing playing: the
@@ -108,11 +139,13 @@ def now_playing():
         p = raw.split("\t")
         if len(p) < 5:
             continue
+        line = p[1] + (" - " + p[2] if p[2] else "")
         track, artist = _ascii(p[1]), _ascii(p[2])
-        if not track:                      # title the font can't draw
+        if not track:                      # ASCII fallback when there's no picture
             track, artist = artist or name, ""
         return {"player": name, "playing": p[0] == "playing", "track": track,
-                "artist": artist, "pos": _num(p[3]), "dur": _num(p[4])}
+                "artist": artist, "pos": _num(p[3]), "dur": _num(p[4]),
+                "art": render_line(line)}
     return None
 
 
@@ -180,6 +213,8 @@ class Watcher:
         elif mode != "call" and music:
             mode = "music"
             st.update({k: music[k] for k in ("playing", "track", "artist", "pos", "dur")})
+            if music.get("art"):
+                st["art"] = music["art"]
         st["mode"] = mode
         return st
 

@@ -9,3 +9,6 @@ CONFIG_PARTITION_TABLE_SINGLE_APP_LARGE=y
 CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG=y
 # Avoid GCC-12+ new warnings being promoted to errors
 CONFIG_COMPILER_DISABLE_GCC12_WARNINGS=y
+
+# Songbird: the feed state carries a ~1 KB song-line picture
+CONFIG_ESP_MAIN_TASK_STACK_SIZE=8192

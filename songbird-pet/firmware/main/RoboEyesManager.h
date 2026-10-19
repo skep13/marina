@@ -6,6 +6,8 @@
 #include <Wire.h>
 #include <Adafruit_SSD1306.h>
 #include "FluxGarage_RoboEyes.h"
+#include "RetroUI.h"
+#include "Scenes.h"
 #include "Config.h"
 
 class RoboEyesManager {
@@ -61,7 +63,7 @@ private:
         LookingMirror,
         StretchingBody,
         // ========== Songbird: following the Mac ==========
-        Music,
+        Scene,          // a full-screen picture (record, terminal...) instead of eyes
     } currentState;
 
     // Timing
@@ -105,6 +107,9 @@ private:
     float musicPos = 0, musicDur = 0;
     unsigned long musicAt = 0;
     String timerText = "";           // focus timer, shown top-right
+    int sceneKind = 0;               // FeedActivity whose picture is up
+    uint8_t musicArt[1024];          // song line as a picture from the Mac
+    int musicArtW = 0, musicArtH = 0;
 
     // Boot phase tracking
     unsigned long bootTime = 0;
@@ -913,20 +918,13 @@ public:
                     }
                     break;
 
-                case Music: {
-                    // Eyes sit right of the record; bob to the beat while it plays
-                    if (feedActivity != FeedMusic) {
-                        enterDefaultState();
-                        break;
+                case Scene:
+                    // Stay on the picture while the Mac is still doing that
+                    if (feedActivity != sceneKind) {
+                        if (hasScene(feedActivity)) enterFeedActivity();
+                        else enterDefaultState();
                     }
-                    int bob = (musicPlaying && (stateDuration / 450) % 2) ? -3 : 0;
-                    roboEyes.setMood(musicPlaying ? ROBO_HAPPY : ROBO_DEFAULT);
-                    roboEyes.eyeLxNext = roboEyes.getScreenConstraint_X();
-                    roboEyes.eyeLyNext = MUSIC_EYES_Y + bob;
-                    roboEyes.eyeRxNext = roboEyes.eyeLxNext + roboEyes.eyeLwidthCurrent + roboEyes.spaceBetweenCurrent;
-                    roboEyes.eyeRyNext = roboEyes.eyeLyNext;
                     break;
-                }
             }
         }
 
@@ -950,7 +948,7 @@ public:
         feedActivity = act;
         if (isSpecialAnimation) return;
         if (act == FeedNone) {
-            if (currentState == Music) enterDefaultState();
+            if (currentState == Scene) enterDefaultState();
             return;
         }
         if (isSleeping || currentState == Asleep || currentState == Sleepy) {
@@ -960,7 +958,17 @@ public:
         enterFeedActivity();
     }
 
-    void setMusic(const String &line, bool playing, float pos, float dur) {
+    void setMusic(const String &line, bool playing, float pos, float dur,
+                  const uint8_t *art = nullptr, int artW = 0, int artH = 0) {
+        // The Mac's picture of the song line wins (it can show Japanese);
+        // `line` is the ASCII fallback.
+        musicArtW = 0;
+        size_t n = (size_t)((artW + 7) / 8) * artH;
+        if (art && artW > 0 && artH > 0 && artH <= TEXT_ZONE_H && n <= sizeof(musicArt)) {
+            memcpy(musicArt, art, n);
+            musicArtW = artW;
+            musicArtH = artH;
+        }
         musicLine = line;
         musicPlaying = playing;
         musicPos = pos;
@@ -1142,40 +1150,54 @@ public:
     void drawOverlays(Adafruit_SSD1306 &disp, bool showTimeOverlay) {
         disp.fillRect(0, TEXT_ZONE_Y, SCREEN_WIDTH, TEXT_ZONE_H, SSD1306_BLACK);
         disp.setTextWrap(false);
+        disp.setTextSize(1);
+        disp.setTextColor(SSD1306_WHITE);
 
-        if (currentState == Music) {
-            drawVinyl(disp);
-            drawMusicBar(disp);
-        } else if (currentState == Asleep) {
-            if (showTimeOverlay && currentTimeStr.length() > 0) {
-                disp.setTextSize(2);
-                disp.setTextColor(SSD1306_WHITE);
-                int16_t x1, y1;
-                uint16_t w, h;
-                disp.getTextBounds(currentTimeStr.c_str(), 0, 0, &x1, &y1, &w, &h);
-                disp.setCursor(SCREEN_WIDTH - w - 2, TEXT_ZONE_Y + 1);
-                disp.print(currentTimeStr);
+        // Songbird: retro-futurist dress. The eyes sit in a CRT tube; the
+        // full-screen scenes are drawn clean. The yellow strip is a readout.
+        if (currentState == Scene) {
+            drawScene(disp);
+            if (sceneKind == FeedMusic) {
+                drawMusicBar(disp);
+                disp.display();
+                return;
             }
         } else {
-            // Songbird: everything sits bottom-right in the yellow strip:
-            // [label] [timer], or the clock when there's neither.
-            disp.setTextSize(1);
-            disp.setTextColor(SSD1306_WHITE);
-            int x = SCREEN_WIDTH - 2;
-            if (timerText.length() > 0) {
-                x -= timerText.length() * 6;
-                disp.setCursor(x, TEXT_Y);
-                disp.print(timerText);
-                x -= 6;
-            }
-            if (activityLabel.length() > 0) {
-                x -= activityLabel.length() * 6;
-                disp.setCursor(x < 0 ? 0 : x, TEXT_Y);
-                disp.print(activityLabel);
-            } else if (timerText.length() == 0 && showTimeOverlay && currentTimeStr.length() > 0) {
-                x -= currentTimeStr.length() * 6;
-                disp.setCursor(x, TEXT_Y);
-                disp.print(currentTimeStr);
+            RetroUI::crt(disp);
+        }
+
+        // Right: seven-segment focus timer (with F/B) or the clock
+        const bool colon = (millis() / 500) % 2;      // blinks like an old clock
+        String seg = "";
+        char phase = 0;
+        if (timerText.length() > 2) {
+            phase = timerText[0];
+            seg = timerText.substring(2);
+        } else if (showTimeOverlay && currentTimeStr.length() > 0) {
+            seg = currentTimeStr;
+        }
+        int right = SCREEN_WIDTH - 2;
+        int segX = right - RetroUI::segWidth(seg.c_str());
+        int leftOfSeg = seg.length() ? segX - (phase ? 8 : 0) - 4 : right;
+
+        // Left: starburst badge, then the label ("Coding...", "zZ" asleep)
+        String label = (currentState == Asleep) ? String("zZ") : activityLabel;
+        int lw = label.length() * 6;
+        bool badge = true;
+        int lx = 20;
+        if (lx + lw > leftOfSeg) { badge = false; lx = 2; }
+        if (lx + lw > leftOfSeg) { seg = ""; lx = right - lw; }   // long label wins
+
+        if (badge) RetroUI::starburst(disp, 3, TEXT_ZONE_Y + 2, RetroUI::starTwinkle());
+        if (lw) {
+            disp.setCursor(lx, TEXT_Y);
+            disp.print(label);
+        }
+        if (seg.length()) {
+            RetroUI::segText(disp, segX, TEXT_ZONE_Y + 2, seg.c_str(), colon || phase);
+            if (phase) {
+                disp.setCursor(segX - 8, TEXT_Y);
+                disp.print(phase);
             }
         }
         disp.display();
@@ -1931,24 +1953,43 @@ private:
     // Random activity picker
     // ========== Songbird scenes ==========
 
-    void enterFeedActivity() {
-        switch (feedActivity) {
-            case FeedMusic:  enterMusicState(); return;
-            case FeedCode:   enterReadingState(); break;
-            case FeedGame:   enterGamingState(); break;
-            case FeedCall:   enterCallingState(); break;
-            case FeedBrowse: enterLookAroundState(); break;
-            case FeedChat:   enterHappyState(); break;
-            case FeedMake:   enterDrawingState(); break;
-            case FeedWrite:  enterWritingState(); break;
-            case FeedAway:   enterLookAroundState(); break;
-            default: return;
-        }
-        activityLabel = feedLabel;
+    // Activities that get a full-screen picture; "away" keeps her eyes so
+    // she can look around for them.
+    static bool hasScene(int act) {
+        return act != FeedNone && act != FeedAway;
     }
 
-    void enterMusicState() {
-        currentState = Music;
+    void enterFeedActivity() {
+        if (hasScene(feedActivity)) {
+            enterSceneState(feedActivity);
+            if (feedActivity != FeedMusic) activityLabel = feedLabel;
+            return;
+        }
+        if (feedActivity == FeedAway) {
+            enterLookAroundState();
+            activityLabel = feedLabel;
+        }
+    }
+
+    void drawScene(Adafruit_SSD1306 &d) {
+        unsigned long ms = millis();
+        d.fillRect(0, EYES_ZONE_Y, SCREEN_WIDTH, EYES_ZONE_HEIGHT, SSD1306_BLACK);  // no eyes
+        switch (sceneKind) {
+            case FeedMusic:  drawVinyl(d); break;
+            case FeedCode:   Scenes::code(d, ms); break;
+            case FeedGame:   Scenes::game(d, ms); break;
+            case FeedCall:   Scenes::call(d, ms); break;
+            case FeedBrowse: Scenes::radar(d, ms); break;
+            case FeedChat:   Scenes::chat(d, ms); break;
+            case FeedMake:   Scenes::printer(d, ms); break;
+            case FeedWrite:  Scenes::write(d, ms); break;
+            default: break;
+        }
+    }
+
+    void enterSceneState(int kind) {
+        currentState = Scene;
+        sceneKind = kind;
         isSleeping = false;
         clearActivityLabel();
         roboEyes.setMood(ROBO_HAPPY);
@@ -2021,6 +2062,18 @@ private:
         d.setTextColor(SSD1306_WHITE);
         d.setTextWrap(false);
         int room = SCREEN_WIDTH - (timerText.length() ? 46 : 0);
+        if (musicArtW > 0) {
+            // Japanese (or anything) drawn by the Mac: scroll the picture
+            int w = musicArtW;
+            if (w <= room) {
+                d.drawBitmap((room - w) / 2, TEXT_ZONE_Y, musicArt, w, musicArtH, SSD1306_WHITE);
+            } else {
+                const int gap = 30;
+                int off = (int)((millis() / 40) % (unsigned long)(w + gap));
+                d.drawBitmap(-off, TEXT_ZONE_Y, musicArt, w, musicArtH, SSD1306_WHITE);
+                d.drawBitmap(w + gap - off, TEXT_ZONE_Y, musicArt, w, musicArtH, SSD1306_WHITE);
+            }
+        } else {
         int w = musicLine.length() * 6;
         if (w <= room) {
             d.setCursor((room - w) / 2, TEXT_ZONE_Y + 2);
@@ -2033,6 +2086,7 @@ private:
             d.setCursor(w + gap - off, TEXT_ZONE_Y + 2);
             d.print(musicLine);
         }
+        }
         if (timerText.length()) {
             d.fillRect(room, TEXT_ZONE_Y, SCREEN_WIDTH - room, 12, SSD1306_BLACK);
             d.setCursor(SCREEN_WIDTH - (int)timerText.length() * 6, TEXT_ZONE_Y + 2);
@@ -2041,8 +2095,7 @@ private:
         if (musicDur > 0) {
             float pos = musicPos + (musicPlaying ? (millis() - musicAt) / 1000.0f : 0);
             if (pos > musicDur) pos = musicDur;
-            for (int x = 0; x < SCREEN_WIDTH; x += 4) d.drawPixel(x, TEXT_ZONE_Y + 14, SSD1306_WHITE);
-            d.fillRect(0, TEXT_ZONE_Y + 13, (int)(SCREEN_WIDTH * pos / musicDur), 2, SSD1306_WHITE);
+            RetroUI::ledBar(d, TEXT_ZONE_Y + 12, pos / musicDur);
         }
     }
 

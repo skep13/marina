@@ -9,18 +9,25 @@ and taught to follow what the Mac is doing:
 |---|---|
 | Spotify / Music open | the record replaces her eyes: spinning while a song plays, track scrolling with a progress bar |
 | ...paused or nothing loaded | record stops, tonearm parks |
-| VS Code, Terminal, Xcode, Claude... | "Coding..." (reading eyes) |
-| Steam, Minecraft, Roblox | "Gaming..." |
-| Zoom, FaceTime, Teams | "On a call" |
-| Safari, Chrome, Firefox, Arc | "Browsing..." |
-| Discord, Slack, Messages, Mail | "Chatting..." |
-| Bambu / Orca / Prusa / Cura, Fusion, Blender, Figma | "Making..." |
-| Pages, Word, Notes, Obsidian | "Writing..." |
+| VS Code, Terminal, Xcode, Claude... | a terminal typing code |
+| Steam, Minecraft, Roblox | a little space shooter |
+| Zoom, FaceTime, Teams | an oscilloscope trace of a voice |
+| Safari, Chrome, Firefox, Arc | a radar sweep |
+| Discord, Slack, Messages, Mail | two speech bubbles taking turns |
+| Bambu / Orca / Prusa / Cura, Fusion, Blender, Figma | a 3D printer building a vase |
+| Pages, Word, Notes, Obsidian | a page filling up |
 | nobody at the keyboard 5 min | looks around for you; asleep at night |
 | 90 min at the Mac without a break | "Stretch break?" every 15 min |
 | Mac battery under 20% | sad, "Mac batt low" |
 
-Between those she still does her own thing (looks around, yawns, gets bored).
+These scenes replace her eyes, drawn clean; a single press still gets a
+reaction from her. Between activities she does her own thing (looks
+around, yawns, gets bored) with her eyes in a little CRT tube. The yellow
+strip is a readout: a twinkling starburst, the label, and a leaning
+seven-segment clock or focus timer.
+
+Song titles in any script (Japanese included) are drawn on the Mac in
+Hiragino and sent as a 1-bit picture, since the pet's own font is ASCII.
 
 ```
 Mac: host/pet_feed.py ──► broker (ct102, TLS) ──► S3 firmware
@@ -95,9 +102,9 @@ launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.songbird.pet-feed.pl
 Log: `~/Library/Logs/songbird-pet-feed.log`. Restart after editing:
 `launchctl kickstart -k gui/$(id -u)/com.songbird.pet-feed`.
 
-Track names go through as plain ASCII (the pet's font has nothing else);
-a title it can't draw at all, like a Japanese one, shows the artist or
-the player name instead.
+The song line is rendered here with Pillow in Hiragino Kaku Gothic W3
+at 12 px and sent as `art` (base64, 1 bit per pixel). Plain-ASCII
+`track`/`artist` go too, as a fallback if Pillow or the font is missing.
 
 The first run asks for permission to control Spotify/Music (System Settings
 → Privacy & Security → Automation). Add your own apps under `"apps"` in the

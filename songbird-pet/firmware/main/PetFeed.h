@@ -11,6 +11,7 @@
 #include <Arduino.h>
 #include "mqtt_client.h"
 #include "cJSON.h"
+#include "mbedtls/base64.h"
 #include "lwip/dns.h"
 #include "lwip/ip_addr.h"
 #include "freertos/FreeRTOS.h"
@@ -20,6 +21,8 @@
 extern const char broker_crt_start[] asm("_binary_broker_crt_start");
 
 #define FEED_STALE_MS 120000UL   // no word from the Mac for this long -> offline
+#define FEED_ART_MAX 1024        // bytes: up to 640x12 px of song line (1 bit per px)
+#define FEED_MSG_MAX 4096        // biggest message we take; the art makes them ~1.5 KB
 
 struct FeedState {
     char mode[12] = "offline";   // music code game call browse chat make write away idle offline
@@ -31,6 +34,10 @@ struct FeedState {
     int batt = -1;               // Mac battery %, -1 = unknown
     bool charging = false;
     unsigned long at = 0;        // millis() when it arrived, 0 = never
+    // The song line drawn by the Mac in a real font (Japanese and all):
+    // packed 1-bit rows, MSB first, as drawBitmap takes them. artW 0 = none.
+    uint8_t art[FEED_ART_MAX];
+    int artW = 0, artH = 0;
 };
 
 class PetFeed {
@@ -54,6 +61,7 @@ public:
         cfg.credentials.client_id = "songbird-pet-s3";
         cfg.session.keepalive = 60;
         cfg.network.reconnect_timeout_ms = 10000;
+        cfg.buffer.size = FEED_MSG_MAX;          // messages carry the song-line picture
         client = esp_mqtt_client_init(&cfg);
         esp_mqtt_client_register_event(client, MQTT_EVENT_ANY, onEvent, this);
         esp_mqtt_client_start(client);
@@ -95,13 +103,14 @@ private:
     }
 
     void parse(const char *data, int len) {
-        char buf[512];
+        static char buf[FEED_MSG_MAX + 1];       // MQTT task only; too big for its stack
         if (len <= 0 || len >= (int)sizeof(buf)) return;
         memcpy(buf, data, len);
         buf[len] = 0;
         cJSON *j = cJSON_Parse(buf);
         if (!j) return;
-        FeedState s;
+        static FeedState s;                      // ~1 KB: keep it off the MQTT task's stack
+        s = FeedState();
         copyStr(s.mode, sizeof(s.mode), cJSON_GetObjectItem(j, "mode"));
         if (!s.mode[0]) strcpy(s.mode, "idle");
         copyStr(s.track, sizeof(s.track), cJSON_GetObjectItem(j, "track"));
@@ -113,6 +122,20 @@ private:
         if (cJSON_IsNumber(n = cJSON_GetObjectItem(j, "active"))) s.active = n->valueint;
         if (cJSON_IsNumber(n = cJSON_GetObjectItem(j, "batt"))) s.batt = n->valueint;
         s.charging = cJSON_IsTrue(cJSON_GetObjectItem(j, "charging"));
+        cJSON *art = cJSON_GetObjectItem(j, "art");
+        if (cJSON_IsObject(art)) {
+            cJSON *aw = cJSON_GetObjectItem(art, "w"), *ah = cJSON_GetObjectItem(art, "h");
+            cJSON *ab = cJSON_GetObjectItem(art, "b");
+            size_t got = 0;
+            if (cJSON_IsNumber(aw) && cJSON_IsNumber(ah) && cJSON_IsString(ab) &&
+                mbedtls_base64_decode(s.art, sizeof(s.art), &got, (const unsigned char *)ab->valuestring,
+                                      strlen(ab->valuestring)) == 0 &&
+                got == (size_t)((aw->valueint + 7) / 8 * ah->valueint)) {
+                s.artW = aw->valueint;
+                s.artH = ah->valueint;
+                if (s.artW != latest.artW) Serial.printf("[feed] song line %dx%d px\n", s.artW, s.artH);
+            }
+        }
         s.at = millis();
         if (s.at == 0) s.at = 1;
         cJSON_Delete(j);
