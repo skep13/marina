@@ -24,11 +24,18 @@
 #define SCREEN_ADDRESS 0x3C
 
 // Display layout zones
-// Songbird: the panel is turned 180 degrees in the case, so its yellow strip
-// is the bottom 16 rows. Eyes live in the blue area above, text in the strip.
-#define EYES_ZONE_Y 0        // eyes use rows 0-47 (blue)
+// Songbird: the panel's yellow strip is its first 16 rows. Upright that's
+// the top of the picture; turned 180 degrees (PET_SCREEN_ROTATION 2) it's
+// the bottom. Text goes in the strip, eyes and scenes in the blue area.
+#include "songbird_config.h"
+#if PET_SCREEN_ROTATION == 2
+#define EYES_ZONE_Y 0        // eyes: rows 0-47 (blue), text: rows 48-63 (yellow)
+#define TEXT_ZONE_Y 48
+#else
+#define EYES_ZONE_Y 16       // text: rows 0-15 (yellow), eyes: rows 16-63 (blue)
+#define TEXT_ZONE_Y 0
+#endif
 #define EYES_ZONE_HEIGHT 48
-#define TEXT_ZONE_Y 48       // time / labels / timer: rows 48-63 (yellow)
 #define TEXT_ZONE_H 16
 #define TEXT_Y (TEXT_ZONE_Y + 4)
 #define MUSIC_EYES_Y 12      // eye top while the record plays beside them

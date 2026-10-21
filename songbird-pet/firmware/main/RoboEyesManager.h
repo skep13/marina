@@ -8,6 +8,7 @@
 #include "FluxGarage_RoboEyes.h"
 #include "RetroUI.h"
 #include "Scenes.h"
+#include "MarinaSprite.h"
 #include "Config.h"
 
 class RoboEyesManager {
@@ -155,12 +156,12 @@ public:
     RoboEyesManager(Adafruit_SSD1306 &disp)
         : display(disp), roboEyes(disp), currentState(Default),
           lastInteractionTime(0), stateStartTime(0), isSpecialAnimation(false),
-          isSleeping(false), showTime(false), eyesYOffset(0) {}   // Songbird: RoboEyes is given just the eye zone below
+          isSleeping(false), showTime(false), eyesYOffset(EYES_ZONE_Y) {}   // Songbird: eyes laid out in the zone, shifted to it
 
     void begin(int screenWidth, int screenHeight, int fps) {
         (void)screenHeight;
         // Songbird: eyes only get the blue area; the text strip is drawn after
-        roboEyes.begin(screenWidth, EYES_ZONE_Y + EYES_ZONE_HEIGHT, fps);
+        roboEyes.begin(screenWidth, EYES_ZONE_HEIGHT, fps);
         roboEyes.skipAutoDisplay = true;
         setDefaultState();
         // Set initial brightness immediately so first frame uses correct level
@@ -1163,8 +1164,9 @@ public:
                 return;
             }
         } else {
-            RetroUI::crt(disp);
+            drawMarina(disp);                         // Songbird: Marina is the pet
         }
+        disp.fillRect(0, TEXT_ZONE_Y, SCREEN_WIDTH, TEXT_ZONE_H, SSD1306_BLACK);  // keep the strip clean
 
         // Right: seven-segment focus timer (with F/B) or the clock
         const bool colon = (millis() / 500) % 2;      // blinks like an old clock
@@ -1952,6 +1954,22 @@ private:
 
     // Random activity picker
     // ========== Songbird scenes ==========
+
+    // Marina in place of the eyes. The eye engine still runs underneath and
+    // drives her: where its eyes look she slides, its blinks and sleepiness
+    // close her eyes, its happy mood gives her happy eyes.
+    void drawMarina(Adafruit_SSD1306 &d) {
+        d.fillRect(0, EYES_ZONE_Y, SCREEN_WIDTH, EYES_ZONE_HEIGHT, SSD1306_BLACK);
+        int range = roboEyes.getScreenConstraint_X();
+        int look = range > 0 ? (roboEyes.eyeLx - range / 2) * 28 / range : 0;   // about +-14 px
+        bool closed = roboEyes.eyeLheightCurrent < roboEyes.eyeLheightDefault / 3 ||
+                      roboEyes.tired || isSleeping ||
+                      currentState == Asleep || currentState == Sleepy;
+        const uint8_t *img = closed ? MARINA_CLOSED : (roboEyes.happy ? MARINA_HAPPY : MARINA_OPEN);
+        int bob = (!closed && (millis() / 1400) % 2) ? 1 : 0;                   // breathing
+        d.drawBitmap((SCREEN_WIDTH - MARINA_W) / 2 + look, EYES_ZONE_Y + bob, img,
+                     MARINA_W, MARINA_H, SSD1306_WHITE);
+    }
 
     // Activities that get a full-screen picture; "away" keeps her eyes so
     // she can look around for them.

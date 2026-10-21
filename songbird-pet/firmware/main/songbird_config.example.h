@@ -26,8 +26,9 @@
 #define PET_LED_G 0
 #define PET_LED_B 24
 
-// Screen orientation: 0 normal, 2 = turned 180 degrees
-#define PET_SCREEN_ROTATION 2
+// Screen orientation: 0 normal, 2 = turned 180 degrees (text follows the
+// yellow strip either way)
+#define PET_SCREEN_ROTATION 0
 
 // Feed from the Mac (songbird-pet/host/pet_feed.py) through the Songbird
 // broker. Set PET_FEED_ENABLED to 0 to run as a plain offline desk pet.
