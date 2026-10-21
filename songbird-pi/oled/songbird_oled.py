@@ -21,10 +21,14 @@
 # ====================================================================
 import math
 import os
+import calendar
+import datetime
 import socket
 import subprocess
 import sys
+import threading
 import time
+from collections import deque
 
 W, H = 128, 64
 ROTATE = int(os.environ.get("OLED_ROTATE", "0"))
@@ -56,7 +60,11 @@ class Canvas:
     def clear(self):
         self.buf[:] = bytes(len(self.buf))
 
+    ox = oy = 0                                  # whole-picture shift (burn-in)
+
     def px(self, x, y, on=1):
+        x += self.ox
+        y += self.oy
         if 0 <= x < W and 0 <= y < H:
             i = (y >> 3) * W + x
             if on:
@@ -95,7 +103,7 @@ class Canvas:
                 err += dx
                 y0 += sy
 
-    def text(self, x, y, s):
+    def text(self, x, y, s, on=1):
         for ch in s:
             c = ord(ch)
             if not 32 <= c <= 126:
@@ -104,7 +112,7 @@ class Canvas:
             for i, col in enumerate(g):
                 for j in range(8):
                     if col >> j & 1:
-                        self.px(x + i, y + j)
+                        self.px(x + i, y + j, on)
             x += 6
         return x
 
@@ -217,6 +225,29 @@ def _run(args):
         return ""
 
 
+_cpu_prev = None
+_net_prev = None
+RX_HISTORY = deque([0.0] * 60, maxlen=60)
+TX_HISTORY = deque([0.0] * 60, maxlen=60)
+CPU_HISTORY = deque([0.0] * 60, maxlen=60)          # 2 minutes at one sample / 2 s
+NET = {"online": None, "ping": None}
+
+
+def _net_checker():
+    """Is the internet actually reachable? Ping every 30 s, off the render loop."""
+    while True:
+        out = _run(["ping", "-c", "1", "-W", "2", "1.1.1.1"])
+        ms = None
+        for tok in out.split():
+            if tok.startswith("time="):
+                try:
+                    ms = float(tok[5:])
+                except ValueError:
+                    pass
+        NET["online"], NET["ping"] = ms is not None, ms
+        time.sleep(30)
+
+
 def vitals():
     v = {"host": socket.gethostname()}
     try:
@@ -238,6 +269,47 @@ def vitals():
         v["mem"] = 1 - mem.get("MemAvailable", 0) / mem["MemTotal"]
     up = _read("/proc/uptime").split()
     v["up"] = float(up[0]) if up else 0.0
+    # CPU busy % since the last reading, from /proc/stat
+    global _cpu_prev
+    f = _read("/proc/stat").split("\n", 1)[0].split()[1:]
+    if f:
+        nums = [int(x) for x in f]
+        idle, total = nums[3] + (nums[4] if len(nums) > 4 else 0), sum(nums)
+        if _cpu_prev:
+            dt, di = total - _cpu_prev[1], idle - _cpu_prev[0]
+            v["cpu"] = max(0.0, min(1.0, 1 - di / dt)) if dt > 0 else 0.0
+        _cpu_prev = (idle, total)
+    CPU_HISTORY.append(v.get("cpu", 0.0))
+    try:
+        st = os.statvfs("/")
+        v["disk"] = 1 - st.f_bavail / st.f_blocks
+        v["disk_gb"] = st.f_blocks * st.f_frsize / 1e9
+    except OSError:
+        pass
+    # wlan0/eth0 traffic since the last reading
+    global _net_prev
+    rx = tx = 0
+    for line in _read("/proc/net/dev").splitlines()[2:]:
+        name, _, rest = line.partition(":")
+        if name.strip() in ("wlan0", "eth0"):
+            f = rest.split()
+            rx, tx = rx + int(f[0]), tx + int(f[8])
+    now_t = time.monotonic()
+    if _net_prev:
+        dt = max(0.1, now_t - _net_prev[2])
+        v["rx"], v["tx"] = (rx - _net_prev[0]) / dt, (tx - _net_prev[1]) / dt
+        RX_HISTORY.append(v["rx"])
+        TX_HISTORY.append(v["tx"])
+    _net_prev = (rx, tx, now_t)
+    top = []
+    for line in _run(["ps", "-eo", "pcpu,comm", "--sort=-pcpu", "--no-headers"]).splitlines()[:4]:
+        f = line.split(None, 1)
+        if len(f) == 2:
+            top.append((f[0], f[1]))
+    v["top"] = top
+    route = _run(["ip", "route", "show", "default"]).split()
+    v["gw"] = route[route.index("via") + 1] if "via" in route else ""
+    v["online"], v["ping"] = NET["online"], NET["ping"]
     v["ssid"], v["signal"] = "", None                # signal: 0-100 %
     for line in _run(["nmcli", "-t", "-f", "ACTIVE,SSID,SIGNAL", "dev", "wifi"]).splitlines():
         parts = line.rsplit(":", 1)
@@ -248,60 +320,242 @@ def vitals():
     return v
 
 
-# --- pages: each uses the whole 128x64 panel ----------------------------
+# --- idle pages: each uses the whole 128x64 panel ------------------------
 
 def page_clock(c, v, t):
     hm = time.strftime("%H:%M")
-    seg_text(c, (W - seg_width(hm, BIG)) // 2, 2, hm, colon=int(t * 2) % 2 == 0, size=BIG)
+    seg_text(c, (W - seg_width(hm, BIG)) // 2, 1, hm, colon=int(t * 2) % 2 == 0, size=BIG)
+    sec = time.localtime().tm_sec + (time.time() % 1)
+    for x in range(0, W, 4):                             # seconds sweep
+        c.px(x, 45)
+    c.hline(0, 45, int(W * sec / 60))
     date = time.strftime("%a %d %b").upper()
     x = (W - (len(date) * 6 + 17)) // 2
     starburst(c, x, 50, (t % 3.5) < 0.3)
     c.text(x + 17, 54, date)
 
 
-def page_vitals(c, v, t):
-    c.text(0, 0, "IP " + v.get("ip", "")[:18])
+def page_system(c, v, t):
+    cpu = v.get("cpu", 0.0)
     temp = v.get("temp")
-    c.text(0, 14, "CPU %s" % (f"{temp:.0f}C" if temp is not None else "--"))
-    bar(c, 60, 16, 68, (temp or 0) / 85)
-    c.text(0, 27, "LOAD %.1f" % v.get("load", 0))
-    bar(c, 60, 29, 68, v.get("load", 0) / 4)
-    c.text(0, 40, "MEM %d%%" % round(v.get("mem", 0) * 100))
-    bar(c, 60, 42, 68, v.get("mem", 0))
-    up = int(v.get("up", 0))
-    c.text(0, 55, "UP %dd %02dh %02dm" % (up // 86400, up // 3600 % 24, up // 60 % 60))
+    c.text(0, 0, "CPU %3d%%" % round(cpu * 100))
+    c.text(W - 4 - 6 * 3, 0, f"{temp:.0f}C" if temp is not None else "--")
+    top, h = 10, 28                                      # load graph, last 2 min
+    c.hline(0, top + h, W - 8)
+    for i, val in enumerate(CPU_HISTORY):
+        bh = max(0, min(h, round(val * h)))
+        if bh:
+            c.vline(i * 2, top + h - bh, bh)
+    for y in range(top, top + h, 7):                    # scale ticks
+        c.px(W - 9, y)
+    c.text(0, 43, "MEM")
+    bar(c, 24, 45, 96, v.get("mem", 0))
+    disk = v.get("disk")
+    c.text(0, 55, "DISK")
+    if disk is not None:
+        bar(c, 30, 57, 60, disk)
+        c.text(94, 55, "%2.0fG" % (v.get("disk_gb", 0) * (1 - disk)))
 
 
-def page_link(c, v, t):
+def page_network(c, v, t):
     sig = v.get("signal")
     bars = 0 if sig is None else max(1, min(4, (sig + 24) // 25))
-    for i in range(4):                                  # big signal bars
-        h = 6 + i * 7
-        x = 2 + i * 9
+    for i in range(4):                                   # big signal bars
+        h = 5 + i * 6
+        x = 1 + i * 8
         if i < bars:
-            c.rect(x, 36 - h, 7, h)
+            c.rect(x, 26 - h, 6, h)
         else:
-            c.hline(x, 35, 7)
-    c.text(44, 4, "WIFI")
-    c.text(44, 16, (v.get("ssid") or "not connected")[:14])
-    c.text(44, 28, f"signal {sig}%" if sig is not None else "no signal")
-    c.text(0, 44, "IP " + v.get("ip", "")[:18])
-    c.text(0, 55, "HOST " + v.get("host", "")[:16])
+            c.hline(x, 25, 6)
+    c.text(38, 0, (v.get("ssid") or "no wi-fi")[:14])
+    c.text(38, 10, f"signal {sig}%" if sig is not None else "")
+    online, ms = v.get("online"), v.get("ping")
+    if online is None:
+        status = "checking..."
+    elif online:
+        status = f"ONLINE {ms:.0f}ms" if ms is not None else "ONLINE"
+    else:
+        status = "OFFLINE"
+    c.text(38, 20, status[:14])
+    if online:                                           # little live heartbeat
+        if int(t * 2) % 2:
+            c.rect(31, 21, 3, 3)
+    c.text(0, 34, "IP " + v.get("ip", "")[:18])
+    c.text(0, 44, "GW " + (v.get("gw") or "-")[:18])
+    c.text(0, 54, v.get("host", "")[:21])
 
 
-def page_stars(c, v, t):
-    cx, cy = W // 2, H // 2
-    for i in range(48):                                 # flying through space
-        a = (i * 2654435761 % 628) / 100
-        d = ((t * (12 + i % 5 * 7) + i * 37) % 80) + 2   # varied speeds
-        x = int(cx + math.cos(a) * d * 1.6)
-        y = int(cy + math.sin(a) * d * 0.8)
-        if abs(y - cy) < 7 and abs(x - cx) < 38:
-            continue                                   # keep off the title
-        c.px(x, y)
-        if d > 45:
-            c.px(x + (1 if x > cx else -1), y)
-    c.text(cx - 33, cy - 3, "SONGBIRD PI")
+def page_recent(c, v, t):
+    c.text(0, 0, "RECENT JOBS")
+    rows = _history()[-4:][::-1]
+    if not rows:
+        c.text(0, 18, "nothing long yet -")
+        c.text(0, 28, "commands over 10s")
+        c.text(0, 38, "show up here")
+    for i, (when, rc, took, cmd) in enumerate(rows):
+        y = 12 + i * 13
+        if rc == 0:                                      # tick
+            c.line(0, y + 3, 2, y + 5)
+            c.line(2, y + 5, 6, y)
+        else:                                            # cross
+            c.line(0, y, 5, y + 5)
+            c.line(5, y, 0, y + 5)
+        d = _dur(took)
+        c.text(W - 4 - len(d) * 6, y, d)                # clear of the page dots
+        c.text(9, y, cmd[:(W - 4 - len(d) * 6 - 12) // 6])
+    up = int(v.get("up", 0))
+    if not rows:
+        c.text(0, 54, "UP %dd %02dh %02dm" % (up // 86400, up // 3600 % 24, up // 60 % 60))
+
+
+def _rate(b):
+    for unit in ("B", "K", "M"):
+        if b < 1000 or unit == "M":
+            return f"{b:.0f}{unit}/s" if b >= 10 or unit == "B" else f"{b:.1f}{unit}/s"
+        b /= 1000
+
+
+def page_analog(c, v, t):
+    cx, cy, r = 31, 31, 29
+    for a in range(0, 360, 6):                           # dial: dots, longer every 5 min
+        ang = math.radians(a)
+        if a % 30 == 0:
+            c.line(int(cx + (r - 4) * math.sin(ang)), int(cy - (r - 4) * math.cos(ang)),
+                   int(cx + r * math.sin(ang)), int(cy - r * math.cos(ang)))
+        else:
+            c.px(int(cx + r * math.sin(ang)), int(cy - r * math.cos(ang)))
+    lt = time.localtime()
+    sec = lt.tm_sec + time.time() % 1
+    mins = lt.tm_min + sec / 60
+    hrs = lt.tm_hour % 12 + mins / 60
+    for frac, length, thick in ((hrs / 12, 15, True), (mins / 60, 23, True), (sec / 60, 26, False)):
+        ang = 2 * math.pi * frac
+        x, y = int(cx + length * math.sin(ang)), int(cy - length * math.cos(ang))
+        c.line(cx, cy, x, y)
+        if thick:
+            c.line(cx + 1, cy, x + 1, y)
+    c.rect(cx - 1, cy - 1, 3, 3)
+    c.text(70, 6, time.strftime("%H:%M:%S"))
+    c.text(70, 24, time.strftime("%A")[:9].upper())
+    c.text(70, 36, time.strftime("%d %b").upper())
+    c.text(70, 48, time.strftime("%Y"))
+
+
+def page_calendar(c, v, t):
+    today = datetime.date.today()
+    head = today.strftime("%B %Y").upper()
+    c.text((W - 4 - len(head) * 6) // 2, 0, head)
+    for i, d in enumerate("MTWTFSS"):
+        c.text(4 + i * 17, 9, d)
+    weeks = calendar.Calendar(firstweekday=0).monthdayscalendar(today.year, today.month)
+    row_h = 7 if len(weeks) > 5 else 8
+    for wk, days in enumerate(weeks):
+        for i, d in enumerate(days):
+            if not d:
+                continue
+            x, y = 1 + i * 17, 18 + wk * row_h
+            if d == today.day:                           # today: inverted cell
+                c.rect(x - 1, y - 1, 15, row_h + 1)
+                c.text(x + (3 if d < 10 else 0), y - (1 if row_h == 7 else 0), str(d), on=0)
+            else:
+                c.text(x + (3 if d < 10 else 0), y - (1 if row_h == 7 else 0), str(d))
+
+
+def page_world(c, v, t):
+    try:
+        from zoneinfo import ZoneInfo
+        zones = (("LONDON", ZoneInfo("Europe/London")), ("TOKYO", ZoneInfo("Asia/Tokyo")))
+    except Exception:
+        return page_clock(c, v, t)
+    for i, (name, tz) in enumerate(zones):
+        now = datetime.datetime.now(tz)
+        y = i * 32
+        c.text(0, y + 2, name)
+        c.text(0, y + 13, now.strftime("%a").upper())
+        night = now.hour >= 19 or now.hour < 6
+        if night:                                        # little moon or sun
+            c.text(0, y + 22, "night")
+        else:
+            c.text(0, y + 22, "day")
+        hm = now.strftime("%H:%M")
+        seg_text(c, W - 4 - seg_width(hm, MID), y + 3, hm, colon=int(t * 2) % 2 == 0, size=MID)
+    c.hline(0, 31, W - 4)
+
+
+def page_traffic(c, v, t):
+    def graph(hist, top, h):
+        peak = max(max(hist), 1000.0)
+        c.hline(0, top + h, W - 6)
+        for i, val in enumerate(hist):
+            bh = max(0, min(h, round(val / peak * h)))
+            if bh:
+                c.vline(i * 2, top + h - bh, bh)
+    c.text(0, 0, "DOWN " + _rate(v.get("rx", 0)))
+    graph(RX_HISTORY, 9, 20)
+    c.text(0, 33, "UP   " + _rate(v.get("tx", 0)))
+    graph(TX_HISTORY, 42, 20)
+
+
+def page_top(c, v, t):
+    c.text(0, 0, "TOP PROCESSES")
+    c.hline(0, 9, W - 4)
+    rows = v.get("top") or []
+    for i, (pcpu, name) in enumerate(rows[:4]):
+        y = 13 + i * 12
+        try:
+            frac = float(pcpu) / 100
+        except ValueError:
+            frac = 0
+        c.text(0, y, name[:11])
+        bar(c, 68, y + 2, 32, frac)
+        p = f"{float(pcpu):.0f}%" if pcpu.replace(".", "", 1).isdigit() else pcpu
+        c.text(W - 4 - len(p) * 6, y, p)
+
+
+_SYNODIC = 29.530588853
+_NEW_MOON = datetime.datetime(2000, 1, 6, 18, 14, tzinfo=datetime.timezone.utc)
+
+
+def page_moon(c, v, t):
+    age = ((datetime.datetime.now(datetime.timezone.utc) - _NEW_MOON).total_seconds() / 86400) % _SYNODIC
+    phase = age / _SYNODIC                               # 0 new, 0.5 full
+    illum = (1 - math.cos(2 * math.pi * phase)) / 2
+    cx, cy, r = 30, 32, 26
+    for y in range(-r, r + 1):
+        half = math.sqrt(max(0, r * r - y * y))
+        # the terminator: an ellipse whose width follows the phase
+        term = half * math.cos(2 * math.pi * phase)
+        for x in range(-int(half), int(half) + 1):
+            lit = (x > term) if phase < 0.5 else (x < -term)   # waxing lit on the right
+            if lit:
+                c.px(cx + x, cy + y)
+            elif abs(x) >= half - 1:
+                c.px(cx + x, cy + y)                    # outline of the dark side
+    names = ["NEW MOON", "WAXING", "FIRST QTR", "WAXING", "FULL MOON", "WANING", "LAST QTR", "WANING"]
+    name = names[int((phase * 8 + 0.5)) % 8]
+    if name in ("WAXING", "WANING"):
+        name += " " + ("CRES" if illum < 0.5 else "GIB")
+    c.text(64, 6, name[:10])
+    c.text(64, 20, f"{illum * 100:.0f}% lit")
+    to_full = (0.5 - phase) % 1 * _SYNODIC
+    full_now = to_full < 1 or to_full > _SYNODIC - 1
+    c.text(64, 34, "full now" if full_now else f"full {to_full:.0f}d")
+    c.text(64, 48, f"age {age:.0f}d")
+
+
+def _history():
+    rows = []
+    for line in (_lines(os.path.join(PANEL_DIR, "history")) or []):
+        f = line.split("\t", 3)
+        if len(f) == 4 and f[0].isdigit():
+            rows.append((int(f[0]), int(f[1]) if f[1].lstrip("-").isdigit() else 1,
+                         int(f[2]) if f[2].isdigit() else 0, f[3]))
+    return rows
+
+
+def _ago(s):
+    s = int(s)
+    return f"{s}s" if s < 60 else f"{s // 60}m" if s < 3600 else f"{s // 3600}h"
 
 
 # --- front panel: what the Pi is doing ----------------------------------
@@ -424,8 +678,10 @@ def page_msg(c, msg, t):
         c.text((W - len(line) * 6) // 2, y + i * 12, line)
 
 
-PAGES = [page_clock, page_vitals, page_link, page_stars]
-PAGE_S = 6
+PAGES = [page_clock, page_system, page_network, page_recent, page_analog,
+         page_calendar, page_world, page_traffic, page_top, page_moon]
+PAGE_S = 7
+WIPE_S = 0.35        # page change: the new page slides in behind a scan line
 
 
 def draw(c, v, t, panel=None):
@@ -440,7 +696,18 @@ def draw(c, v, t, panel=None):
     elif panel.get("jobs"):
         page_running(c, panel["jobs"], t)
     else:
-        PAGES[int(t // PAGE_S) % len(PAGES)](c, v, t)
+        n = int(t // PAGE_S) % len(PAGES)
+        # burn-in protection: nudge the whole picture a pixel every 2 minutes
+        c.ox, c.oy = ((0, 0), (1, 0), (1, 1), (0, 1))[int(time.time() // 120) % 4]
+        PAGES[n](c, v, t)
+        c.ox = c.oy = 0
+        phase = t % PAGE_S
+        if phase < WIPE_S:                               # wipe in from the left
+            edge = int(W * phase / WIPE_S)
+            c.rect(edge + 1, 0, W - edge - 1, H, 0)
+            c.vline(edge, 0, H)
+        for i in range(len(PAGES)):                      # page dots, right edge
+            c.vline(W - 1, 2 + i * 5, 3 if i == n else 1)
 
 
 # --- the panel ----------------------------------------------------------
@@ -460,8 +727,16 @@ class SSD1306:
         time.sleep(0.1)
         self.init()
 
+    contrast_now = 0xCF
+
     def init(self):
         self.cmd(*self.INIT)
+        self.cmd(0x81, self.contrast_now)              # keep the night/day level
+
+    def contrast(self, level):
+        if level != self.contrast_now:
+            self.contrast_now = level
+            self.cmd(0x81, level)
 
     def cmd(self, *c):
         for b in c:
@@ -506,6 +781,7 @@ def main():
     v, v_at = {}, 0.0
     init_at = time.monotonic()
     kbd_check = 0.0
+    threading.Thread(target=_net_checker, daemon=True).start()
     try:
         import oled_terminal                             # needs python3-pyte
     except ImportError as e:
@@ -530,6 +806,8 @@ def main():
             if time.monotonic() - init_at > 30:            # keep the panel awake
                 panel.init()
                 init_at = time.monotonic()
+            hour = time.localtime().tm_hour
+            panel.contrast(0x06 if hour >= 23 or hour < 7 else 0xCF)   # dim at night
             draw(c, v, time.monotonic(), panel_state())
             panel.show(c.rotated())
             time.sleep(0.12)

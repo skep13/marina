@@ -3,7 +3,8 @@
 #  Installed as /etc/profile.d/songbird-jobs.sh (interactive bash only).
 #
 #  A command running longer than a few seconds shows on the panel with a
-#  timer; one that took 10 s or more leaves a "done" / "failed" card.
+#  timer; one that took 10 s or more leaves a "done" / "failed" card and a
+#  line in the panel's recent-jobs history.
 #  Interactive programs (editors, ssh, top...) are left alone.
 # ====================================================================
 if [ -n "$BASH_VERSION" ] && [[ $- == *i* ]] && [ -d /run/songbird-oled ]; then
@@ -34,6 +35,7 @@ if [ -n "$BASH_VERSION" ] && [[ $- == *i* ]] && [ -d /run/songbird-oled ]; then
             rm -f "$__sb_dir/job.$$"
             if [ "$took" -ge 10 ]; then
                 printf '%s\n%s\n%s\n%s\n' "$(date +%s)" "$rc" "$took" "$__sb_cmd" > "$__sb_dir/note" 2>/dev/null
+                printf '%s\t%s\t%s\t%s\n' "$(date +%s)" "$rc" "$took" "${__sb_cmd//$'\t'/ }" >> "$__sb_dir/history" 2>/dev/null
             fi
         fi
         __sb_cmd=
