@@ -52,6 +52,7 @@ apt:
     DPkg::Lock::Timeout "300";
 packages:
   - i2c-tools
+  - python3-pyte          # the OLED's keyboard terminal
 
 write_files:
   - path: /etc/modules-load.d/i2c-dev.conf
@@ -72,7 +73,13 @@ write_files:
 runcmd:
   - [ sh, -c, "usermod -aG i2c,gpio skep || true" ]
   - [ install, -m, "0755", /boot/firmware/songbird/songbird_oled.py, /usr/local/bin/songbird_oled.py ]
+  - [ install, -m, "0755", /boot/firmware/songbird/oled_terminal.py, /usr/local/bin/oled_terminal.py ]
   - [ install, -m, "0644", /boot/firmware/songbird/songbird-oled.service, /etc/systemd/system/songbird-oled.service ]
+  # front panel: shell hook for running/finished commands, the `oled` command
+  - [ install, -m, "0644", /boot/firmware/songbird/songbird-oled.tmpfiles, /etc/tmpfiles.d/songbird-oled.conf ]
+  - [ systemd-tmpfiles, --create, /etc/tmpfiles.d/songbird-oled.conf ]
+  - [ install, -m, "0644", /boot/firmware/songbird/songbird-jobs.sh, /etc/profile.d/songbird-jobs.sh ]
+  - [ install, -m, "0755", /boot/firmware/songbird/oled, /usr/local/bin/oled ]
   - [ modprobe, i2c-dev ]
   - [ systemctl, daemon-reload ]
   - [ systemctl, enable, --now, songbird-oled.service ]
@@ -144,7 +151,8 @@ def main():
 
     dest = os.path.join(boot, "songbird")
     os.makedirs(dest, exist_ok=True)
-    for name in ("songbird_oled.py", "songbird-oled.service"):
+    for name in ("songbird_oled.py", "oled_terminal.py", "songbird-oled.service", "songbird-oled.tmpfiles",
+                 "songbird-jobs.sh", "oled"):
         shutil.copy(os.path.join(OLED_DIR, name), dest)
 
     print("prepared", boot, "- networks:", [s for s, _ in networks()])

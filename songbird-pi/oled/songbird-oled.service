@@ -4,7 +4,7 @@ After=multi-user.target
 
 [Service]
 ExecStart=/usr/bin/python3 /usr/local/bin/songbird_oled.py
-Environment=OLED_ROTATE=0
+Environment=OLED_ROTATE=180
 Restart=always
 RestartSec=3
 

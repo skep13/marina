@@ -1,0 +1,22 @@
+#!/bin/sh
+# Songbird Pi - put a message on the OLED front panel.
+#
+#   oled "Back at 3"          show it (for 30 s)
+#   oled -t 120 "Uploading"   show it for 120 s
+#   make && oled "build ok"   after something finishes
+#   oled -c                   clear it
+DIR=/run/songbird-oled
+secs=30
+if [ "$1" = "-c" ]; then
+    rm -f "$DIR/msg"
+    exit 0
+fi
+if [ "$1" = "-t" ]; then
+    secs=$2
+    shift 2
+fi
+if [ $# -eq 0 ]; then
+    echo "usage: oled [-t seconds] message   |   oled -c" >&2
+    exit 1
+fi
+printf '%s\n%s\n%s\n' "$(date +%s)" "$secs" "$*" > "$DIR/msg"
