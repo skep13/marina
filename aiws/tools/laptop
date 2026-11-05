@@ -1,0 +1,48 @@
+#!/usr/bin/env bash
+# Drive the aiws laptop from the Mac over whichever link is up.
+#
+#   laptop                      interactive shell
+#   laptop run 'cmd ...'        run a command (bash, not the fish login shell)
+#   laptop sh < script.sh       run a local script there; extra args pass through
+#   laptop root 'cmd ...'       run as root (needs grant-remote-admin.sh once)
+#   laptop push SRC... DEST     copy files/dirs to the laptop (rsync)
+#   laptop pull SRC DEST        copy from the laptop
+#   laptop lab3 'cmd ...'       run with lab3's llama-swap tunnelled to
+#                               127.0.0.1:18080 (CAD_BASE_URL is set for you),
+#                               for when the laptop can't route to 192.168.1.15
+#   laptop where                print which address answered
+#
+# Addresses are tried in order: Tailscale, USB tether, home LAN, other LAN.
+# Override with LAPTOP_HOST=... ; user with LAPTOP_USER (default friereon).
+set -euo pipefail
+USER_="${LAPTOP_USER:-friereon}"
+CANDIDATES=(${LAPTOP_HOST:-100.111.37.54 192.168.3.7 192.168.1.78 192.168.0.226})
+SSHOPTS=(-o ConnectTimeout=4 -o BatchMode=yes -o StrictHostKeyChecking=accept-new
+         -o ServerAliveInterval=30 -o ControlMaster=auto
+         -o "ControlPath=$HOME/.ssh/cm-laptop-%C" -o ControlPersist=10m)
+
+find_host() {
+  for h in "${CANDIDATES[@]}"; do
+    if ssh "${SSHOPTS[@]}" "$USER_@$h" true 2>/dev/null; then echo "$h"; return; fi
+  done
+  echo "laptop: not reachable at ${CANDIDATES[*]}" >&2; exit 1
+}
+
+H=$(find_host)
+T="$USER_@$H"
+cmd="${1:-shell}"; shift || true
+case "$cmd" in
+  shell) exec ssh -t "${SSHOPTS[@]}" "$T" ;;
+  where) echo "$T" ;;
+  # Commands go over stdin: the login shell there is fish, so nothing is
+  # quoted for it to parse.
+  run)   exec ssh "${SSHOPTS[@]}" "$T" bash -ls <<<"$*" ;;
+  sh)    exec ssh "${SSHOPTS[@]}" "$T" bash -s -- "$@" ;;
+  root)  exec ssh "${SSHOPTS[@]}" "$T" sudo -n bash -s <<<"$*" ;;
+  push)  dest="${!#}"; set -- "${@:1:$#-1}"
+         exec rsync -az -e "ssh ${SSHOPTS[*]}" "$@" "$T:$dest" ;;
+  pull)  exec rsync -az -e "ssh ${SSHOPTS[*]}" "$T:$1" "$2" ;;
+  lab3)  exec ssh "${SSHOPTS[@]}" -o ControlPath=none -R 18080:192.168.1.15:8080 "$T" \
+           bash -ls <<<"export CAD_BASE_URL=http://127.0.0.1:18080; $*" ;;
+  *) sed -n '2,17p' "$0"; exit 2 ;;
+esac
