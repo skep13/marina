@@ -39,6 +39,21 @@ vaults even for Songbird. To lift even that, set `shield_secrets=False` on
   so does Ctrl-C.
 - **Step cap:** `policy.max_steps` (default 40), or `--steps`.
 
+## Driving apps (the screen)
+
+Both personas work in a see-act-see loop: screenshot → one action → screenshot
+to check. To work in an app they `focus_app` it first (which launches it if
+needed and confirms it's frontmost), then prefer keyboard shortcuts (`cmd+n`,
+`cmd+l`, `cmd+s`, `return`) over clicking buttons by description. Screen
+reading, shell, files and the web are fast and reliable; GUI control works but
+is slower and benefits from the shortcut-first approach.
+
+Vision (screenshots and click-by-description) always goes to the `marina`
+model, the only one on lab3 with a vision projector. For **Songbird** that
+means each screenshot makes llama-swap swap to `marina` and back, so GUI tasks
+as Songbird are noticeably slower (~80s/step). Marina drives the screen faster
+because her own model has the eyes — prefer Marina for heavy GUI work.
+
 ## The lab3 key (not in the repo)
 
 Each persona reads its key from the environment or a git-ignored keys file:

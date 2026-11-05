@@ -37,6 +37,12 @@ from process.tools import lookup       # noqa: E402
 
 from agent.personas import PERSONAS, LAB3_BASE_URL  # noqa: E402
 
+# lab3 serves only the `marina` model with a vision projector, so every
+# persona's screenshots — and the click-by-description lookups inside the Mac
+# tools — are described by that model.
+VISION_MODEL = "marina"
+_VISION_KEY = None  # set when a run starts; used by the mac._vision override
+
 STATE = Path.home() / ".marina"
 STOP_FILE = STATE / "agent.stop"
 KEYS_FILE = STATE / "agent-keys.env"   # git-ignored; KEY=VALUE per line
@@ -182,7 +188,8 @@ def t_screenshot(ctx, question="Describe what is on screen."):
     # Ask the persona's own vision-capable model on lab3 about the image.
     content = [{"type": "text", "text": f"{question}\n(The screen is {w}x{h} pixels.)"},
                {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{b64}"}}]
-    r = lab3_chat(ctx, [{"role": "user", "content": content}], tools=None, max_tokens=500)
+    r = lab3_chat(ctx, [{"role": "user", "content": content}], tools=None,
+                  max_tokens=500, model=VISION_MODEL)
     return r["choices"][0]["message"].get("content") or "(no description)"
 
 
@@ -218,6 +225,33 @@ def t_scroll(ctx, direction="down", amount=5):
     return mac.mac_scroll(direction=direction, amount=amount)
 
 
+_APP_NAME = re.compile(r"^[A-Za-z0-9 ._-]{1,60}$")
+
+
+def t_focus_app(ctx, name):
+    """Bring an app to the front so screenshots, clicks and keys act on it.
+    A plain activate — no synthetic keystrokes — so it's allowed even though
+    general osascript isn't."""
+    name = (name or "").strip().rstrip(".app")
+    if not _APP_NAME.match(name):
+        raise Refused("give a plain application name, e.g. Safari or TextEdit")
+    if ctx.dry_run:
+        return f"[dry-run] would focus {name}"
+    # Launch it if it isn't running, then activate, then confirm it's frontmost.
+    subprocess.run(["open", "-a", name], capture_output=True, text=True, timeout=10)
+    time.sleep(0.6)
+    for _ in range(3):
+        subprocess.run(["osascript", "-e", f'tell application "{name}" to activate'],
+                       capture_output=True, text=True, timeout=10)
+        time.sleep(1.0)
+        front = mac._frontmost() or ""
+        if name.lower() in front.lower() or front.lower() in name.lower():
+            return f"{name} is now frontmost. Take a screenshot to see it."
+    return (f"Asked {name} to come forward, but {front or 'another app'} is still in "
+            f"front — it may be on another Space or mid-launch. Screenshot to check "
+            f"before you type, so your keys don't go to the wrong app.")
+
+
 def t_web_search(ctx, query, max_results=5):
     return lookup.web_search(query, max_results=max_results)
 
@@ -249,6 +283,9 @@ TOOLS = {
                   {"keys": "string"}, ["keys"]),
     "scroll": (t_scroll, "Scroll the focused window.",
                {"direction": "string", "amount": "integer"}, []),
+    "focus_app": (t_focus_app, "Bring a named app to the front (e.g. Safari, TextEdit) "
+                  "before you screenshot, click or type in it.",
+                  {"name": "string"}, ["name"]),
     "web_search": (t_web_search, "Search the web.",
                    {"query": "string", "max_results": "integer"}, ["query"]),
     "read_page": (t_read_page, "Fetch a public web page as text.",
@@ -268,22 +305,39 @@ def schemas():
 
 # --- lab3 client -------------------------------------------------------------
 
-def lab3_chat(ctx, messages, tools, max_tokens=2048, temperature=0.3):
-    body = {"model": ctx.persona.model, "messages": messages,
+def _post_lab3(key, body):
+    req = urllib.request.Request(
+        LAB3_BASE_URL + "/v1/chat/completions", data=json.dumps(body).encode(),
+        headers={"Content-Type": "application/json", "Authorization": "Bearer " + key})
+    with urllib.request.urlopen(req, timeout=900) as r:
+        return json.load(r)
+
+
+def lab3_chat(ctx, messages, tools, max_tokens=2048, temperature=0.3, model=None):
+    body = {"model": model or ctx.persona.model, "messages": messages,
             "temperature": temperature, "max_tokens": max_tokens,
             "chat_template_kwargs": {"enable_thinking": False}}
     if tools:
         body["tools"] = tools
-    req = urllib.request.Request(
-        LAB3_BASE_URL + "/v1/chat/completions", data=json.dumps(body).encode(),
-        headers={"Content-Type": "application/json", "Authorization": "Bearer " + ctx.key})
     try:
-        with urllib.request.urlopen(req, timeout=900) as r:
-            return json.load(r)
+        return _post_lab3(model and _VISION_KEY or ctx.key, body)
     except urllib.error.HTTPError as e:
         sys.exit(f"lab3 said {e.code}: {e.read().decode()[:300]}")
     except (urllib.error.URLError, TimeoutError) as e:
         sys.exit(f"can't reach lab3 at {LAB3_BASE_URL} ({e})")
+
+
+def _vision_via_lab3(prompt, image_b64, max_tokens=300):
+    """Replaces mac._vision so the Mac tools' click-by-description lookups
+    use lab3's vision model instead of the chat bridge's local model."""
+    content = [{"type": "text", "text": prompt},
+               {"type": "image_url",
+                "image_url": {"url": f"data:image/jpeg;base64,{image_b64}"}}]
+    body = {"model": VISION_MODEL, "messages": [{"role": "user", "content": content}],
+            "temperature": 0.0, "max_tokens": max_tokens,
+            "chat_template_kwargs": {"enable_thinking": False}}
+    r = _post_lab3(_VISION_KEY, body)
+    return r["choices"][0]["message"].get("content") or ""
 
 
 # --- logging and stop --------------------------------------------------------
@@ -305,7 +359,10 @@ def check_stop(persona):
 # --- the loop ----------------------------------------------------------------
 
 def run(persona, task, steps, dry_run):
+    global _VISION_KEY
     key = load_key(persona)
+    _VISION_KEY = key
+    mac._vision = _vision_via_lab3   # click-by-description lookups go to lab3
     ctx = Ctx(persona, key, dry_run)
     fns = {name: spec[0] for name, spec in TOOLS.items()}
     msgs = [{"role": "system", "content": persona.system_prompt},
