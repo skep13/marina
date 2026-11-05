@@ -1,0 +1,359 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="dark">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#0c0e14">
+<title>Mac Agent</title>
+<style>
+  :root{
+    --bg:#0c0e14; --panel:#141824; --panel2:#1b2030; --line:#262d40;
+    --ink:#e7ecf6; --dim:#8b95ad; --faint:#5c6782;
+    --accent:#5ad1c0; --accent2:#7aa2ff;
+    --ok:#4ec98f; --refused:#e3b341; --error:#f06d6d; --assistant:#7aa2ff;
+    --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
+    --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%}
+  body{
+    background:var(--bg); color:var(--ink); font-family:var(--sans);
+    font-size:15px; line-height:1.45;
+    display:flex; flex-direction:column; min-height:100%;
+    -webkit-text-size-adjust:100%;
+  }
+  header{
+    position:sticky; top:0; z-index:10;
+    padding:14px 16px calc(14px + env(safe-area-inset-top)) 16px;
+    padding-top:calc(14px + env(safe-area-inset-top));
+    background:linear-gradient(180deg,#0c0e14,#0c0e14ee);
+    border-bottom:1px solid var(--line);
+    display:flex; align-items:center; gap:10px; flex-wrap:wrap;
+  }
+  .brand{font-weight:700; letter-spacing:.04em; display:flex; align-items:center; gap:8px}
+  .dot{width:9px;height:9px;border-radius:50%;background:var(--faint);box-shadow:0 0 0 0 transparent}
+  .dot.live{background:var(--ok); animation:pulse 1.4s infinite}
+  @keyframes pulse{0%{box-shadow:0 0 0 0 #4ec98f66}70%{box-shadow:0 0 0 7px transparent}100%{box-shadow:0 0 0 0 transparent}}
+  .status{color:var(--dim); font-size:13px; margin-left:auto}
+
+  main{flex:1; width:100%; max-width:820px; margin:0 auto; padding:16px; display:flex; flex-direction:column; gap:14px}
+
+  .card{background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:14px}
+  label.lbl{display:block; font-size:12px; color:var(--dim); text-transform:uppercase; letter-spacing:.06em; margin:0 0 8px}
+
+  .personas{display:flex; gap:10px; flex-wrap:wrap}
+  .persona{
+    flex:1 1 180px; text-align:left; cursor:pointer; background:var(--panel2);
+    border:1.5px solid var(--line); border-radius:12px; padding:11px 12px; color:var(--ink);
+    transition:border-color .15s, background .15s;
+  }
+  .persona:hover{border-color:var(--faint)}
+  .persona.sel{border-color:var(--accent); background:#16241f}
+  .persona.sel.songbird{border-color:#c678dd; background:#201627}
+  .persona .pname{font-weight:700; display:flex; align-items:center; gap:7px}
+  .persona .pmodel{font-family:var(--mono); font-size:11px; color:var(--faint)}
+  .tags{display:flex; gap:5px; flex-wrap:wrap; margin-top:7px}
+  .tag{font-size:10.5px; padding:2px 6px; border-radius:6px; border:1px solid var(--line); color:var(--dim)}
+  .tag.warn{color:var(--refused); border-color:#4a3f1e}
+  .tag.off{color:var(--faint); opacity:.65}
+
+  textarea{
+    width:100%; min-height:84px; resize:vertical; background:var(--panel2); color:var(--ink);
+    border:1px solid var(--line); border-radius:10px; padding:11px 12px; font:inherit; font-size:15px;
+  }
+  textarea:focus,input:focus,select:focus{outline:none; border-color:var(--accent)}
+  .row{display:flex; gap:12px; align-items:center; flex-wrap:wrap; margin-top:12px}
+  .row .field{display:flex; align-items:center; gap:7px; color:var(--dim); font-size:13px}
+  input[type=number]{width:74px; background:var(--panel2); color:var(--ink); border:1px solid var(--line); border-radius:8px; padding:7px 9px; font:inherit}
+  input[type=checkbox]{width:17px;height:17px;accent-color:var(--accent)}
+
+  .actions{display:flex; gap:10px; margin-top:4px}
+  button.go,button.stop{
+    flex:1; border:none; border-radius:11px; padding:13px 16px; font:inherit; font-weight:700;
+    font-size:15px; cursor:pointer; letter-spacing:.02em;
+  }
+  button.go{background:var(--accent); color:#06231f}
+  button.go:disabled{background:var(--panel2); color:var(--faint); cursor:not-allowed}
+  button.stop{background:var(--error); color:#2a0b0b; display:none}
+  button.stop.show{display:block}
+  button.stop:disabled{opacity:.55; cursor:progress}
+
+  .meta{color:var(--faint); font-size:12.5px; margin:2px 2px 0}
+
+  .timeline{display:flex; flex-direction:column; gap:9px}
+  .empty{color:var(--faint); text-align:center; padding:26px 10px; font-size:14px}
+  .ev{background:var(--panel); border:1px solid var(--line); border-left-width:3px; border-radius:11px; overflow:hidden}
+  .ev .head{display:flex; align-items:center; gap:9px; padding:10px 12px; cursor:pointer; user-select:none}
+  .ev .head .ic{font-family:var(--mono); font-size:12px; opacity:.9}
+  .ev .head .nm{font-family:var(--mono); font-weight:600; font-size:13.5px}
+  .ev .head .sub{color:var(--faint); font-size:12px; font-family:var(--mono); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1}
+  .ev .head .st{font-size:10.5px; text-transform:uppercase; letter-spacing:.05em; padding:2px 7px; border-radius:6px}
+  .ev .head .chev{color:var(--faint); transition:transform .15s; font-size:11px}
+  .ev.open .head .chev{transform:rotate(90deg)}
+  .ev .body{display:none; border-top:1px solid var(--line); padding:0}
+  .ev.open .body{display:block}
+  .kv{padding:10px 12px; border-bottom:1px solid var(--line)}
+  .kv:last-child{border-bottom:none}
+  .kv .k{font-size:11px; color:var(--dim); text-transform:uppercase; letter-spacing:.05em; margin-bottom:4px}
+  pre{margin:0; font-family:var(--mono); font-size:12.5px; line-height:1.5; white-space:pre-wrap; word-break:break-word; color:var(--ink)}
+  .step{color:var(--faint); font-family:var(--mono); font-size:11px}
+
+  .ev.ok{border-left-color:var(--ok)} .ev.ok .st{background:#0f2a1e; color:var(--ok)}
+  .ev.refused{border-left-color:var(--refused)} .ev.refused .st{background:#2a2410; color:var(--refused)}
+  .ev.error{border-left-color:var(--error)} .ev.error .st{background:#2a1212; color:var(--error)}
+  .ev.pending{border-left-color:var(--accent2)}
+  .ev.assistant{border-left-color:var(--assistant); background:#12182a}
+  .ev.assistant .nm{color:var(--assistant)}
+  .ev.note{border-left-color:var(--faint)}
+
+  .final{border:1px solid var(--accent); background:#0f1f1d; border-radius:14px; padding:14px 16px; display:none}
+  .final.show{display:block}
+  .final.songbird{border-color:#c678dd; background:#1a1322}
+  .final h3{margin:0 0 8px; font-size:13px; text-transform:uppercase; letter-spacing:.06em; color:var(--accent)}
+  .final.songbird h3{color:#c678dd}
+
+  .toast{position:fixed; left:50%; bottom:calc(18px + env(safe-area-inset-bottom)); transform:translateX(-50%);
+    background:#2a1212; color:var(--error); border:1px solid #4a2020; padding:10px 15px; border-radius:10px;
+    font-size:13.5px; max-width:90%; display:none; z-index:20}
+  .toast.show{display:block}
+</style>
+</head>
+<body>
+<header>
+  <span class="brand"><span class="dot" id="dot"></span>Mac&nbsp;Agent</span>
+  <span class="status" id="status">idle</span>
+</header>
+
+<main>
+  <div class="card">
+    <label class="lbl">Persona</label>
+    <div class="personas" id="personas"><div class="meta">loading personas…</div></div>
+  </div>
+
+  <div class="card">
+    <label class="lbl" for="task">Task</label>
+    <textarea id="task" placeholder="e.g. find every TODO under ~/marina and summarise them"></textarea>
+    <div class="row">
+      <span class="field"><label for="steps">max steps</label><input type="number" id="steps" min="1" max="200" placeholder="auto"></span>
+      <span class="field"><input type="checkbox" id="dry"><label for="dry">dry-run (change nothing)</label></span>
+    </div>
+    <div class="actions" style="margin-top:14px">
+      <button class="go" id="go">Run</button>
+      <button class="stop" id="stop">Stop</button>
+    </div>
+    <div class="meta" id="runmeta"></div>
+  </div>
+
+  <div class="final" id="final"><h3>Final answer</h3><pre id="finaltext"></pre></div>
+
+  <div>
+    <label class="lbl">Timeline</label>
+    <div class="timeline" id="timeline"><div class="empty">No run yet. Pick a persona, type a task, press Run.</div></div>
+  </div>
+</main>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const $ = s => document.querySelector(s);
+const el = (t, c) => { const e = document.createElement(t); if (c) e.className = c; return e; };
+let personas = [], selected = null, es = null, running = false;
+let timelineEmpty = true;
+const pending = {};   // step:name -> tool_call event node awaiting its result
+
+function toast(msg){ const t=$('#toast'); t.textContent=msg; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),4200); }
+function setStatus(s, live){ $('#status').textContent=s; $('#dot').classList.toggle('live', !!live); }
+
+function policyTags(p){
+  const pol = p.policy, tags = [];
+  tags.push(pol.confine_home ? ['home only','ok'] : ['files: anywhere','warn']);
+  tags.push(pol.block_risky ? ['safe shell','ok'] : ['shell: unrestricted','warn']);
+  tags.push(pol.shield_secrets ? ['secrets shielded','ok'] : ['secrets exposed','warn']);
+  tags.push(pol.gui_control ? ['screen','ok'] : ['no screen','off']);
+  return tags;
+}
+
+function renderPersonas(){
+  const box = $('#personas'); box.innerHTML='';
+  personas.forEach(p=>{
+    const card = el('button','persona'+(p.name==='songbird'?' songbird':''));
+    card.type='button';
+    const name = el('div','pname'); name.textContent = p.name[0].toUpperCase()+p.name.slice(1);
+    const m = el('span','pmodel'); m.textContent = 'model: '+p.model; name.appendChild(m);
+    card.appendChild(name);
+    const tags = el('div','tags');
+    policyTags(p).forEach(([txt,kind])=>{ const t=el('span','tag '+(kind==='warn'?'warn':kind==='off'?'off':'')); t.textContent=txt; tags.appendChild(t); });
+    card.appendChild(tags);
+    card.onclick = ()=>select(p.name);
+    card.dataset.name = p.name;
+    box.appendChild(card);
+  });
+  select(selected || (personas[0] && personas[0].name));
+}
+
+function select(name){
+  selected = name;
+  document.querySelectorAll('.persona').forEach(c=>c.classList.toggle('sel', c.dataset.name===name));
+}
+
+function clearTimeline(){
+  $('#timeline').innerHTML=''; timelineEmpty=false;
+  for(const k in pending) delete pending[k];
+  $('#final').classList.remove('show','songbird'); $('#finaltext').textContent='';
+}
+
+function addEvent({cls, icon, name, sub, status, bodyKVs, open=false}){
+  if(timelineEmpty){ $('#timeline').innerHTML=''; timelineEmpty=false; }
+  const ev = el('div','ev '+cls+(open?' open':''));
+  const head = el('div','head');
+  const ic = el('span','ic'); ic.textContent=icon; head.appendChild(ic);
+  const nm = el('span','nm'); nm.textContent=name; head.appendChild(nm);
+  const s = el('span','sub'); s.textContent=sub||''; head.appendChild(s);
+  if(status){ const st=el('span','st'); st.textContent=status; head.appendChild(st); }
+  const chev = el('span','chev'); chev.textContent='▶'; head.appendChild(chev);
+  const body = el('div','body');
+  (bodyKVs||[]).forEach(([k,v])=>{
+    const kv=el('div','kv'); const kk=el('div','k'); kk.textContent=k; const pre=el('pre'); pre.textContent=v;
+    kv.appendChild(kk); kv.appendChild(pre); body.appendChild(kv);
+  });
+  ev.appendChild(head); ev.appendChild(body);
+  head.onclick = ()=> ev.classList.toggle('open');
+  if(!(bodyKVs&&bodyKVs.length)){ chev.style.visibility='hidden'; head.style.cursor='default'; }
+  $('#timeline').appendChild(ev);
+  requestAnimationFrame(()=> ev.scrollIntoView({block:'nearest',behavior:'smooth'}));
+  return ev;
+}
+
+function fmtArgs(args){
+  if(!args || !Object.keys(args).length) return '(no arguments)';
+  return JSON.stringify(args, null, 2);
+}
+function briefArgs(args){
+  if(!args) return '';
+  return Object.entries(args).map(([k,v])=>{ let s=typeof v==='string'?v:JSON.stringify(v); if(s.length>48)s=s.slice(0,48)+'…'; return k+'='+s; }).join(', ');
+}
+
+function handle(ev){
+  switch(ev.type){
+    case 'start':
+      $('#runmeta').textContent = `${ev.persona} · model ${ev.model} · up to ${ev.steps} steps${ev.dry_run?' · dry-run':''}`;
+      addEvent({cls:'note', icon:'▶', name:'start', sub:ev.task, bodyKVs:[['task',ev.task]]});
+      break;
+    case 'tool_call':{
+      const key = ev.step+':'+ev.name;
+      const node = addEvent({cls:'pending', icon:'⚙', name:ev.name, sub:briefArgs(ev.args),
+        status:'running', bodyKVs:[['step '+ev.step+' · arguments', fmtArgs(ev.args)]]});
+      pending[key] = node;
+      break; }
+    case 'tool_result':{
+      const key = ev.step+':'+ev.name;
+      const node = pending[key];
+      if(node){
+        node.classList.remove('pending'); node.classList.add(ev.status);
+        node.querySelector('.ic').textContent = ev.status==='ok'?'✓':ev.status==='refused'?'⊘':'✕';
+        node.querySelector('.st').textContent = ev.status;
+        const body = node.querySelector('.body');
+        const kv=el('div','kv'); const kk=el('div','k'); kk.textContent='result'; const pre=el('pre'); pre.textContent=ev.result;
+        kv.appendChild(kk); kv.appendChild(pre); body.appendChild(kv);
+        if(ev.status!=='ok') node.classList.add('open');
+        delete pending[key];
+      } else {
+        addEvent({cls:ev.status, icon:ev.status==='ok'?'✓':'✕', name:ev.name, status:ev.status, bodyKVs:[['result',ev.result]]});
+      }
+      break; }
+    case 'assistant':
+      if(ev.final) break;  // the final text is shown in the Final panel via 'done'
+      addEvent({cls:'assistant', icon:'✎', name:selected||'assistant', sub:ev.text.slice(0,80),
+        bodyKVs:[['says', ev.text]], open:true});
+      break;
+    case 'done':{
+      const f=$('#final'); $('#finaltext').textContent = ev.text || '(no final message)';
+      f.classList.add('show'); if(selected==='songbird') f.classList.add('songbird');
+      finish('done');
+      break; }
+    case 'step_limit':
+      addEvent({cls:'refused', icon:'■', name:'step limit', status:'stopped', sub:`reached ${ev.steps} steps`});
+      finish('step limit reached');
+      break;
+    case 'stopped':
+      addEvent({cls:'refused', icon:'■', name:'stopped', status:'stopped', sub:'halted by the Stop button'});
+      finish('stopped');
+      break;
+    case 'error':
+      addEvent({cls:'error', icon:'✕', name:'error', status:'error', sub:ev.message, bodyKVs:[['message',ev.message]], open:true});
+      toast(ev.message);
+      finish('error');
+      break;
+    case 'end':
+      finish();  // safety net if no terminal event arrived
+      break;
+  }
+}
+
+function finish(note){
+  if(!running) return;
+  running=false;
+  if(es){ es.close(); es=null; }
+  $('#go').disabled=false; $('#stop').classList.remove('show'); $('#stop').disabled=false;
+  setStatus(note||'idle', false);
+  // mark any still-pending tool call as interrupted
+  for(const k in pending){ const n=pending[k]; n.classList.remove('pending'); n.classList.add('error');
+    n.querySelector('.st').textContent='interrupted'; delete pending[k]; }
+}
+
+async function run(){
+  if(running || !selected) return;
+  const prompt = $('#task').value.trim();
+  if(!prompt){ toast('Type a task first.'); return; }
+  const body = { persona:selected, prompt };
+  const steps = parseInt($('#steps').value,10); if(steps) body.max_steps=steps;
+  if($('#dry').checked) body.dry_run=true;
+  $('#go').disabled=true;
+  let res;
+  try{ res = await fetch('/api/run',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}); }
+  catch(e){ toast('Cannot reach the agent server.'); $('#go').disabled=false; return; }
+  const data = await res.json().catch(()=>({}));
+  if(!res.ok){ toast(data.error||('server said '+res.status)); $('#go').disabled=false; return; }
+  running=true; clearTimeline();
+  $('#stop').classList.add('show'); $('#stop').disabled=false;
+  setStatus('running', true);
+  es = new EventSource('/api/events?run_id='+encodeURIComponent(data.run_id));
+  es.onmessage = e=>{ try{ handle(JSON.parse(e.data)); }catch(_){} };
+  es.onerror = ()=>{ if(running) setStatus('stream dropped — run continues', true); };
+}
+
+async function stop(){
+  $('#stop').disabled=true; setStatus('stopping…', true);
+  try{ await fetch('/api/stop',{method:'POST'}); }catch(_){}
+}
+
+$('#go').onclick = run;
+$('#stop').onclick = stop;
+$('#task').addEventListener('keydown', e=>{ if((e.metaKey||e.ctrlKey)&&e.key==='Enter') run(); });
+
+async function boot(){
+  try{
+    const r = await fetch('/api/personas'); const d = await r.json();
+    personas = d.personas||[]; renderPersonas();
+  }catch(e){ $('#personas').innerHTML='<div class="meta">could not load personas — is the server running?</div>'; }
+  // Reattach to a run already in progress (e.g. after a phone reloaded).
+  try{
+    const s = await (await fetch('/api/status')).json();
+    if(s.running && s.run_id){
+      selected = s.persona || selected; select(selected);
+      running=true; clearTimeline(); $('#go').disabled=true;
+      $('#stop').classList.add('show'); setStatus('running', true);
+      es = new EventSource('/api/events?run_id='+encodeURIComponent(s.run_id));
+      es.onmessage = e=>{ try{ handle(JSON.parse(e.data)); }catch(_){} };
+      es.onerror = ()=>{ if(running) setStatus('stream dropped — run continues', true); };
+    }
+  }catch(_){}
+}
+boot();
+</script>
+</body>
+</html>

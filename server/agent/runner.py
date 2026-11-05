@@ -356,9 +356,25 @@ def check_stop(persona):
         raise Stopped()
 
 
+def request_stop():
+    """Ask a running loop (CLI or web) to halt before its next step."""
+    STATE.mkdir(exist_ok=True)
+    STOP_FILE.touch()
+
+
 # --- the loop ----------------------------------------------------------------
 
-def run(persona, task, steps, dry_run):
+def run(persona, task, steps, dry_run, on_event=None):
+    """Run the agent loop. If on_event is given, it's called with a structured
+    dict for every interesting moment (start, assistant text, each tool call
+    and its result, done/stopped/limit) so a web layer can stream the run.
+    The CLI passes no on_event, so its behaviour is unchanged."""
+    def emit(**ev):
+        if on_event:
+            try:
+                on_event(ev)
+            except Exception:
+                pass
     global _VISION_KEY
     key = load_key(persona)
     _VISION_KEY = key
@@ -369,6 +385,8 @@ def run(persona, task, steps, dry_run):
             {"role": "user", "content": task}]
     log(persona, f"START as {persona.name} (model {persona.model}"
                  f"{', dry-run' if dry_run else ''}): {task}")
+    emit(type="start", persona=persona.name, model=persona.model,
+         dry_run=dry_run, steps=steps, task=task)
     for step in range(1, steps + 1):
         check_stop(persona)
         r = lab3_chat(ctx, msgs, schemas())
@@ -378,8 +396,11 @@ def run(persona, task, steps, dry_run):
         calls = msg.get("tool_calls") or []
         if msg.get("content") and msg["content"].strip():
             print(f"\n{persona.name}: {msg['content'].strip()}\n", flush=True)
+            emit(type="assistant", step=step, text=msg["content"].strip(),
+                 final=not calls)
         if not calls:
             log(persona, "DONE")
+            emit(type="done", text=msg.get("content") or "")
             return msg.get("content") or ""
         for call in calls:
             check_stop(persona)
@@ -390,21 +411,26 @@ def run(persona, task, steps, dry_run):
                 args = {}
             brief = ", ".join(f"{k}={str(v)[:60]!r}" for k, v in args.items())
             log(persona, f"step {step}: {name}({brief})")
+            emit(type="tool_call", step=step, name=name, args=args)
+            status = "ok"
             try:
                 if name not in fns:
                     raise Refused(f"no such tool: {name}")
                 out = str(fns[name](ctx, **args))
             except Refused as e:
-                out = f"refused: {e}"
+                out, status = f"refused: {e}", "refused"
                 log(persona, f"  refused: {e}")
             except Stopped:
                 raise
             except Exception as e:
-                out = f"error: {type(e).__name__}: {e}"
+                out, status = f"error: {type(e).__name__}: {e}", "error"
                 log(persona, f"  error: {e}")
+            emit(type="tool_result", step=step, name=name,
+                 status=status, result=out)
             msgs.append({"role": "tool", "tool_call_id": call.get("id", name),
                          "content": out[:6000]})
     log(persona, f"stopped after the step limit ({steps})")
+    emit(type="step_limit", steps=steps)
     return f"Stopped after {steps} steps."
 
 
