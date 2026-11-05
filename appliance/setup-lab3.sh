@@ -17,6 +17,10 @@
 #                                    #   reverts to the LAN in ROLLBACK_WINDOW seconds
 #                                    #   (default 600) unless you run 'confirm'. Run it
 #                                    #   detached, e.g. via systemd-run (see README).
+#   setup-lab3.sh wifi-ap            # host a Wi-Fi network (SSID in AP_SSID) so
+#                                    #   devices connect with no cable. Put the WPA2
+#                                    #   passphrase in /etc/appliance/ap.pass first.
+#                                    #   Keeps the wired LAN up — no cutover needed.
 #   setup-lab3.sh confirm            # keep the cutover; cancel the auto-rollback.
 #   setup-lab3.sh status             # show what's configured / running
 #
@@ -40,6 +44,13 @@ MODEL_IP_APPLIANCE="10.42.0.10"
 
 KEY_FILE="/etc/appliance/lab3.key"   # llama-swap API key, injected by the proxy so
                                      # plugged-in apps need no key (isolated network)
+
+# Wi-Fi access point: devices join this network instead of plugging in a cable.
+AP_IFACE="wls1"                 # the wifi NIC (Intel AX200, AP mode)
+AP_SSID="Local AI Box"          # network name
+AP_CHANNEL=6                    # 2.4GHz (most reliable for AX200 AP)
+AP_COUNTRY=GB
+AP_PASS_FILE="/etc/appliance/ap.pass"   # WPA2 passphrase (>=8 chars); NOT in the repo
 LOG() { echo "[appliance] $*"; }
 
 need_root() { [ "$(id -u)" = 0 ] || { echo "run as root on the lab3 host"; exit 1; }; }
@@ -210,6 +221,65 @@ PY
   fi
 }
 
+wifi_ap() {   # host a Wi-Fi network so devices connect with no cable
+  need_root
+  [ -f "$AP_PASS_FILE" ] || { echo "put the WPA2 passphrase (>=8 chars) in $AP_PASS_FILE first"; exit 1; }
+  local pass; pass="$(cat "$AP_PASS_FILE")"
+  command -v hostapd >/dev/null || { export DEBIAN_FRONTEND=noninteractive; apt-get install -y -qq iw hostapd; }
+  rfkill unblock wifi 2>/dev/null || true
+  iw reg set "$AP_COUNTRY" 2>/dev/null || true
+  cat > /etc/hostapd/hostapd.conf <<EOF
+interface=${AP_IFACE}
+driver=nl80211
+ssid=${AP_SSID}
+country_code=${AP_COUNTRY}
+hw_mode=g
+channel=${AP_CHANNEL}
+ieee80211n=1
+wmm_enabled=1
+auth_algs=1
+wpa=2
+wpa_key_mgmt=WPA-PSK
+rsn_pairwise=CCMP
+wpa_passphrase=${pass}
+EOF
+  chmod 600 /etc/hostapd/hostapd.conf
+  sed -i 's|^#*DAEMON_CONF=.*|DAEMON_CONF="/etc/hostapd/hostapd.conf"|' /etc/default/hostapd
+  grep -q DAEMON_CONF /etc/default/hostapd || echo 'DAEMON_CONF="/etc/hostapd/hostapd.conf"' >> /etc/default/hostapd
+  # give the AP interface the appliance IP, after hostapd brings the radio up
+  cat > /etc/systemd/system/appliance-ap-ip.service <<EOF
+[Unit]
+Description=Appliance AP IP on ${AP_IFACE}
+After=hostapd.service
+BindsTo=hostapd.service
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/sbin/ip addr replace ${APPLIANCE_IP}/24 dev ${AP_IFACE}
+ExecStart=/sbin/ip link set ${AP_IFACE} up
+[Install]
+WantedBy=multi-user.target
+EOF
+  # DHCP + mDNS for AP clients (on the wifi interface, not the LAN)
+  cat > /etc/dnsmasq.d/appliance.conf <<EOF
+interface=${AP_IFACE}
+bind-interfaces
+dhcp-range=${DHCP_FROM},${DHCP_TO},12h
+dhcp-option=option:router,${APPLIANCE_IP}
+dhcp-option=option:dns-server,${APPLIANCE_IP}
+address=/${APPLIANCE_NAME}/${APPLIANCE_IP}
+no-resolv
+EOF
+  mkdir -p /etc/systemd/system/dnsmasq.service.d
+  printf '[Unit]\nAfter=appliance-ap-ip.service\nRequires=appliance-ap-ip.service\n' \
+    > /etc/systemd/system/dnsmasq.service.d/after-ap.conf
+  systemctl daemon-reload
+  systemctl unmask hostapd 2>/dev/null || true
+  systemctl enable hostapd appliance-ap-ip dnsmasq
+  systemctl restart hostapd; sleep 4; systemctl restart appliance-ap-ip; systemctl restart dnsmasq
+  LOG "Wi-Fi AP '${AP_SSID}' up on ${AP_IFACE} ($(systemctl is-active hostapd)); join it and open http://${APPLIANCE_NAME}"
+}
+
 confirm() {   # keep the cutover; cancel the auto-rollback
   need_root
   touch "$CONFIRMED"
@@ -243,6 +313,7 @@ status() {
 
 case "${1:-}" in
   stage-a)   stage_a ;;
+  wifi-ap)   wifi_ap ;;
   cutover)   cutover "$@" ;;
   confirm)   confirm ;;
   _rollback) _rollback ;;

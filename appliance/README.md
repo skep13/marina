@@ -37,7 +37,26 @@ curl -H 'Host: ai.local' -X POST http://192.168.1.13/v1/chat/completions \
 (Verified: chat page, `/v1/models`, and a live `marina` completion all work
 keyless through the proxy.)
 
-## Stage B — cutover
+## Wi-Fi access (no cable) — recommended
+
+Instead of (or as well as) the wired cutover, lab3 can host **its own Wi-Fi**:
+devices join the network and open `http://ai.local`, with the wired port left
+on your LAN so the box stays manageable. The Intel AX200 does AP mode on
+2.4 GHz for roughly 8 devices.
+
+```bash
+printf 'YOUR_WPA2_PASSPHRASE' > /etc/appliance/ap.pass && chmod 600 /etc/appliance/ap.pass
+/root/setup-lab3.sh wifi-ap      # SSID is AP_SSID in the script
+```
+
+This installs/configures hostapd (SSID from `AP_SSID`), gives the Wi-Fi NIC
+`10.42.0.1`, and serves DHCP + `ai.local` on it via dnsmasq — the same Caddy
+proxy already answers chat + the keyless API. Verified: a client gets a
+`10.42.0.x` lease, resolves `ai.local`, and both the chat and `/v1` serve.
+The passphrase lives only in `/etc/appliance/ap.pass` and `hostapd.conf` on the
+box, never in the repo.
+
+## Stage B — cutover (only if you want the WIRED port to be the appliance net)
 
 This repurposes the wired NIC into the appliance network. **It cuts lab3 off
 your LAN and ends the SSH session.** You can do it two ways.
