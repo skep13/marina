@@ -37,32 +37,52 @@ curl -H 'Host: ai.local' -X POST http://192.168.1.13/v1/chat/completions \
 (Verified: chat page, `/v1/models`, and a live `marina` completion all work
 keyless through the proxy.)
 
-## Stage B — cutover (do this at the console, when you unplug lab3)
+## Stage B — cutover
 
 This repurposes the wired NIC into the appliance network. **It cuts lab3 off
-your LAN and ends remote SSH**, so run it with a keyboard+screen on the box.
+your LAN and ends the SSH session.** You can do it two ways.
 
-1. **Leave the Proxmox cluster first** (lab3 is currently a cluster node). From
-   another node (e.g. lab1):
-   ```bash
-   pvecm delnode lab3
-   ```
-   Then on lab3, drop its cluster config and go standalone:
-   ```bash
-   systemctl stop pve-cluster corosync
-   pmxcfs -l
-   rm -f /etc/corosync/* /etc/pve/corosync.conf
-   killall pmxcfs; systemctl start pve-cluster
-   ```
-2. Run the cutover:
-   ```bash
-   /root/setup-lab3.sh cutover      # type CUTOVER to confirm
-   ```
-   It re-addresses `vmbr0` to `10.42.0.1/24`, moves ct110→`10.42.0.10` and
-   ct100→`10.42.0.11`, re-points the proxy and the WebUI at the new model IP,
-   turns on DHCP (`10.42.0.50–200`) + mDNS, and applies the network.
-3. Plug a device into lab3's wired port. It gets an address and opens
-   **http://ai.local** for chat; apps point at **http://ai.local/v1**.
+### Remotely, no display (recommended — lab3 is headless)
+
+`cutover --remote` arms an **auto-rollback** before it changes anything: if you
+don't confirm within a window (default 600s), it restores the LAN config and
+SSH comes back — so a botched cutover can't lock you out. Run it detached so it
+survives your SSH dropping:
+
+```bash
+# on lab3, over SSH (after leaving the cluster, below):
+systemd-run --unit=appliance-cutover /root/setup-lab3.sh cutover --remote
+```
+
+Your SSH will freeze/drop within a second — that's expected. Then:
+1. Plug a laptop into lab3's wired port. It gets a `10.42.0.x` address.
+2. Open **http://ai.local** — if the chat loads, it worked.
+3. Make it permanent: `ssh root@10.42.0.1 '/root/setup-lab3.sh confirm'`.
+4. If anything went wrong, do nothing — in ~10 min it reverts to the LAN and you
+   can SSH back to `192.168.1.13` to retry. Tune the window with
+   `ROLLBACK_WINDOW=900 systemd-run ... cutover --remote`.
+
+### At the console (if you have a keyboard+screen)
+
+```bash
+/root/setup-lab3.sh cutover      # type CUTOVER to confirm; no rollback needed
+```
+
+Either way the cutover re-addresses `vmbr0` to `10.42.0.1/24`, moves
+ct110→`10.42.0.10` and ct100→`10.42.0.11`, re-points the proxy and WebUI at the
+new model IP, and turns on DHCP (`10.42.0.50–200`) + mDNS.
+
+### First: leave the Proxmox cluster
+
+lab3 is a cluster node, so make it standalone before the cutover. From another
+node (e.g. lab1): `pvecm delnode lab3`. Then on lab3:
+
+```bash
+systemctl stop pve-cluster corosync
+pmxcfs -l
+rm -f /etc/corosync/* /etc/pve/corosync.conf
+killall pmxcfs; systemctl start pve-cluster
+```
 
 ### Optional: wifi uplink
 lab3 has wifi (`wls1`). To give the appliance its own internet (updates, web

@@ -10,10 +10,15 @@
 #
 #   setup-lab3.sh stage-a      # reversible: install + configure, no network change
 #                              #   (safe to run now while lab3 is still on your LAN)
-#   setup-lab3.sh cutover      # IRREVERSIBLE-ish: repurpose the wired NIC into the
-#                              #   appliance network. Cuts lab3 off your LAN and ends
-#                              #   remote SSH. RUN THIS AT THE CONSOLE (keyboard+screen).
-#   setup-lab3.sh status       # show what's configured / running
+#   setup-lab3.sh cutover            # repurpose the wired NIC into the appliance
+#                                    #   network. Cuts lab3 off your LAN / ends SSH.
+#   setup-lab3.sh cutover --remote   # same, but ARM an auto-rollback first, so a
+#                                    #   headless/remote cutover can't lock you out:
+#                                    #   reverts to the LAN in ROLLBACK_WINDOW seconds
+#                                    #   (default 600) unless you run 'confirm'. Run it
+#                                    #   detached, e.g. via systemd-run (see README).
+#   setup-lab3.sh confirm            # keep the cutover; cancel the auto-rollback.
+#   setup-lab3.sh status             # show what's configured / running
 #
 # Everything is idempotent; re-running is safe.
 set -euo pipefail
@@ -135,16 +140,41 @@ stage_a() {
   LOG "dnsmasq is installed but OFF until cutover. Nothing on your LAN changed."
 }
 
+ROLLBACK_WINDOW="${ROLLBACK_WINDOW:-600}"   # seconds to confirm before auto-revert
+PRECUTOVER="/etc/appliance/interfaces.precutover"
+CONFIRMED="/etc/appliance/cutover-confirmed"
+
 cutover() {
   need_root
+  # --remote (or non-tty) arms an auto-rollback so a headless/remote cutover
+  # can't lock you out: if you don't `confirm` within the window, it reverts
+  # to the LAN and SSH comes back. Safe to run over SSH detached.
+  local remote=0; [ "${2:-}" = "--remote" ] && remote=1
   cat <<EOF
 
-  !!  CUTOVER — this reconfigures ${BRIDGE} into the appliance network.
-  !!  It CUTS lab3 OFF YOUR LAN and ENDS remote SSH. Run this at the console.
-  !!  lab3 must already be removed from the Proxmox cluster (see README).
+  !!  CUTOVER — reconfigures ${BRIDGE} into the appliance network.
+  !!  It CUTS lab3 OFF YOUR LAN and ENDS this SSH session (expected).
+  !!  lab3 must already have LEFT the Proxmox cluster (see README).
+  $( [ "$remote" = 1 ] && echo "!!  Remote mode: auto-reverts in ${ROLLBACK_WINDOW}s unless you run 'setup-lab3.sh confirm'." )
 
 EOF
-  read -rp "Type CUTOVER to proceed: " c; [ "$c" = CUTOVER ] || { echo "aborted"; exit 1; }
+  if [ "$remote" != 1 ]; then
+    read -rp "Type CUTOVER to proceed: " c; [ "$c" = CUTOVER ] || { echo "aborted"; exit 1; }
+  fi
+
+  # Save what we need to revert to, and (remote) arm the rollback BEFORE any change.
+  install -d /etc/appliance
+  cp /etc/network/interfaces "$PRECUTOVER"
+  rm -f "$CONFIRMED"
+  pct config "$MODEL_CTID" | sed -n 's/^net0: //p' > /etc/appliance/ct${MODEL_CTID}.net0.pre
+  pct config "$WEBUI_CTID" | sed -n 's/^net0: //p' > /etc/appliance/ct${WEBUI_CTID}.net0.pre
+  if [ "$remote" = 1 ]; then
+    systemctl stop appliance-rollback.timer 2>/dev/null || true
+    systemd-run --on-active="${ROLLBACK_WINDOW}" --unit=appliance-rollback \
+      /root/setup-lab3.sh _rollback >/dev/null 2>&1 || \
+      LOG "WARNING: could not arm auto-rollback (systemd-run failed) — proceeding WITHOUT a safety net"
+    LOG "auto-rollback armed: reverts in ${ROLLBACK_WINDOW}s unless you run 'setup-lab3.sh confirm'"
+  fi
 
   # 1. Re-address the bridge to the appliance network (no gateway: it's its own net).
   cp /etc/network/interfaces /etc/network/interfaces.bak.$(date +%s)
@@ -174,7 +204,32 @@ PY
   ifreload -a || systemctl restart networking
   pct reboot "$MODEL_CTID"; pct reboot "$WEBUI_CTID"
   systemctl restart caddy
-  LOG "Cutover complete. Plug a device into the wired port; it gets an IP and reaches http://${APPLIANCE_NAME}."
+  LOG "Cutover applied. Plug a device into the wired port; it gets an IP and reaches http://${APPLIANCE_NAME}."
+  if systemctl is-active appliance-rollback.timer >/dev/null 2>&1; then
+    LOG "CONFIRM within the window: from a device plugged into the appliance, SSH ${APPLIANCE_IP} and run 'setup-lab3.sh confirm' — else it auto-reverts to the LAN."
+  fi
+}
+
+confirm() {   # keep the cutover; cancel the auto-rollback
+  need_root
+  touch "$CONFIRMED"
+  systemctl stop appliance-rollback.timer 2>/dev/null || true
+  systemctl reset-failed 'appliance-rollback*' 2>/dev/null || true
+  LOG "Cutover confirmed. Auto-rollback cancelled; the appliance network is permanent."
+}
+
+_rollback() {  # fired by the armed timer; reverts unless confirmed
+  need_root
+  if [ -f "$CONFIRMED" ]; then LOG "rollback: confirmed, nothing to do"; exit 0; fi
+  LOG "rollback: not confirmed in time — restoring the LAN config"
+  [ -f "$PRECUTOVER" ] && cp "$PRECUTOVER" /etc/network/interfaces
+  [ -f /etc/appliance/ct${MODEL_CTID}.net0.pre ] && pct set "$MODEL_CTID" --net0 "$(cat /etc/appliance/ct${MODEL_CTID}.net0.pre)"
+  [ -f /etc/appliance/ct${WEBUI_CTID}.net0.pre ] && pct set "$WEBUI_CTID" --net0 "$(cat /etc/appliance/ct${WEBUI_CTID}.net0.pre)"
+  systemctl disable --now dnsmasq 2>/dev/null || true
+  write_caddyfile "$WEBUI_IP_NOW" "$MODEL_IP_NOW"; systemctl restart caddy 2>/dev/null || true
+  ifreload -a 2>/dev/null || systemctl restart networking
+  pct reboot "$MODEL_CTID" 2>/dev/null || true; pct reboot "$WEBUI_CTID" 2>/dev/null || true
+  LOG "rollback done — lab3 is back on the LAN; SSH should return."
 }
 
 status() {
@@ -187,8 +242,10 @@ status() {
 }
 
 case "${1:-}" in
-  stage-a) stage_a ;;
-  cutover) cutover ;;
-  status)  status ;;
+  stage-a)   stage_a ;;
+  cutover)   cutover "$@" ;;
+  confirm)   confirm ;;
+  _rollback) _rollback ;;
+  status)    status ;;
   *) sed -n '2,33p' "$0"; exit 2 ;;
 esac
