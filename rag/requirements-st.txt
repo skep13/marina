@@ -1,0 +1,7 @@
+# Optional: the sentence-transformers fallback embedder, for building/testing
+# the index on a Mac without lab3. Pulls torch, so it's a heavy extra — only
+# install it if you want local (non-llama.cpp) embeddings.
+#   pip install -r rag/requirements.txt -r rag/requirements-st.txt
+sentence-transformers>=2.7
+# nomic-embed-text needs einops; harmless for bge.
+einops>=0.7

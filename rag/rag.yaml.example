@@ -1,0 +1,22 @@
+# Copy to rag/rag.yaml to override defaults. Environment variables win over
+# this file. Do NOT put the API key here — it comes from the environment or
+# ~/.marina/agent-keys.env via key_env.
+
+# Where the vector DB and caches live (default: rag/data).
+# data_dir: /models/rag-data        # e.g. on the lab3 appliance
+
+chunk_tokens: 350
+chunk_overlap: 60
+
+embed:
+  # provider: llamacpp | sentence-transformers | hash
+  provider: llamacpp
+  # Known models carry their own dim + retrieval prefixes (see config.EMBED_MODELS):
+  #   bge-small-en-v1.5 (384)  |  nomic-embed-text-v1.5 (768)
+  model: bge-small-en-v1.5
+
+  # --- llamacpp provider (lab3) ---
+  base_url: http://192.168.1.15:8080
+  remote_model: embed            # llama-swap served name / aiws role alias
+  key_env: MARINA_LAB3_KEY       # env var or key in ~/.marina/agent-keys.env
+  batch_size: 32

@@ -1,0 +1,11 @@
+# Generated vector store, caches, and downloaded source data.
+data/
+.venv/
+rag.yaml
+
+# Manually-downloaded sources (gated / bulk). The sample notes under
+# sources_data/notes/ ARE tracked; everything else here is local.
+sources_data/hf_vyber/
+sources_data/nvd/
+__pycache__/
+*.pyc
