@@ -31,3 +31,7 @@ reminders.json
 reminders.tmp
 songbird-kali/agent/kali_agent.py
 songbird-kali/webui/kali_tool.py
+
+# Mac agent (server/agent): lab3 keys live outside the repo; never commit them
+.marina/
+server/agent/agent-keys.env
