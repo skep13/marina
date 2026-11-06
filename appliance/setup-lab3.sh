@@ -76,6 +76,10 @@ http://${APPLIANCE_NAME}, http://${APPLIANCE_IP}, http://localhost {
 			$( [ -n "$key" ] && echo "header_up Authorization \"Bearer ${key}\"" )
 		}
 	}
+	# Cybersecurity RAG retrieval (rag_serve.py on 127.0.0.1:7391); see rag/.
+	handle /rag* {
+		reverse_proxy 127.0.0.1:7391
+	}
 	# One-line agent installer: curl http://${APPLIANCE_NAME}/install | sh
 	handle /install {
 		root * /var/lib/appliance/www
