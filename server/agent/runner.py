@@ -37,11 +37,15 @@ from process.tools import lookup       # noqa: E402
 
 from agent.personas import PERSONAS, LAB3_BASE_URL  # noqa: E402
 
-# lab3 serves only the `marina` model with a vision projector, so every
-# persona's screenshots — and the click-by-description lookups inside the Mac
-# tools — are described by that model.
-VISION_MODEL = "marina"
-_VISION_KEY = None  # set when a run starts; used by the mac._vision override
+# Both personas now have a vision projector, so screenshots and the
+# click-by-description lookups inside the Mac tools use the running persona's
+# own model (set per run) — no model-swap to borrow Marina's eyes.
+_VISION_MODEL = "marina"  # overwritten per run with the persona's model
+_VISION_KEY = None        # set when a run starts; used by the mac._vision override
+
+# Local cybersecurity RAG endpoint (deployed on lab3, behind the ai.local proxy).
+RAG_URL = os.environ.get("AGENT_RAG_URL", "http://ai.local/rag")
+RAG_HOST_HEADER = os.environ.get("AGENT_RAG_HOST", "ai.local")
 
 STATE = Path.home() / ".marina"
 STOP_FILE = STATE / "agent.stop"
@@ -189,7 +193,7 @@ def t_screenshot(ctx, question="Describe what is on screen."):
     content = [{"type": "text", "text": f"{question}\n(The screen is {w}x{h} pixels.)"},
                {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{b64}"}}]
     r = lab3_chat(ctx, [{"role": "user", "content": content}], tools=None,
-                  max_tokens=500, model=VISION_MODEL)
+                  max_tokens=500, model=ctx.persona.model)
     return r["choices"][0]["message"].get("content") or "(no description)"
 
 
@@ -252,6 +256,22 @@ def t_focus_app(ctx, name):
             f"before you type, so your keys don't go to the wrong app.")
 
 
+def t_rag_search(ctx, query, k=6, domain="", source=""):
+    import urllib.parse
+    params = {"q": query, "k": k}
+    if domain:
+        params["domain"] = domain
+    if source:
+        params["source"] = source
+    url = RAG_URL + "?" + urllib.parse.urlencode(params)
+    req = urllib.request.Request(url, headers={"Host": RAG_HOST_HEADER})
+    try:
+        with urllib.request.urlopen(req, timeout=60) as r:
+            return r.read().decode()[:6000]
+    except Exception as e:
+        return f"rag_search unavailable ({e}); fall back to your own knowledge or the web."
+
+
 def t_web_search(ctx, query, max_results=5):
     return lookup.web_search(query, max_results=max_results)
 
@@ -286,6 +306,13 @@ TOOLS = {
     "focus_app": (t_focus_app, "Bring a named app to the front (e.g. Safari, TextEdit) "
                   "before you screenshot, click or type in it.",
                   {"name": "string"}, ["name"]),
+    "rag_search": (t_rag_search, "Search the local cybersecurity knowledge base "
+                   "(MITRE ATT&CK, OWASP cheat sheets, PortSwigger Web Security Academy, "
+                   "your own notes) for vetted reference material. Prefer this over memory "
+                   "for security facts, techniques and mitigations. Optional: domain "
+                   "('att&ck','web','cve') or source to narrow results.",
+                   {"query": "string", "k": "integer", "domain": "string",
+                    "source": "string"}, ["query"]),
     "web_search": (t_web_search, "Search the web.",
                    {"query": "string", "max_results": "integer"}, ["query"]),
     "read_page": (t_read_page, "Fetch a public web page as text.",
@@ -333,7 +360,7 @@ def _vision_via_lab3(prompt, image_b64, max_tokens=300):
     content = [{"type": "text", "text": prompt},
                {"type": "image_url",
                 "image_url": {"url": f"data:image/jpeg;base64,{image_b64}"}}]
-    body = {"model": VISION_MODEL, "messages": [{"role": "user", "content": content}],
+    body = {"model": _VISION_MODEL, "messages": [{"role": "user", "content": content}],
             "temperature": 0.0, "max_tokens": max_tokens,
             "chat_template_kwargs": {"enable_thinking": False}}
     r = _post_lab3(_VISION_KEY, body)
@@ -359,9 +386,10 @@ def check_stop(persona):
 # --- the loop ----------------------------------------------------------------
 
 def run(persona, task, steps, dry_run):
-    global _VISION_KEY
+    global _VISION_KEY, _VISION_MODEL
     key = load_key(persona)
     _VISION_KEY = key
+    _VISION_MODEL = persona.model    # each persona sees with its own model
     mac._vision = _vision_via_lab3   # click-by-description lookups go to lab3
     ctx = Ctx(persona, key, dry_run)
     fns = {name: spec[0] for name, spec in TOOLS.items()}
