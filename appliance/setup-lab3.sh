@@ -21,6 +21,8 @@
 #                                    #   devices connect with no cable. Put the WPA2
 #                                    #   passphrase in /etc/appliance/ap.pass first.
 #                                    #   Keeps the wired LAN up — no cutover needed.
+#                                    #   Also shares the wired internet with Wi-Fi clients.
+#   setup-lab3.sh share-internet     # (re)apply just the internet sharing (NAT)
 #   setup-lab3.sh confirm            # keep the cutover; cancel the auto-rollback.
 #   setup-lab3.sh status             # show what's configured / running
 #
@@ -74,6 +76,13 @@ http://${APPLIANCE_NAME}, http://${APPLIANCE_IP}, http://localhost {
 	handle /v1/* {
 		reverse_proxy ${model}:8080 {
 			$( [ -n "$key" ] && echo "header_up Authorization \"Bearer ${key}\"" )
+		}
+	}
+	# Marina's bridge (chat/stream, voice, moods) for apps like the café game:
+	# http://${APPLIANCE_NAME}/marina/health, /marina/chat/stream. Streams NDJSON.
+	handle_path /marina/* {
+		reverse_proxy ${model}:8765 {
+			flush_interval -1
 		}
 	}
 	# Cybersecurity RAG retrieval (rag_serve.py on 127.0.0.1:7391); see rag/.
@@ -225,6 +234,41 @@ PY
   fi
 }
 
+share_internet() {  # NAT Wi-Fi clients out of the wired port, so joining the
+                    # box's Wi-Fi doesn't cost a laptop its internet
+  cat > /etc/sysctl.d/90-appliance-forward.conf <<EOF
+net.ipv4.ip_forward=1
+EOF
+  sysctl -q -p /etc/sysctl.d/90-appliance-forward.conf
+  install -d /etc/appliance
+  cat > /etc/appliance/nat.nft <<EOF
+table ip appliance_nat {
+	chain postrouting {
+		type nat hook postrouting priority srcnat; policy accept;
+		ip saddr ${APPLIANCE_IP%.*}.0/24 oifname "${BRIDGE}" masquerade
+	}
+}
+EOF
+  cat > /etc/systemd/system/appliance-nat.service <<EOF
+[Unit]
+Description=Share lab3's wired internet with appliance Wi-Fi clients
+After=network-online.target
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStartPre=-/usr/sbin/nft delete table ip appliance_nat
+ExecStart=/usr/sbin/nft -f /etc/appliance/nat.nft
+ExecStop=-/usr/sbin/nft delete table ip appliance_nat
+[Install]
+WantedBy=multi-user.target
+EOF
+  command -v nft >/dev/null || { export DEBIAN_FRONTEND=noninteractive; apt-get install -y -qq nftables; }
+  systemctl daemon-reload
+  systemctl enable --now appliance-nat
+  systemctl restart appliance-nat
+  LOG "internet sharing on: Wi-Fi clients reach the internet through ${BRIDGE} when it's cabled to a router"
+}
+
 wifi_ap() {   # host a Wi-Fi network so devices connect with no cable
   need_root
   [ -f "$AP_PASS_FILE" ] || { echo "put the WPA2 passphrase (>=8 chars) in $AP_PASS_FILE first"; exit 1; }
@@ -272,8 +316,14 @@ dhcp-range=${DHCP_FROM},${DHCP_TO},12h
 dhcp-option=option:router,${APPLIANCE_IP}
 dhcp-option=option:dns-server,${APPLIANCE_IP}
 address=/${APPLIANCE_NAME}/${APPLIANCE_IP}
-no-resolv
+# Other names go to lab3's own upstream DNS, so AP clients keep internet
+# whenever the wired port has one (see share_internet below).
+resolv-file=/etc/resolv.conf
 EOF
+  share_internet
+  # refresh the proxy too, so new routes (like /marina/) go live with this command
+  if [ -f "$CONFIRMED" ]; then write_caddyfile "$WEBUI_IP_APPLIANCE" "$MODEL_IP_APPLIANCE"; else write_caddyfile "$WEBUI_IP_NOW" "$MODEL_IP_NOW"; fi
+  systemctl reload caddy 2>/dev/null || systemctl restart caddy
   mkdir -p /etc/systemd/system/dnsmasq.service.d
   printf '[Unit]\nAfter=appliance-ap-ip.service\nRequires=appliance-ap-ip.service\n' \
     > /etc/systemd/system/dnsmasq.service.d/after-ap.conf
@@ -318,9 +368,10 @@ status() {
 case "${1:-}" in
   stage-a)   stage_a ;;
   wifi-ap)   wifi_ap ;;
+  share-internet) need_root; share_internet ;;
   cutover)   cutover "$@" ;;
   confirm)   confirm ;;
   _rollback) _rollback ;;
   status)    status ;;
-  *) sed -n '2,33p' "$0"; exit 2 ;;
+  *) sed -n '2,35p' "$0"; exit 2 ;;
 esac

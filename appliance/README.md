@@ -56,6 +56,24 @@ proxy already answers chat + the keyless API. Verified: a client gets a
 The passphrase lives only in `/etc/appliance/ap.pass` and `hostapd.conf` on the
 box, never in the repo.
 
+### Keeping internet while you use the box
+
+A laptop has one Wi-Fi radio, so joining "Local AI Box" used to mean losing
+the internet. Two ways round it:
+
+- **Box cabled to a router (home, office):** lab3's wired port stays on that
+  LAN, so the laptop stays on its normal Wi-Fi and reaches Marina over the LAN
+  (`http://192.168.1.15:8765`, or `http://<lab3-ip>/marina/` with
+  `Host: ai.local`). Nothing to join.
+- **Joining the box's Wi-Fi:** `wifi-ap` now also NATs Wi-Fi clients out of
+  the wired port (`share-internet`), and dnsmasq forwards other names upstream,
+  so a laptop on "Local AI Box" keeps the internet whenever the box itself is
+  cabled to a router. With no cable anywhere, tether the laptop to a phone
+  over USB and put that service above Wi-Fi in the macOS network order.
+
+Marina's bridge is proxied at `http://ai.local/marina/` (health, chat/stream),
+so apps on the box's Wi-Fi need only that one address.
+
 ## Stage B — cutover (only if you want the WIRED port to be the appliance net)
 
 This repurposes the wired NIC into the appliance network. **It cuts lab3 off
