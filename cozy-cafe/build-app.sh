@@ -11,7 +11,7 @@ rm -rf "$APP" build
 mkdir -p build "$APP/Contents/MacOS" "$APP/Contents/Resources/game"
 
 swiftc -O -o "$APP/Contents/MacOS/RainyDayCafe" mac/CafeApp.swift \
-  -framework Cocoa -framework WebKit
+  -framework Cocoa -framework WebKit -framework AVFoundation
 
 swift mac/make-icon.swift build/AppIcon.iconset
 iconutil -c icns build/AppIcon.iconset -o "$APP/Contents/Resources/AppIcon.icns"
@@ -32,6 +32,7 @@ cat > "$APP/Contents/Info.plist" <<'PLIST'
   <key>CFBundleShortVersionString</key><string>1.0</string>
   <key>CFBundleVersion</key><string>1</string>
   <key>LSMinimumSystemVersion</key><string>13.0</string>
+  <key>NSMicrophoneUsageDescription</key><string>So you can talk to Marina on a call.</string>
   <key>LSApplicationCategoryType</key><string>public.app-category.simulation-games</string>
   <key>NSHighResolutionCapable</key><true/>
   <key>NSAppTransportSecurity</key>
