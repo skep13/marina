@@ -264,6 +264,7 @@ function createWindow() {
 
 let openersOn = true;
 let wakeOn = false;
+let onCall = false;
 
 // The personalities the bridge offers, for the menu bar. Fetched when the
 // menu is about to show, since the bridge owns the current choice.
@@ -353,6 +354,11 @@ function buildTray() {
           if (!win || win.isDestroyed()) return createWindow();
           win.isVisible() ? win.hide() : win.show();
         },
+      },
+      {
+        label: onCall ? 'Hang up' : 'Call Marina',
+        accelerator: 'Command+Shift+C',
+        click: () => { win?.show(); win?.webContents.send('toggle-call'); },
       },
       { type: 'separator' },
       {
@@ -444,6 +450,10 @@ app.whenReady().then(() => {
     win?.webContents.send('interrupt');
   });
   globalShortcut.register('CommandOrControl+Shift+F', () => setStage(!stage));
+  globalShortcut.register('CommandOrControl+Shift+C', () => {
+    win?.show();
+    win?.webContents.send('toggle-call');
+  });
   globalShortcut.register('CommandOrControl+Shift+Space', () => {
     win?.webContents.send('toggle-listen');
   });
@@ -543,5 +553,6 @@ ipcMain.handle('capture-screen', async () => {
 
 ipcMain.on('openers-changed', (_e, on) => { openersOn = !!on; });
 ipcMain.on('wake-changed', (_e, on) => { wakeOn = !!on; });
+ipcMain.on('call-changed', (_e, on) => { onCall = !!on; });
 ipcMain.on('quit', () => app.quit());
 ipcMain.on('minimize', () => win?.hide());

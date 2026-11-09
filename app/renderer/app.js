@@ -1370,7 +1370,7 @@ function tick() {
 
 const gl = renderer.getContext();
 const probe = new Uint8Array(4);
-const UI = ['#bar', '#chrome', '#status', '#bubble', '#picker', '#notice', '#ask', '#drag-strip'];
+const UI = ['#call', '#bar', '#chrome', '#status', '#bubble', '#picker', '#notice', '#ask', '#drag-strip'];
 
 function overUI(x, y) {
   const hit = document.elementFromPoint(x, y);
@@ -1909,6 +1909,7 @@ async function toggleListenWeb() {
 
 function showListening(on) {
   recording = on;
+  callState.hearing = false;
   btnMic.classList.toggle('recording', on);
   if (on) setStatus('busy', 'listening…');
 }
@@ -1926,6 +1927,7 @@ async function consumeVoice(res, req, onWake) {
       showListening(true);
       pushCue('tilt', 0.8);
     } else if (ev.type === 'speech') {
+      callState.hearing = true;
       if (recording) setStatus('busy', 'listening…');
     } else if (ev.type === 'transcribing') {
       showListening(false);
@@ -1983,7 +1985,7 @@ async function toggleListen() {
 // else it hears is kept. Busy, speaking or listening for the button, it
 // stops, so she never hears herself.
 function wakeIdle() {
-  return wakeOn && bridgeReady && !busy && !recording && !playing && utterance.epoch < 0;
+  return !callState.on && wakeOn && bridgeReady && !busy && !recording && !playing && utterance.epoch < 0;
 }
 
 function pauseWake(force) {
@@ -2041,6 +2043,248 @@ function sendFromInput() {
 }
 
 btnSend.addEventListener('click', sendFromInput);
+
+// ── Calling her ───────────────────────────────────────────────────────────
+// Hands-free, like a phone call: she picks up and says hello, then it goes
+// in turns. The mic listens until you pause, she answers (you can talk over
+// her, as with any reply), and when she's finished it listens again. The
+// bridge tells her she's on a call so she talks like it. On the Mac the
+// bridge does the listening; in a browser the page does and uploads each
+// thing you say.
+const callState = { on: false, t0: 0, muted: false, ctrl: null, hearing: false, level: 0, timer: null };
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+function paintCall() {
+  const box = el('call');
+  const s = Math.floor((Date.now() - callState.t0) / 1000);
+  el('call-time').textContent = `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+  const talking = playing > 0 || utterance.epoch >= 0;
+  const phase = !callState.t0 ? 'ringing'
+    : talking ? 'talking'
+    : callState.muted ? 'muted'
+    : recording ? (callState.hearing ? 'hearing' : 'listening')
+    : busy ? 'thinking' : 'listening';
+  const words = { ringing: 'ringing…', talking: 'Marina is talking', muted: 'you’re muted', hearing: 'hearing you…', listening: 'listening, just talk', thinking: 'thinking…' };
+  box.dataset.phase = phase;
+  el('call-phase').textContent = words[phase];
+  const bars = el('call-level').children;
+  const t = performance.now() / 1000;
+  for (let i = 0; i < bars.length; i++) {
+    const v = phase === 'talking' ? mouthOpen * 1.6 + 0.15 * Math.abs(Math.sin(t * 7 + i))
+      : phase === 'hearing' ? (WEB ? Math.min(1, callState.level * 16) : 0.3 + 0.5 * Math.abs(Math.sin(t * 9 + i * 1.7)))
+      : phase === 'thinking' ? 0.25 + 0.25 * Math.sin(t * 4 + i)
+      : phase === 'listening' && WEB ? Math.min(1, callState.level * 16) : 0.05;
+    bars[i].style.height = `${3 + Math.min(1, v) * (14 - Math.abs(i - 2) * 2)}px`;
+  }
+}
+
+async function startCall() {
+  if (callState.on) return endCall();
+  if (!bridgeReady) { showNotice(BRIDGE_DOWN, 'bridge'); return; }
+  if (recording) return;
+  await interrupt();
+  pauseWake(true);
+  ensureAudio();
+  Object.assign(callState, { on: true, t0: 0, muted: false, hearing: false, level: 0 });
+  document.body.classList.add('oncall');
+  el('call').classList.remove('hidden', 'muted');
+  el('btn-call').classList.add('on');
+  el('btn-call').title = 'Hang up (⌘⇧C)';
+  window.marina?.callChanged?.(true);
+  callState.timer = setInterval(paintCall, 80);
+  paintCall();
+  pushCue('tilt', 0.8);
+
+  // She picks up.
+  setBusy(true, 'ringing…');
+  const req = newRequest();
+  try {
+    await sleep(700);
+    if (!callState.on) return;
+    if (WEB) await webCallOpen();
+    callState.t0 = Date.now();
+    await consumeReply(await fetch(`${BRIDGE}/call/start`, { method: 'POST' }), req);
+  } catch (e) {
+    if (callState.on && !req.cancelled) {
+      showNotice(WEB && e?.name !== 'TypeError' ? `Can't use the microphone: ${e.message}` : BRIDGE_DOWN, 'bridge');
+      endCall();
+    }
+    return;
+  } finally {
+    disarmBargeIn(req);
+    if (inflight === req) inflight = null;
+    setBusy(false);
+  }
+  callLoop();
+}
+
+async function callLoop() {
+  while (callState.on) {
+    if (callState.muted || busy || recording || playing > 0 || utterance.epoch >= 0) {
+      await sleep(200);
+      continue;
+    }
+    await callTurn();
+    await sleep(150);
+  }
+}
+
+async function callTurn() {
+  const ctrl = new AbortController();
+  callState.ctrl = ctrl;
+  const req = newRequest();
+  req.voice = true;
+  showListening(true);
+  hideNotice('bridge');
+  try {
+    if (WEB) {
+      const clip = await webCallUtterance(ctrl.signal);
+      if (!clip || !callState.on) return;
+      showListening(false);
+      setBusy(true, 'transcribing');
+      const form = new FormData();
+      form.append('audio', clip, clip.type.includes('mp4') ? 'clip.m4a' : 'clip.webm');
+      await consumeReply(await fetch('/voice/stream', { method: 'POST', body: form, signal: ctrl.signal }), req);
+    } else {
+      await consumeVoice(await fetch(`${BRIDGE}/listen/auto?max_seconds=30`, { signal: ctrl.signal }), req);
+    }
+  } catch {
+    if (callState.on && !ctrl.signal.aborted && !req.cancelled) {
+      endCall();
+      bridgeLost();
+    }
+  } finally {
+    if (callState.ctrl === ctrl) callState.ctrl = null;
+    showListening(false);
+    disarmBargeIn(req);
+    if (inflight === req) inflight = null;
+    setBusy(false);
+  }
+}
+
+function stopListeningTurn() {
+  if (callState.ctrl) { try { callState.ctrl.abort(); } catch {} callState.ctrl = null; }
+  if (!WEB) post('/listen/cancel').catch(() => {});
+}
+
+function toggleCallMute() {
+  if (!callState.on) return;
+  callState.muted = !callState.muted;
+  el('call').classList.toggle('muted', callState.muted);
+  el('call-mute').title = callState.muted ? 'Unmute' : 'Mute your mic';
+  if (callState.muted) stopListeningTurn();
+  paintCall();
+}
+
+function endCall() {
+  if (!callState.on) return;
+  callState.on = false;
+  stopListeningTurn();
+  interrupt();
+  if (WEB) webCallClose();
+  clearInterval(callState.timer);
+  document.body.classList.remove('oncall');
+  el('call').classList.add('hidden');
+  el('btn-call').classList.remove('on');
+  el('btn-call').title = 'Call her: talk hands-free (⌘⇧C)';
+  window.marina?.callChanged?.(false);
+  post('/call/end').then((r) => {
+    const s = r?.seconds || 0;
+    if (s > 4) setStatus('ok', `call ended · ${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`);
+  }).catch(() => {});
+  setBusy(false);
+  if (wakeOn) startWakeLoop();
+}
+
+// In a browser: the page listens and cuts each thing you say into a clip.
+let webCall = null;
+
+async function webCallOpen() {
+  if (webCall) return webCall;
+  if (navigator.audioSession) navigator.audioSession.type = 'play-and-record';
+  const stream = await navigator.mediaDevices.getUserMedia({
+    audio: { echoCancellation: true, noiseSuppression: true },
+  });
+  const ac = new AudioContext();
+  const an = ac.createAnalyser();
+  an.fftSize = 1024;
+  ac.createMediaStreamSource(stream).connect(an);
+  webCall = { stream, ac, an, buf: new Float32Array(an.fftSize), noise: 0.01 };
+  return webCall;
+}
+
+function webCallClose() {
+  if (!webCall) return;
+  webCall.stream.getTracks().forEach((t) => t.stop());
+  webCall.ac.close().catch(() => {});
+  webCall = null;
+  if (navigator.audioSession) navigator.audioSession.type = 'playback';
+}
+
+// Resolves with a clip once you've said something and paused, or null if
+// the turn was stopped. Too-short sounds (a cough, a click) are skipped.
+function webCallUtterance(signal) {
+  return new Promise((resolve) => {
+    const w = webCall;
+    if (!w) return resolve(null);
+    let speaking = false, spoke = 0, silent = 0, started = 0, rec = null, parts = [];
+    let last = performance.now();
+    const finish = (clip) => {
+      clearInterval(timer);
+      signal.removeEventListener('abort', onAbort);
+      resolve(clip);
+    };
+    const onAbort = () => {
+      if (rec) { rec.onstop = null; try { rec.stop(); } catch {} }
+      finish(null);
+    };
+    signal.addEventListener('abort', onAbort);
+    const timer = setInterval(() => {
+      const now = performance.now();
+      const dt = (now - last) / 1000;
+      last = now;
+      w.an.getFloatTimeDomainData(w.buf);
+      let sq = 0;
+      for (const v of w.buf) sq += v * v;
+      const rms = Math.sqrt(sq / w.buf.length);
+      callState.level = rms;
+      const th = Math.max(0.015, w.noise * 3);
+      if (!speaking) {
+        if (rms > th) {
+          spoke += dt;
+          if (spoke > 0.12) {
+            speaking = true; silent = 0; started = now; parts = [];
+            rec = new MediaRecorder(w.stream);
+            rec.ondataavailable = (e) => { if (e.data.size) parts.push(e.data); };
+            rec.start();
+            callState.hearing = true;
+          }
+        } else {
+          spoke = 0;
+          w.noise = w.noise * 0.97 + rms * 0.03;
+        }
+        return;
+      }
+      silent = rms < th * 0.7 ? silent + dt : 0;
+      if (silent < 0.9 && now - started < 30000) return;
+      const talked = now - started - silent * 1000;
+      const r = rec;
+      rec = null; speaking = false; spoke = 0; callState.hearing = false;
+      r.onstop = () => {
+        if (talked >= 400) finish(new Blob(parts, { type: r.mimeType }));
+      };
+      r.stop();
+    }, 50);
+  });
+}
+
+el('btn-call').addEventListener('click', startCall);
+el('call-end').addEventListener('click', endCall);
+el('call-mute').addEventListener('click', toggleCallMute);
+window.marina?.onToggleCall?.(startCall);
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && callState.on && !askId && document.activeElement !== input) { e.preventDefault(); endCall(); }
+});
 
 input.addEventListener('keydown', (e) => {
   if (e.key === 'Enter') sendFromInput();

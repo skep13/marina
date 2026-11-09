@@ -18,6 +18,8 @@ contextBridge.exposeInMainWorld('marina', {
   onSetPreset: (cb) => ipcRenderer.on('set-preset', (_e, name) => cb(name)),
   onSetStage: (cb) => ipcRenderer.on('set-stage', (_e, on) => cb(on)),
   openersChanged: (on) => ipcRenderer.send('openers-changed', on),
+  onToggleCall: (cb) => ipcRenderer.on('toggle-call', () => cb()),
+  callChanged: (on) => ipcRenderer.send('call-changed', on),
   onSetWake: (cb) => ipcRenderer.on('set-wake', (_e, on) => cb(on)),
   wakeChanged: (on) => ipcRenderer.send('wake-changed', on),
 });

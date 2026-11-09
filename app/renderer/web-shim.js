@@ -18,6 +18,8 @@
     cameraAccess: async () => true,
     openersChanged: noop,
     onToggleListen: noop,
+    onToggleCall: noop,
+    callChanged: noop,
     onPickModel: noop,
     onLookAtScreen: noop,
     onBridgeDown: noop,

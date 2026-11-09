@@ -237,6 +237,51 @@ button svg { display: block; pointer-events: none; }
 }
 @keyframes pulse { 50% { opacity: .55; } }
 
+/* Calling her: a pill above her head; the bar stays for typing. */
+#call {
+  position: fixed;
+  left: 50%;
+  top: 34px;
+  transform: translateX(-50%);
+  width: min(440px, calc(100% - 24px));
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 8px 8px 14px;
+  border-radius: 18px;
+  background: var(--panel-strong);
+  border: 1px solid rgba(255,255,255,.09);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  box-shadow: 0 10px 30px rgba(0,0,0,.4);
+  z-index: 12;
+  -webkit-app-region: no-drag;
+  transition: opacity .2s ease, transform .2s ease;
+}
+#call.hidden { opacity: 0; transform: translateX(-50%) translateY(-8px); pointer-events: none; }
+#call-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--ok); flex: none; animation: pulse 1.6s ease-in-out infinite; }
+#call-info { flex: 1; min-width: 0; display: flex; flex-direction: column; line-height: 1.25; }
+#call-info b { font-weight: 600; font-size: 13px; }
+#call-info > span { color: var(--muted); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#call-time { font-variant-numeric: tabular-nums; }
+#call-level { display: inline-flex; align-items: center; gap: 2px; height: 18px; color: var(--accent); }
+#call-level i { width: 3px; height: 3px; border-radius: 2px; background: currentColor; transition: height .08s; }
+#call[data-phase="talking"] #call-level { color: #f2a3b4; }
+#call button {
+  width: 34px; height: 34px; border: 0; border-radius: 50%; flex: none;
+  background: rgba(255,255,255,.1); color: var(--text); cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center; padding: 0;
+}
+#call button:hover { background: rgba(255,255,255,.18); }
+#call-mute .slash { display: none; }
+#call.muted #call-mute { background: rgba(255,255,255,.04); color: var(--muted); }
+#call.muted #call-mute .slash { display: inline; }
+#call #call-end { background: var(--danger); color: #fff; }
+#btn-call.on { background: var(--ok); color: #0b1017; }
+body.oncall #btn-mic { display: none; }
+body.oncall #bar, body.oncall #status { opacity: 1; }
+.web #call { top: calc(env(safe-area-inset-top) + 54px); }
+
 #status {
   position: fixed;
   left: 50%;
