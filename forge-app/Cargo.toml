@@ -1,0 +1,17 @@
+[package]
+name = "forge-app"
+version = "0.1.0"
+edition = "2024"
+description = "Forge.app — native macOS window for the Forge coding agent (DeepSeek Harness + KAT-Coder on lab3)"
+license = "MIT"
+
+[dependencies]
+libc = "0.2.191"
+muda = "0.21.2"
+serde_json = "1.0.154"
+tao = "0.37.2"
+wry = "0.57.1"
+
+[profile.release]
+opt-level = 2
+strip = true
