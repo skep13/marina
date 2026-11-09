@@ -33,24 +33,23 @@ TEMPLATE = """/* ============================================================
   --ink-dim: {inkdim};
   --mono: "DepartureMono","IBM Plex Mono","JetBrains Mono",ui-monospace,Menlo,monospace;
 
+  /* Open WebUI is Tailwind v4: bg-gray-* => var(--color-gray-*). Make the
+     surface grays TRANSLUCENT so the app chrome stops covering the wallpaper. */
   --color-gray-50:#f3edf2;--color-gray-100:{ink};--color-gray-200:#cbbfd6;
   --color-gray-300:#a89bbd;--color-gray-400:{inkdim};--color-gray-500:#5c5570;
-  --color-gray-600:{bezel};--color-gray-700:{panel2};--color-gray-800:{panel};
-  --color-gray-850:{bg};--color-gray-900:{bg};--color-gray-950:{bg};
+  --color-gray-600:{bezel};
+  --color-gray-700:color-mix(in srgb, {panel2} 82%, transparent);
+  --color-gray-800:color-mix(in srgb, {panel} 72%, transparent);
+  --color-gray-850:color-mix(in srgb, {bg} 62%, transparent);
+  --color-gray-900:color-mix(in srgb, {bg} 56%, transparent);
+  --color-gray-950:color-mix(in srgb, {bg} 74%, transparent);
 }}
 
 /* ---- full-page art backdrop + scrim ---------------------- */
-/* Image + scrim + scanlines are layered directly on the body
-   background (top layer listed first) and fixed to the viewport,
-   so an opaque surface never paints over the art. */
-html {{ background-color: var(--bg) !important; }}
-html, body, body.dark {{
-  color: var(--ink) !important;
-  font-family: var(--mono) !important;
-  text-shadow: 0 1px 3px rgba(0,0,0,.6);
-  min-height: 100vh;
-}}
-body, body.dark {{
+/* Wallpaper + scrim + scanlines go on <html> (the base layer, fixed to
+   the viewport), and <body> plus the app shell are made transparent, so
+   Open WebUI's own opaque surfaces never paint over the art. */
+html {{
   background-image:
     repeating-linear-gradient(to bottom, transparent 0 2px, rgba(0,0,0,.22) 3px),
     linear-gradient(180deg, {scrimTop} 0%, {scrimMid} 52%, {scrimBot} 100%),
@@ -61,9 +60,17 @@ body, body.dark {{
   background-attachment: fixed, fixed, fixed !important;
   background-color: var(--bg) !important;
 }}
-/* let the art show through the app shell */
-#app, #messages-container, .main, .chat-container, [class*="chat"] {{
-  background: transparent !important;
+html, body, body.dark {{
+  color: var(--ink) !important;
+  font-family: var(--mono) !important;
+  text-shadow: 0 1px 3px rgba(0,0,0,.6);
+  min-height: 100vh;
+}}
+body, body.dark {{ background: transparent !important; }}
+/* let the art show through the app shell + its full-height containers */
+#app, #messages-container, .main, .chat-container, [class*="chat"],
+.h-screen, .min-h-screen, .h-full, .w-full.h-full {{
+  background-color: transparent !important;
 }}
 
 /* ---- top strip ------------------------------------------- */
@@ -161,7 +168,7 @@ REZE = dict(
   c2="#55c2cc", c2glow="rgba(85,194,204,.5)",
   c3="#55c2cc", c3glow="rgba(85,194,204,.5)",
   ink="#f6cfd1", inkdim="#6f9a9e",
-  imgpos="center top", scrimTop="rgba(3,5,6,.52)", scrimMid="rgba(3,5,6,.66)", scrimBot="rgba(3,5,6,.93)",
+  imgpos="center", scrimTop="rgba(3,5,6,.52)", scrimMid="rgba(3,5,6,.66)", scrimBot="rgba(3,5,6,.93)",
 )
 CRIMSON = dict(
   title="Open WebUI container — steel & crimson theme", where="an Open WebUI container",
