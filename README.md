@@ -81,6 +81,9 @@ Her config, memory and chat history live in
 ## What she can do
 
 - Sit on your desktop in a transparent, always-on-top window
+- Call her hands-free from the window, the tray or a phone's browser
+- Play Rainy Day Café with her, a coffee shop game where she works shifts
+  and reacts to how the day is going
 - Talk to her or type. The mic stops by itself when you finish talking,
   or after 10 seconds
 - Say her name to talk to her hands-free: "Marina, what time is it?" Off
@@ -89,8 +92,17 @@ Her config, memory and chat history live in
   her
 - Starts speaking before the whole reply has been generated
 - You can cut her off by talking over her
-- Sometimes says something without being asked
-- Timers, reading the clipboard, opening links, remembering things
+- Sometimes says something without being asked, and notices when you're
+  back after a while or have been in one app for hours (`idle.notice`)
+- Has something going on in her own life each day, picked from the date
+- Tracks the openers and phrases she's been leaning on lately and steers
+  away from them, so she doesn't fall into the loops local models get into
+- Timers, reminders that survive a restart, reading the clipboard, opening
+  links, remembering things
+- Searches the web, reads pages, checks the weather, and knows your
+  calendar and what's playing
+- Can use your Mac's mouse, keyboard, files and terminal, with Allow and
+  Deny for anything risky (off by default)
 - Has her own Linux machine where she runs commands and edits code, so you
   can build things with her instead of just talking about them
 - You can text her on Telegram, voice notes included, and she texts you
@@ -109,6 +121,73 @@ Her config, memory and chat history live in
 - Local voice (Kokoro) and speech recognition (Faster-Whisper)
 - Works with any OpenAI-compatible model: Ollama, llama.cpp, LM Studio, vLLM
   or OpenAI itself
+- Has an OpenAI-style API of her own, so Open WebUI and other chat front ends
+  can talk to her with the same memory and personality
+- A desk pet that follows what the Mac is doing, and a plug-in AI box that
+  runs her with no setup on the device
+
+## Calling her
+
+Press call in her window or the tray menu, or **V** in Rainy Day Café. She
+picks up with a greeting that fits the conversation so far, and from then
+on it's turns: you talk, she answers, the mic opens again. While a call is
+on, she talks like someone on the phone: short spoken sentences, no lists,
+no `*actions*`. Nothing she'd say unprompted interrupts a call. The call
+screen has a timer, mute and hang-up.
+
+On the Mac the bridge does the listening. In a browser, such as a phone on
+the AI box's Wi-Fi, the page listens instead. The bridge side is
+`/call/start`, `/call/end` and `/call` ([`server/process/call.py`](server/process/call.py)).
+
+## Rainy Day Café
+
+[`cozy-cafe/`](cozy-cafe/) is an isometric coffee shop game, built as a
+native Mac app (`cozy-cafe/build-app.sh` installs it to /Applications).
+You run the counter across 13 stations, hire staff, and decorate. Marina
+works shifts there, and the game connects to her bridge, so it's really
+her: she reacts to a perfect cup, a customer walking out, a new
+decoration or outfit, and to how the day went, and she greets you with
+what she remembers.
+
+Call her with **V** and the café pauses while you talk. Press **K** to keep
+playing during the call, and she talks about the game as it happens. The
+game finds her bridge on the same Mac, on the AI box's Wi-Fi or on your home
+network.
+
+## Her hands on your Mac
+
+With `mac.enabled: true` on a bridge running on the Mac, she can run
+commands, read and edit files in your home folder, take a look at the
+screen, and click, type and scroll. A few things keep that safe:
+
+- Using the mouse and keyboard needs your OK once per reply, and risky
+  commands (deleting, `sudo`, `git push`, piping a download into a shell)
+  need it every time. The app shows Allow and Deny, and no answer means no.
+- Secrets are off limits: `~/.ssh`, keychains, password managers and the
+  apps that hold them can't be read, written, opened or typed into.
+- macOS has to allow it as well: Screen Recording and Accessibility for
+  Marina, under System Settings > Privacy & Security.
+
+Only the desktop bridge has these tools. Telegram and chat front ends run
+on the server and never get them.
+
+## Hardware
+
+**A desk pet.** [`songbird-pet/`](songbird-pet/) turns an ESP32-S3 with a
+small OLED into a desk pet that follows what the Mac is doing. While music
+plays, a spinning record replaces her eyes. She shows a terminal while you
+code and a radar sweep while you browse. She looks around for you when you
+step away and suggests a stretch after 90 minutes. `songbird-pet/host/pet_feed.py`
+publishes the Mac's state to the pet over MQTT, and the pet's button
+plays and pauses music.
+
+**A box you plug in.** [`appliance/`](appliance/) turns a mini PC into a
+portable AI box. Plug a device into it, or join its Wi-Fi, and Marina is
+at `http://ai.local`: her app over HTTPS for phones, Open WebUI and the
+model API, all running on the box with no setup on the device. It can host
+its own Wi-Fi and join another network at the same time, take an address
+from whatever it's plugged into, and be reached from anywhere over
+Tailscale.
 
 ## Texting her
 
@@ -329,10 +408,21 @@ server/
     text_func/speech.py       splits replies into speech and animation cues,
                               and into speakable chunks while streaming
     idle.py                   when she says something unprompted
+    notice.py                 back after a while away, hours in one app
+    call.py                   hands-free calls
+    confirm.py                Allow / Deny before risky actions
+    llm_funcs/fresh.py        keeping her from repeating herself
+    memory/persona.py         what's going on in her life today
     tools/context.py          time, frontmost app, battery
     tools/registry.py         timers, clipboard, links, remembering
+    tools/reminders.py        reminders that survive a restart
+    tools/lookup.py           web search, reading pages, weather
+    tools/desk.py             calendar and what's playing
+    tools/mac.py              commands, files, screen, mouse and keyboard
     tools/workspace.py        commands and files on her own machine, over SSH
     telegram.py               texting her, voice notes, texting first
+    satellite.py              Wyoming server for an Echo in another room
+    openai_api.py             OpenAI-style API for chat front ends
     vision/look.py            screenshot to vision model
     memory/store.py           durable facts, deduped and capped
     memory/extract.py         decides what is worth remembering
@@ -346,6 +436,9 @@ app/
   models/model.vrm            your avatar
   test/                       Electron scripts that load the avatar and check it
   build/backend/              staged by build-app.sh, copied into the bundle
+cozy-cafe/                    Rainy Day Café, the game she works in
+songbird-pet/                 ESP32-S3 desk pet and its Mac feed
+appliance/                    the plug-in AI box (setup-lab3.sh)
 ```
 
 Inside the packaged app the same pieces sit like this:
