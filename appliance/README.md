@@ -74,6 +74,121 @@ the internet. Two ways round it:
 Marina's bridge is proxied at `http://ai.local/marina/` (health, chat/stream),
 so apps on the box's Wi-Fi need only that one address.
 
+### Hosting and joining at once (`wifi-both`)
+
+With no cable anywhere, lab3's Wi-Fi card can do both jobs: host "Local AI
+Box" and join another network (your phone's hotspot, a café's Wi-Fi) for
+internet, which it shares with everyone on "Local AI Box". The AP moves to a
+virtual interface (`wlap0`); the card itself joins the uplink.
+
+Limits of the hardware: both have to be on **one 2.4 GHz channel**. A watcher
+moves "Local AI Box" onto the uplink's channel, so its clients drop for a few
+seconds whenever that happens. On an iPhone hotspot turn on **Maximise
+Compatibility** (otherwise it's 5 GHz only). Don't list your home Wi-Fi here:
+it shares `192.168.1.x` with the wired port; at home, use the cable.
+
+1. On the box, list the networks to join (the passwords stay on the box).
+   The name has to match exactly, spaces included: an iPhone's hotspot is
+   often called `iPhone (2)`, not `iPhone(2)`. Keep the iPhone's Personal
+   Hotspot screen open while the box first joins; it stops advertising soon
+   after you leave it.
+
+   ```bash
+   cat > /etc/appliance/uplink.conf <<'EOF'
+   network={
+       ssid="My iPhone"
+       psk="hotspot password"
+   }
+   EOF
+   ```
+
+2. Run it detached (your connection to "Local AI Box" drops while it switches):
+
+   ```bash
+   systemd-run --unit=appliance-wifi-both /root/setup-lab3.sh wifi-both
+   ```
+
+3. Rejoin "Local AI Box", check you have internet, then keep it:
+
+   ```bash
+   ssh root@10.42.0.1 /root/setup-lab3.sh wifi-both-ok
+   ```
+
+   If you can't get back on within 10 minutes, it reverts to plain AP mode on
+   its own (`WIFI_REVERT_WINDOW`). If the AP doesn't come up at all it reverts
+   straight away. `setup-lab3.sh status` shows the channel, the uplink and the
+   route; `setup-lab3.sh wifi-ap-only` turns it off.
+
+All the tools it needs (`wpasupplicant`, `isc-dhcp-client`, `hostapd`, `iw`)
+must already be installed; with no uplink yet there's no `apt`, so it checks
+first and changes nothing if one is missing. When the cable is plugged in, the
+box prefers it for internet automatically.
+
+### Calling Marina from a phone (`phone`)
+
+Marina's own app, with hands-free calls, for phones on "Local AI Box". It is
+served over HTTPS on port 8443, because browsers only let a page use the
+microphone over HTTPS, and only to devices on the box's Wi-Fi.
+
+1. Copy the app into ct110 under `/opt/marina/app/`: `app/renderer`,
+   `app/models/model.vrm` and `app/build/icon.png` from the repo.
+2. On lab3: `/root/setup-lab3.sh phone`. This makes a token for the proxy
+   (`/etc/appliance/phone.token`, never in the repo) and turns on `web:` in her
+   config with that token. Her bridge still refuses everything else from the
+   network. It restarts her bridge and Caddy, and publishes the box's
+   certificate.
+3. On the phone, once: join "Local AI Box", open
+   `http://10.42.0.1/marina-ca.crt` and trust it.
+   - **iPhone:** Settings › Profile Downloaded › Install, then Settings ›
+     General › About › Certificate Trust Settings › turn it on.
+   - **Android:** Settings › Security › Encryption & credentials › Install a
+     certificate › CA certificate.
+4. Open **https://10.42.0.1:8443** (or `https://ai.local:8443`), Share › Add
+   to Home Screen, and tap the green phone button to call her.
+
+### Moving the box around (`roam`)
+
+For a box that gets plugged in somewhere different each time. Your laptop
+stays on its own Wi-Fi the whole time. Run it once:
+
+```bash
+/root/setup-lab3.sh roam
+```
+
+- **Plugged into a Mac:** turn on Internet Sharing on the Mac (System Settings ›
+  General › Sharing › Internet Sharing, from Wi-Fi to the USB ethernet
+  adapter). The box takes an address from the Mac and uses its internet, and
+  Marina and the chat are at **http://ai.local**. Without Internet Sharing the
+  box still answers at `http://169.254.42.1`. For that, leave the Mac's ethernet
+  on "Using DHCP": macOS then picks a `169.254.x` address on the cable by itself.
+- **Plugged into a router:** the box takes an address there and uses its
+  internet. At home it keeps `192.168.1.13` as well.
+- **Nothing on the cable:** the box uses its Wi-Fi uplink (`wifi-both`) if
+  one's in range, and "Local AI Box" works as always.
+
+The containers go out through lab3 (lab3 is their gateway and DNS), so Marina
+keeps her internet (Telegram, web tools) wherever the box has some. mDNS
+answers `ai.local` on each network with the box's address there.
+
+Marina's bridge and the keyless model API answer only from trusted networks
+(`TRUSTED_NETS`): "Local AI Box", the cable (`169.254.x`, or a Mac's Internet
+Sharing on `192.168.2-3.x`), the home LAN and Tailscale. On anyone else's
+network, other devices get a 403.
+
+### From any network (Tailscale)
+
+With the box at home and cabled to the router, you can reach it from anywhere
+over Tailscale and keep your normal internet:
+
+```bash
+/root/setup-lab3.sh tailscale    # installs Tailscale, joins as "lab3"; open the login link it prints
+```
+
+Then sign in to the same Tailscale account on your laptop. The box answers at
+`http://lab3` (chat), `http://lab3/v1` (keyless API) and `http://lab3/marina/`
+(Marina's bridge; the café game finds it automatically). This needs MagicDNS,
+which Tailscale turns on by default; otherwise use the box's `100.x` address.
+
 ## Stage B — cutover (only if you want the WIRED port to be the appliance net)
 
 This repurposes the wired NIC into the appliance network. **It cuts lab3 off
