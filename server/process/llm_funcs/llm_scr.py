@@ -26,6 +26,7 @@ from process.memory import extract as memory_extract
 from process.memory import persona
 from process.memory import store as memory
 from process.tools import context as ambient
+from process.llm_funcs import fresh
 from process.tools import registry as tools
 
 char_config = load_config()
@@ -174,6 +175,11 @@ SEED = _llm.get("seed")
 
 REPEAT_PENALTY = float(_llm.get("repeat_penalty", 1.12))
 FREQUENCY_PENALTY = float(_llm.get("frequency_penalty", 0.35))
+# For chat only (work mode turns penalties off): presence_penalty pushes away
+# from any word already said; DRY (llama.cpp) from repeating runs of words,
+# which is what a stuck opener or template is. 0 leaves them off.
+PRESENCE_PENALTY = float(_llm.get("presence_penalty", 0.0))
+DRY_MULTIPLIER = float(_llm.get("dry_multiplier", 0.0))
 
 
 
@@ -229,6 +235,15 @@ def _request_extras(kw):
         kw["extra_body"] = extra
     if "seed" not in kw:
         kw["seed"] = SEED if SEED is not None else random.randrange(2**31)
+    chatting = kw.get("frequency_penalty") != 0.0  # work mode sets it to 0
+    if chatting and PRESENCE_PENALTY and "presence_penalty" not in kw:
+        kw["presence_penalty"] = PRESENCE_PENALTY
+    if chatting and DRY_MULTIPLIER:
+        extra = dict(kw.get("extra_body") or {})
+        extra.setdefault("dry_multiplier", DRY_MULTIPLIER)
+        extra.setdefault("dry_base", 1.75)
+        extra.setdefault("dry_allowed_length", 3)
+        kw["extra_body"] = extra
     if FREQUENCY_PENALTY and "frequency_penalty" not in kw:
         kw["frequency_penalty"] = FREQUENCY_PENALTY
     if REPEAT_PENALTY and REPEAT_PENALTY != 1.0:
@@ -398,7 +413,7 @@ def note_exchange(user_text, assistant_text):
 
 def llm_response(user_input):
     history = _window(load_history())
-    history.append({"role": "user", "content": user_input})
+    history.append({"role": "user", "content": user_input + fresh.note(history, user_input)})
 
     reply = scripted_reply(user_input)
     if reply is None:
@@ -519,7 +534,7 @@ def llm_stream(user_input=None, extra_system=None, use_tools=True, history=None)
     if user_input is not None:
         # The clock goes on this message only, never into the saved history
         # or the system prompt, so the cached prefix stays the same.
-        note = ambient.as_note()
+        note = ambient.as_note() + fresh.note(history, user_input)
         if isinstance(user_input, list):  # text and images, from a chat UI
             content = user_input + ([{"type": "text", "text": note.strip()}] if note else [])
         else:
@@ -532,7 +547,7 @@ def llm_stream(user_input=None, extra_system=None, use_tools=True, history=None)
         history = _merge_her_runs(history)
         history.append({"role": "user", "content":
                         "(No new message from them; the app is giving you a chance "
-                        "to speak first.)" + ambient.as_note()})
+                        "to speak first.)" + ambient.as_note() + fresh.note(history)})
 
     system = system_message()
     if extra_system:

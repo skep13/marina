@@ -6,6 +6,10 @@ Two models:
                 other way of talking to her, and her tools. Each chat in the
                 front end is its own thread, separate from the personal
                 conversation, but what she learns about you in one is kept.
+  marina-voice  her, for a speaker in another room (see satellite): told
+                she is talking out loud, and answers with only what is said,
+                no *actions*. The speaker's own instructions are dropped,
+                since they describe its tools, not hers.
   marina-plain  the same model with none of that, for the front end's own
                 housekeeping, like naming chats.
 
@@ -23,6 +27,7 @@ from fastapi.responses import JSONResponse, StreamingResponse
 from process.config import load_config
 from process.llm_funcs import llm_scr
 from process.memory import extract as memory_extract
+from process.text_func.speech import split_reply
 
 KEY = str((load_config().get("api") or {}).get("key") or "").strip()
 
@@ -35,6 +40,13 @@ texting on a phone. It renders markdown, so here code blocks, lists and
 headings are fine when they help, and longer answers are fine when the
 task needs them. You are still you: same voice, same opinions. No *actions*
 in asterisks."""
+
+SPEAKER = """
+
+Right now you are talking out loud through a speaker in their room, not
+texting and not in a chat window. They hear you; they can't see anything.
+Keep it short, the way you'd answer someone across the room: no lists, no
+markdown, no links, no code, and no *actions* in asterisks."""
 
 
 def enabled():
@@ -81,7 +93,7 @@ def _completion(cid, model, text):
     }
 
 
-def _her(body):
+def _her(body, voice=False):
     messages = [m for m in body.get("messages") or [] if isinstance(m, dict)]
     their_system = "\n\n".join(_text(m.get("content")) for m in messages
                                if m.get("role") == "system").strip()
@@ -92,8 +104,11 @@ def _her(body):
     if not chat or chat[-1]["role"] != "user":
         return None, None, None
     *before, last = chat
-    extra = CHAT_WINDOW + (f"\n\nThey added this for the chat:\n{their_system}"
-                           if their_system else "")
+    if voice:
+        extra = SPEAKER
+    else:
+        extra = CHAT_WINDOW + (f"\n\nThey added this for the chat:\n{their_system}"
+                               if their_system else "")
     stream = llm_scr.llm_stream(last["content"], extra_system=extra,
                                 history=before[-WINDOW:])
     return stream, _text(last["content"]), before
@@ -110,6 +125,7 @@ def mount(app):
         now = int(time.time())
         return {"object": "list", "data": [
             {"id": "marina", "object": "model", "created": now, "owned_by": "marina"},
+            {"id": "marina-voice", "object": "model", "created": now, "owned_by": "marina"},
             {"id": "marina-plain", "object": "model", "created": now, "owned_by": "marina"},
         ]}
 
@@ -132,11 +148,20 @@ def mount(app):
             out = llm_scr.chat_completion(body.get("messages") or [], **kw)
             return JSONResponse(out.model_dump(exclude_none=True))
 
-        stream, user_text, _before = _her(body)
+        voice = model == "marina-voice"
+        stream, user_text, _before = _her(body, voice)
         if stream is None:
             return JSONResponse({"error": {"message": "The last message has to be from the user."}},
                                 status_code=400)
-        print(f"[chat ui] you: {user_text[:120]}", flush=True)
+        print(f"[{'speaker' if voice else 'chat ui'}] you: {user_text[:120]}", flush=True)
+
+        if voice:
+            # Always whole: what she says goes to text to speech in one go.
+            reply = "".join(stream).strip()
+            _remember(user_text, reply)
+            spoken = split_reply(reply)["speech"].strip()
+            print(f"[speaker] marina: {spoken[:120]}", flush=True)
+            return JSONResponse(_completion(cid, "marina-voice", spoken))
 
         if not streaming:
             reply = "".join(stream).strip()

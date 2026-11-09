@@ -40,7 +40,7 @@ THREAD = [
 
 def test_models_lists_her_and_plain(monkeypatch):
     ids = [m["id"] for m in client(monkeypatch).get("/v1/models").json()["data"]]
-    assert ids == ["marina", "marina-plain"]
+    assert ids == ["marina", "marina-voice", "marina-plain"]
 
 
 def test_thread_becomes_her_history(monkeypatch):
@@ -89,3 +89,23 @@ def test_steps_are_shown_and_not_fed_back(monkeypatch):
                    for l in r.text.splitlines() if l.startswith("data: {"))
     assert "*on her machine:* running `ls`" in text and text.endswith("done")
     assert seen["history"][1]["content"] == "ok"
+
+
+def test_voice_answers_out_loud_without_actions(monkeypatch):
+    def acting(user_input=None, extra_system=None, use_tools=True, history=None):
+        seen.update(user=user_input, extra=extra_system, history=history)
+        yield "*waves* "
+        yield "Hi there."
+
+    monkeypatch.setattr(llm_scr, "llm_stream", acting)
+    monkeypatch.setattr(openai_api, "_remember", lambda *a: None)
+    app = FastAPI()
+    openai_api.mount(app)
+    r = TestClient(app).post("/v1/chat/completions", json={
+        "model": "marina-voice", "temperature": 0.2, "messages": [
+            {"role": "system", "content": "You can set timers with the timer tool."},
+            {"role": "user", "content": "hello"}]})
+    assert r.json()["choices"][0]["message"]["content"] == "Hi there."
+    assert seen["user"] == "hello"
+    assert "out loud" in seen["extra"]
+    assert "timer tool" not in seen["extra"]

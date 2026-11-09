@@ -54,6 +54,7 @@ from process import openai_api
 from process import shared
 from process import config as cfg
 from process import idle
+from process import call
 from process import notice
 from process.tools import registry as tools
 from process.memory import store as memory
@@ -168,6 +169,7 @@ def health():
         "camera": bool(cfg.setting("tools", "camera", True)),
         "barge_in": _barge_enabled(),
         "idle": idle.status(),
+        "call": call.status(),
     }
 
 
@@ -239,7 +241,7 @@ def _stream_reply(user_text, speak=True, transcript=None, extra_system=None,
     spoken = []
     index = 0
     interrupted = False
-    generator = llm_stream(user_text, extra_system=extra_system)
+    generator = llm_stream(user_text, extra_system=call.extra_for(user_text, extra_system))
 
     def emit(segment):
         nonlocal index
@@ -606,10 +608,21 @@ def wake_listen(timeout: float = 120.0):
                              media_type="application/x-ndjson")
 
 
+def _drop_ear():
+    """Stop a /listen/auto without transcribing anything: close the mic and
+    end its stream as if nothing was said."""
+    ear = _ears["button"]
+    if ear is not None:
+        ear.close()
+        ear.events.put(("silence",))
+    return ear is not None
+
+
 @app.post("/listen/cancel")
 def listen_cancel():
     recorder.cancel()
-    return {"ok": True}
+    dropped = _drop_ear()
+    return {"ok": True, "dropped": dropped}
 
 
 _barge = config.get("barge_in") or {}
@@ -898,13 +911,16 @@ def memory_clear():
 # (see process.shared). Only reachable from the network with the token.
 
 _LOCAL_CLIENTS = {"127.0.0.1", "::1", "localhost", "testclient"}
+# A proxy that serves her own app to other devices (the box's phone page)
+# sends this, and gets what this machine gets.
+WEB_TOKEN = str((config.get("web") or {}).get("token") or "").strip()
 
 
 @app.middleware("http")
 async def shared_guard(request, call_next):
     """From the network, only /shared/ (other bridges) and /v1/ (chat front
     ends), each with its own token. Everything else is for this machine."""
-    if shared.SERVE_TOKEN or openai_api.enabled():
+    if shared.SERVE_TOKEN or openai_api.enabled() or WEB_TOKEN:
         client = request.client.host if request.client else ""
         if client not in _LOCAL_CLIENTS:
             sent = request.headers.get("authorization", "").encode()
@@ -913,7 +929,8 @@ async def shared_guard(request, call_next):
             def has(token):
                 return bool(token) and hmac.compare_digest(sent, f"Bearer {token}".encode())
 
-            ok = ((path.startswith("/shared/") and has(shared.SERVE_TOKEN))
+            ok = (has(WEB_TOKEN)
+                  or (path.startswith("/shared/") and has(shared.SERVE_TOKEN))
                   or (path.startswith("/v1/") and openai_api.enabled()
                       and has(openai_api.KEY)))
             if not ok:
@@ -974,6 +991,32 @@ def shared_history_clear():
     return {"ok": True}
 
 
+@app.post("/call/start")
+def call_start():
+    """Start a call. Streams her picking up and saying hello; that greeting
+    isn't saved as something you said. Replies use the call style until
+    /call/end."""
+    threading.Thread(target=whisper, daemon=True).start()
+    call.start()
+    idle.note_interaction()
+    return StreamingResponse(
+        _stream_reply(None, True, transcript="", extra_system=call.pick_up()),
+        media_type="application/x-ndjson")
+
+
+@app.post("/call/end")
+def call_end():
+    _drop_ear()
+    if recorder.is_monitoring:
+        recorder.cancel()
+    return call.end()
+
+
+@app.get("/call")
+def call_status():
+    return call.status()
+
+
 @app.post("/reset")
 def reset():
     reset_history()
@@ -1000,6 +1043,12 @@ def _idle_stream(timeout):
     """Long poll: returns when she has something unprompted to say."""
     waited = 0.0
     while waited < timeout:
+        if call.active():
+            # On a call she only answers; nothing unprompted cuts across it.
+            time.sleep(2.0)
+            waited += 2.0
+            yield _ndjson({"type": "waiting"})
+            continue
         announcement = tools.pending_announcement()
         if announcement:
             idle.note_interaction()
@@ -1064,6 +1113,10 @@ if __name__ == "__main__":
     from process import telegram
     telegram.start(transcribe=lambda path: transcribe_file(whisper(), path),
                    synthesize=synthesize)
+
+    from process import satellite
+    satellite.start(transcribe=lambda audio: transcribe_audio(whisper(), audio, prompt=WAKE_PROMPT),
+                    synthesize=synthesize)
 
     bridge = config.get("bridge", {})
     uvicorn.run(

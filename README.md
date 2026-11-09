@@ -130,6 +130,29 @@ Only that chat can talk to her; anyone else just gets told their chat id.
 bot steal each other's messages. Mine runs on the server next to her model,
 so she can text me when the Mac is asleep.
 
+## A speaker in another room
+
+An old Echo running [TECHO5](https://github.com/HuskerMinion/techo5) instead
+of Alexa can be her ears and voice in another room: it listens for the wake
+word itself, sends what you say to her Whisper, and plays her answer in her
+own Kokoro voice. TECHO5 runs on the Echo Dot 2nd and 3rd gen (D9N29T only,
+not the one with a clock), the Echo 2nd gen and some Echo Shows; see
+[TECHO5 Dot](https://github.com/HuskerMinion/techo5-dot) for unlocking and
+installing it.
+
+1. On the bridge, set `bridge.host: "0.0.0.0"`, a long random `api.key`, and
+   under `satellite` set `enabled: true` and `allow` to the Echo's address.
+   Restart the bridge.
+2. On the Echo's setup page, **Sound & Voice**, **Voice assistant**: answered
+   by *Speech and a chat model, directly*. Speech to text and text to speech
+   are both `<bridge address>:10300`; leave the voice empty. The chat model
+   endpoint is `http://<bridge address>:8765/v1`, the model `marina-voice` and
+   the key your `api.key`.
+
+She keeps her memory and personality there, and talks the way she would out
+loud, without `*actions*`. The Echo needs the bridge awake, so this suits a
+bridge on an always-on server more than a laptop.
+
 ## Her own machine
 
 Give her a Linux box (mine is a Debian VM) and she can actually do things on

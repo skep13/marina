@@ -415,6 +415,17 @@ shared:
 api:
   key: ""
 
+# Her ears and voice for a speaker in another room, like an Echo Dot running
+# TECHO5 (https://github.com/HuskerMinion/techo5). A Wyoming server: give the
+# speaker this host:port for both speech to text and text to speech, and the
+# /v1/ API above as its chat model, with model "marina-voice" and api.key as
+# its key. Wyoming has no keys, so list the speaker's address in allow.
+satellite:
+  enabled: false
+  host: "0.0.0.0"
+  port: 10300
+  allow: []          # e.g. ["192.168.1.192"]; empty is anyone on the network
+
 # Let her use this Mac: see the screen, use apps with the mouse and
 # keyboard, run commands and edit files in your home folder. Turn it on and
 # off from her menu bar icon. She asks first before using the mouse and
