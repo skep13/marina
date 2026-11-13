@@ -23,6 +23,7 @@ from process import confirm
 from process import shared
 from process.config import load_config, resolve_data
 from process.memory import extract as memory_extract
+from process.memory import lore
 from process.memory import persona
 from process.memory import store as memory
 from process.tools import context as ambient
@@ -385,6 +386,7 @@ def save_turn(user_text, assistant_text):
 
 
 def reset_history():
+    lore.reset()
     if _shared_history():
         shared.call("DELETE", "/shared/history")
     reset_local_history()
@@ -413,7 +415,8 @@ def note_exchange(user_text, assistant_text):
 
 def llm_response(user_input):
     history = _window(load_history())
-    history.append({"role": "user", "content": user_input + fresh.note(history, user_input)})
+    history.append({"role": "user", "content": user_input + lore.note(history, user_input)
+                    + fresh.note(history, user_input)})
 
     reply = scripted_reply(user_input)
     if reply is None:
@@ -534,7 +537,8 @@ def llm_stream(user_input=None, extra_system=None, use_tools=True, history=None)
     if user_input is not None:
         # The clock goes on this message only, never into the saved history
         # or the system prompt, so the cached prefix stays the same.
-        note = ambient.as_note() + fresh.note(history, user_input)
+        note = (ambient.as_note() + lore.note(history, user_input)
+                + fresh.note(history, user_input))
         if isinstance(user_input, list):  # text and images, from a chat UI
             content = user_input + ([{"type": "text", "text": note.strip()}] if note else [])
         else:
@@ -547,7 +551,8 @@ def llm_stream(user_input=None, extra_system=None, use_tools=True, history=None)
         history = _merge_her_runs(history)
         history.append({"role": "user", "content":
                         "(No new message from them; the app is giving you a chance "
-                        "to speak first.)" + ambient.as_note() + fresh.note(history)})
+                        "to speak first.)" + ambient.as_note() + lore.note(history)
+                        + fresh.note(history)})
 
     system = system_message()
     if extra_system:

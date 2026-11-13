@@ -260,6 +260,18 @@ persona:
   enabled: true
   mention_rate: 0.15
 
+# Memories that come up when their subject does: shared stories, running
+# jokes, things that happened. Each entry in lore.json (next to her memory)
+# has trigger words; when one turns up in the last scan_depth messages, the
+# entry goes in front of her for that reply only, then rests for its
+# cooldown so she doesn't retell it. See lore.example.json for the format.
+# Off whenever recall is off (the presentation preset).
+lore:
+  enabled: true
+  file: lore.json
+  scan_depth: 4      # messages back to look for trigger words
+  max_entries: 3     # most memories in front of her at once
+
 asr:
   model: "base.en"
   # Which mic she listens with: "auto", "default", or part of a device's
