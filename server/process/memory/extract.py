@@ -2,8 +2,9 @@
 import json
 import re
 import threading
-from datetime import datetime
+from datetime import date, datetime, timedelta
 
+from process import backend
 from process.memory import store
 
 PROMPT = """Extract durable facts the USER stated about themselves.
@@ -22,7 +23,28 @@ DO NOT RECORD:
 Write each fact as one short sentence starting with "The user". Turn
 relative dates into real ones using today's date, so "my birthday was
 yesterday" is stored as the actual day, never as "yesterday".
-Reply with ONLY a JSON array of strings. No prose, no markdown, no fences.
+
+ALSO RECORD anything coming up on a particular day that a friend would ask
+about afterwards: an exam, a presentation, an interview, a trip, an
+appointment, a deadline, a match. Write those as an object instead of a
+string, with the day worked out from today's date:
+{"event": "The user has their driving test", "on": "2026-10-13"}
+When they gave a day ("tomorrow", "on Friday", "the 3rd"), use it. When it
+is clearly coming up but the day is loose ("next week", "in a few days",
+"coming up"), give your best guess and add "rough": true. "Someday" or
+"next year" is too vague; leave it out. Things already over are not events.
+
+ALSO, from YOUR OWN reply only: if you (Marina) said something new and
+concrete about your own life, tastes or opinions that you would need to
+stay consistent with later, record it as {"self": "You ..."}. Not moods,
+not reactions to them, nothing about them.
+
+ALSO: if the user sounds genuinely low, struggling or hopeless in this
+message, even quietly, add {"feeling": "low"}; if they talk about not
+wanting to be alive or hurting themselves, {"feeling": "crisis"}. Not for
+jokes, ordinary complaining or being tired after a long day.
+
+Reply with ONLY a JSON array. No prose, no markdown, no fences.
 
 user: "my beelink has 32 gigs of ram"
 ["The user has a Beelink with 32 GB of RAM"]
@@ -33,6 +55,18 @@ user: "i'm building a vtuber assistant"
 user: "it was my birthday yesterday" (today is Monday 12 October 2026)
 ["The user's birthday is on 11 October"]
 
+user: "ugh my driving test is tomorrow" (today is Monday 12 October 2026)
+[{"event": "The user has their driving test", "on": "2026-10-13"}]
+
+user: "got an interview next week, kind of dreading it" (today is Monday 12 October 2026)
+[{"event": "The user has an interview", "on": "2026-10-19", "rough": true}]
+
+user: "what are you watching" / you replied: "rewatching Mob Psycho, season two is the best one"
+[{"self": "You think season two of Mob Psycho is the best one"}]
+
+user: "i don't really see the point of any of it lately"
+[{"feeling": "low"}]
+
 user: "call me Sam"
 ["The user prefers to be called Sam"]
 
@@ -42,7 +76,7 @@ user: "what's the weather like"
 user: "thanks, that works"
 []"""
 
-MAX_PER_TURN = 3
+MAX_PER_TURN = 4
 MAX_FACT_CHARS = 160
 
 MIN_USER_CHARS = 15
@@ -63,7 +97,7 @@ def worth_extracting(user_text):
     return True
 
 
-def _parse(raw):
+def _parse(raw, today=None):
     if not raw:
         return []
     text = raw.strip()
@@ -81,12 +115,53 @@ def _parse(raw):
 
     out = []
     for item in parsed:
+        if isinstance(item, dict):
+            found = _event(item, today) or _self(item) or _feeling(item)
+            if found:
+                out.append(found)
+            continue
         if not isinstance(item, str):
             continue
         item = " ".join(item.split())
         if 4 <= len(item) <= MAX_FACT_CHARS:
             out.append(item)
     return out[:MAX_PER_TURN]
+
+
+def _self(item):
+    text = item.get("self")
+    if not isinstance(text, str):
+        return None
+    text = " ".join(text.split())
+    if 8 <= len(text) <= MAX_FACT_CHARS and text.lower().startswith("you "):
+        return {"self": text}
+    return None
+
+
+def _feeling(item):
+    how = item.get("feeling")
+    return {"feeling": how} if how in ("low", "crisis") else None
+
+
+EVENT_HORIZON = 120   # days ahead; further off than this is a wrong date
+
+
+def _event(item, today=None):
+    """{"event", "on"} if this is a dated thing still to come, else None."""
+    text, on = item.get("event"), item.get("on")
+    if not isinstance(text, str) or not isinstance(on, str):
+        return None
+    text = " ".join(text.split())
+    try:
+        day = date.fromisoformat(on.strip()[:10])
+    except ValueError:
+        return None
+    today = today or date.today()
+    if not (today <= day <= today + timedelta(days=EVENT_HORIZON)):
+        return None
+    if not 8 <= len(text) <= MAX_FACT_CHARS:
+        return None
+    return {"event": text, "on": day.isoformat() + ("~" if item.get("rough") is True else "")}
 
 
 def extract(client, model, user_text, assistant_text):
@@ -103,6 +178,9 @@ def extract(client, model, user_text, assistant_text):
             max_tokens=200,
             stream=False,
         )
+        if backend.on_fallback():
+            # The small backup model invents facts; better to learn nothing.
+            return []
         return _parse(completion.choices[0].message.content)
     except Exception as e:
         print(f"[memory] extraction failed: {type(e).__name__}: {e}", flush=True)
@@ -182,8 +260,21 @@ def remember_async(client, model, user_text, assistant_text):
         return
 
     def work():
-        for text in extract(client, model, user_text, assistant_text):
-            fact = store.add(text, source="auto")
+        for item in extract(client, model, user_text, assistant_text):
+            if isinstance(item, dict) and "feeling" in item:
+                from process import care
+                care.heard(item["feeling"])
+                continue
+            if isinstance(item, dict) and "self" in item:
+                if store.add(item["self"], source=store.SELF):
+                    print(f"[memory] +{item['self']} (about herself)", flush=True)
+                continue
+            if isinstance(item, dict):
+                fact = store.add(item["event"], source=store.EVENT, due=item["on"])
+                if fact:
+                    print(f"[memory] +{fact['text']} (on {item['on']})", flush=True)
+                continue
+            fact = store.add(item, source="auto")
             if fact:
                 print(f"[memory] +{fact['text']}", flush=True)
 

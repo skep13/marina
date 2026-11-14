@@ -94,7 +94,21 @@ Her config, memory and chat history live in
 - You can cut her off by talking over her
 - Sometimes says something without being asked, and notices when you're
   back after a while or have been in one app for hours (`idle.notice`)
-- Has something going on in her own life each day, picked from the date
+- Has something going on in her own life, picked from the date and lasting
+  a couple of days, plus fixed facts about herself (`persona.profile`) so
+  she never gets her own age or your projects mixed up with hers
+- Knows how long it has been: every message is timestamped, so she notices
+  a few days' silence or the first message of the day
+- Texts you on the day of something you told her about (Telegram)
+- Asks how it went: mention something with a day attached ("my driving test
+  is tomorrow") and she brings it up once the day comes
+- Keeps a mood from one message to the next that fades over a couple of
+  hours, and carries the conversation herself when she has only been reacting
+- Drops the teasing when you sound low, and stays with you
+- Her voice speeds up or slows a little with her mood
+- "What she remembers…" in her menu opens a page of everything in her
+  memory, to add to, keep for good or delete; "Rate her last reply" (or
+  `/good` and `/bad` on Telegram) saves the exchange to `ratings.jsonl`
 - Tracks the openers and phrases she's been leaning on lately and steers
   away from them, so she doesn't fall into the loops local models get into
 - Timers, reminders that survive a restart, reading the clipboard, opening
@@ -117,7 +131,8 @@ Her config, memory and chat history live in
   round at an event
 - Hair physics, blinking and eye movement
 - `*actions*` in her replies play as animations instead of being read out
-- Long-term memory
+- Long-term memory: facts about you, and a few sentences on each stretch of
+  conversation once it scrolls out of her window
 - Local voice (Kokoro) and speech recognition (Faster-Whisper)
 - Works with any OpenAI-compatible model: Ollama, llama.cpp, LM Studio, vLLM
   or OpenAI itself
@@ -412,7 +427,15 @@ server/
     call.py                   hands-free calls
     confirm.py                Allow / Deny before risky actions
     llm_funcs/fresh.py        keeping her from repeating herself
-    memory/persona.py         what's going on in her life today
+    memory/persona.py         who she is, and what's going on in her life
+    memory/followup.py        asking how the thing you mentioned went
+    memory/episode.py         what an older stretch of conversation was about
+    memory/recall.py          bringing an older conversation back to mind
+    mood.py                   a mood she keeps, with a floor
+    gap.py                    how long since you last talked
+    state.py                  mood and the like, shared between bridges
+    ratings.py                thumbs up or down on a reply
+    care.py                   noticing when you're low
     tools/context.py          time, frontmost app, battery
     tools/registry.py         timers, clipboard, links, remembering
     tools/reminders.py        reminders that survive a restart
@@ -424,7 +447,7 @@ server/
     satellite.py              Wyoming server for an Echo in another room
     openai_api.py             OpenAI-style API for chat front ends
     vision/look.py            screenshot to vision model
-    memory/store.py           durable facts, deduped and capped
+    memory/store.py           facts, dated events and episodes, deduped and capped
     memory/extract.py         decides what is worth remembering
     tts_func/engine.py        picks the voice backend (kokoro or sovits)
     tts_func/sovits_ping.py   GPT-SoVITS HTTP client

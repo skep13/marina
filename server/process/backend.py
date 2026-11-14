@@ -136,3 +136,11 @@ def current():
 def describe():
     cur = current()
     return cur + (" (auto)" if _mode == "auto" else "")
+
+
+def on_fallback():
+    """True when the last answer came from the backup ("local") because the
+    main machine didn't answer, rather than because it was chosen. The backup
+    is a much smaller model: fine for keeping her talking, not for deciding
+    what she remembers or for using tools."""
+    return _mode == "auto" and len(NAMES) > 1 and _last_used == "local"

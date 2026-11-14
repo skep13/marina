@@ -148,3 +148,43 @@ def note(history, their_message=""):
     return ("\n\n(Note to you, not from them: don't repeat yourself. "
             + "; ".join(parts)
             + ". Respond to what they actually just said, in fresh words.)")
+
+
+# How many of her replies in a row may only react before she is asked to
+# carry the conversation, and how many may end on a question before she is
+# asked not to.
+ONLY_REACTING = 3
+ALL_QUESTIONS = 2
+
+_ACTION = re.compile(r"\*[^*\n]*\*")
+
+
+def _asks(reply):
+    """Whether a reply ends by asking them something."""
+    return _ACTION.sub("", reply).rstrip().rstrip("\"')").endswith("?")
+
+
+def steer(history, their_message=""):
+    """A note on which way to take this reply, or "".
+
+    Told not to end every reply with a question, she stopped asking
+    anything, and the conversation became them talking and her reacting.
+    A rule in the prompt can't count, so this does: after a run of replies
+    that only react she is asked to move things along, and after a run that
+    all end on a question she is asked to just say her thing."""
+    replies = _recent(history)
+    if len(replies) < ALL_QUESTIONS:
+        return ""
+    asked = [_asks(r) for r in replies]
+    if all(asked[-ALL_QUESTIONS:]):
+        return ("\n\n(Note to you, not from them: your last few replies all ended "
+                "on a question. This time say your piece and stop, no question.)")
+    if isinstance(their_message, str) and their_message.rstrip().endswith("?"):
+        return ""   # they asked something; answering it is moving things along
+    if len(replies) >= ONLY_REACTING and not any(asked[-ONLY_REACTING:]):
+        return ("\n\n(Note to you, not from them: you've only been reacting for a "
+                "few replies, so they are doing all the work. This time react "
+                "briefly, then carry it forward yourself: ask one specific thing "
+                "about what they just said, or bring up something of your own or "
+                "something you remember about them. One of those, not all.)")
+    return ""

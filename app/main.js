@@ -57,6 +57,19 @@ function configFile() {
 
 const BRIDGE_URL = 'http://127.0.0.1:8765';
 
+// A thumbs up or down on her last reply, kept with the exchange by the
+// bridge (ratings.jsonl) for picking examples and training later.
+async function rateReply(good) {
+  try {
+    await fetch(`${BRIDGE_URL}/rate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ good }),
+      signal: AbortSignal.timeout(3000),
+    });
+  } catch { /* the bridge is down; nothing to rate */ }
+}
+
 async function bridgeAlive() {
   try {
     const res = await fetch(`${BRIDGE_URL}/health`, { signal: AbortSignal.timeout(1500) });
@@ -409,6 +422,14 @@ function buildTray() {
       { label: 'Change model…', click: () => { win?.show(); win?.webContents.send('pick-model'); } },
       { label: 'Reset position', click: () => { if (win) { win.setBounds({ x: 60, y: 60, width: 420, height: 680 }); win.show(); } } },
       { label: 'Reload', click: () => win?.reload() },
+      { label: 'What she remembers…', click: () => shell.openExternal(`${BRIDGE_URL}/memory/view`) },
+      {
+        label: 'Rate her last reply',
+        submenu: [
+          { label: 'Sounded like her', click: () => rateReply(true) },
+          { label: 'Didn\u2019t sound like her', click: () => rateReply(false) },
+        ],
+      },
       { label: 'Edit config…', click: () => shell.openPath(configFile()) },
       { label: 'Open bridge log', click: () => shell.openPath(path.join(app.getPath('userData'), 'bridge.log')) },
       { type: 'separator' },

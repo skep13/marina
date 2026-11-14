@@ -56,6 +56,9 @@ from process import config as cfg
 from process import idle
 from process import call
 from process import notice
+from process import mood as her_mood
+from process import state as her_state
+from process import ratings
 from process.tools import registry as tools
 from process.memory import store as memory
 from process.vision.look import (
@@ -196,6 +199,9 @@ def _ndjson(event):
 
 def _speak_segment(segment, index, speak):
     parts = split_reply(segment)
+    if parts["mood"]["name"] == "neutral":
+        # Nothing in the sentence itself: her face rests on the mood she is in.
+        parts["mood"] = her_mood.face() or parts["mood"]
     event = {
         "type": "chunk",
         "index": index,
@@ -887,7 +893,50 @@ class MemoryIn(BaseModel):
 @app.get("/memory")
 def memory_list():
     facts = sorted(memory.all_facts(), key=lambda f: f.get("updated", ""), reverse=True)
-    return {"count": len(facts), "facts": facts}
+    return {"count": len(facts), "facts": facts, "ratings": ratings.counts()}
+
+
+@app.get("/memory/view")
+def memory_view():
+    """The page behind "What she remembers…" in her menu."""
+    from fastapi.responses import HTMLResponse
+    from process.memory_page import HTML
+    return HTMLResponse(HTML)
+
+
+@app.post("/memory/{fact_id}/pin")
+def memory_pin(fact_id: str):
+    return {"ok": memory.pin(fact_id)}
+
+
+class TestChatIn(BaseModel):
+    messages: list[dict]
+
+
+@app.post("/test/chat")
+def test_chat(body: TestChatIn):
+    """For docs/marina-bench/replay.py on this machine: her reply to a
+    made-up conversation, with nothing kept."""
+    reply = openai_api.rehearse(body.messages)
+    if reply is None:
+        return JSONResponse({"error": "The last message has to be from the user."},
+                            status_code=400)
+    return {"reply": reply}
+
+
+class RateIn(BaseModel):
+    good: bool
+    note: str = ""
+
+
+@app.post("/rate")
+def rate_reply(body: RateIn):
+    """Thumbs up or down on her last reply, saved with the exchange."""
+    from process.llm_funcs.llm_scr import load_history
+    entry = ratings.rate(body.good, load_history(), active_model(), body.note)
+    if entry:
+        print(f"[rated] {'good' if body.good else 'bad'}: {entry['her'][:80]}", flush=True)
+    return {"ok": bool(entry), **ratings.counts()}
 
 
 @app.post("/memory")
@@ -941,6 +990,7 @@ async def shared_guard(request, call_next):
 class SharedFactIn(BaseModel):
     text: str
     source: str = "auto"
+    due: str | None = None
 
 
 class SharedTurnIn(BaseModel):
@@ -954,10 +1004,30 @@ def shared_memory():
 
 @app.post("/shared/memory")
 def shared_memory_add(body: SharedFactIn):
-    fact = memory.local_add(body.text, source=body.source)
+    fact = memory.local_add(body.text, source=body.source, due=body.due)
     if fact:
         print(f"[memory] +{fact['text']} (from another bridge)", flush=True)
     return {"fact": fact}
+
+
+@app.post("/shared/memory/{fact_id}/pin")
+def shared_memory_pin(fact_id: str):
+    return {"ok": memory.local_pin(fact_id)}
+
+
+class SharedStateIn(BaseModel):
+    value: object = None
+
+
+@app.get("/shared/state/{key}")
+def shared_state(key: str):
+    return {"value": her_state.local_get(key)}
+
+
+@app.post("/shared/state/{key}")
+def shared_state_put(key: str, body: SharedStateIn):
+    her_state.local_put(key, body.value)
+    return {"ok": True}
 
 
 @app.delete("/shared/memory/{fact_id}")
@@ -978,7 +1048,9 @@ def shared_history():
 
 @app.post("/shared/history")
 def shared_history_add(body: SharedTurnIn):
-    msgs = [{"role": m["role"], "content": m["content"]} for m in body.messages
+    msgs = [{"role": m["role"], "content": m["content"],
+             **({"at": m["at"]} if isinstance(m.get("at"), str) else {})}
+            for m in body.messages
             if m.get("role") in ("user", "assistant") and isinstance(m.get("content"), str)]
     if msgs:
         append_local(msgs)

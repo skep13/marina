@@ -71,6 +71,13 @@ to something they told you, or just checking in on a thing they mentioned.
 Don't greet them formally, don't offer help, don't ask what they're up to
 in a generic way, and don't repeat anything already said above."""
 
+EVENT_DAY = """
+
+Something they told you about is today: {what}. Text them about it first
+thing, the way a friend would: one short text wishing them luck or saying
+you're thinking of them. It is their thing, not yours. Don't ask a string of
+questions, and don't mention anything else."""
+
 # Long polling gets a session of its own. Everything else opens a fresh
 # connection: home routers drop idle connections without telling either
 # end, and a send on a pooled connection that has quietly died just hangs
@@ -474,6 +481,13 @@ def _command(chat, text):
     elif cmd == "/unquiet":
         idle.set_muted(False)
         _call("sendMessage", chat_id=chat, text="(she can text first again)")
+    elif cmd in ("/good", "/bad"):
+        from process import ratings
+        from process.llm_funcs.llm_scr import active_model, load_history
+        entry = ratings.rate(cmd == "/good", load_history(), active_model(),
+                             text.partition(" ")[2].strip())
+        _call("sendMessage", chat_id=chat,
+              text="(noted)" if entry else "(nothing to rate yet)")
     else:
         return False
     return True
@@ -574,6 +588,26 @@ def _send_unprompted(extra, record_as=None):
         _send_text(OWNER, reply)
 
 
+EVENT_TEXT_FROM = 8   # the hour from which she texts about something due today
+
+
+def _event_today(now=None):
+    """Something due today that she hasn't texted about yet, or None."""
+    from datetime import datetime
+    from process import state
+    from process.memory import followup
+    now = now or datetime.now()
+    if (now.hour < EVENT_TEXT_FROM or idle.muted() or idle.in_quiet_hours()
+            or not followup.enabled() or not bool(setting("idle", "enabled", True))):
+        return None
+    wished = state.get("wished") or []
+    for event in followup.due_today(now.date()):
+        if event["id"] not in wished:
+            state.put("wished", (wished + [event["id"]])[-40:])
+            return event
+    return None
+
+
 def _proactive():
     while True:
         time.sleep(20)
@@ -584,6 +618,12 @@ def _proactive():
             _send_unprompted("\n\n" + announcement)
             continue
         now = time.time()
+        if int(now) % 300 < 20:
+            event = _event_today()
+            if event:
+                _unprompted_at.append(now)
+                _send_unprompted(EVENT_DAY.format(what=event["text"].rstrip(".")))
+                continue
         if int(now) % 300 < 20 and _unprompted_due(now):
             _unprompted_at.append(now)
             _send_unprompted(UNPROMPTED)

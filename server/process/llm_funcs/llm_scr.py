@@ -13,6 +13,9 @@ import time
 from openai import OpenAI, Timeout
 
 from process import backend
+from process import care
+from process import gap
+from process import mood
 
 from process.backend import current as backend_current
 from process.backend import mode as backend_mode
@@ -22,9 +25,12 @@ from process import config
 from process import confirm
 from process import shared
 from process.config import load_config, resolve_data
+from process.memory import episode
 from process.memory import extract as memory_extract
+from process.memory import followup
 from process.memory import lore
 from process.memory import persona
+from process.memory import recall
 from process.memory import store as memory
 from process.tools import context as ambient
 from process.llm_funcs import fresh
@@ -64,6 +70,11 @@ def _recall():
 
 
 def _stable_context():
+    """The day and rough time, for when the exact clock isn't riding on her
+    newest message. With the clock on this would only repeat it, and change
+    the cached prompt six times a day to do so."""
+    if ambient.ENABLED and ambient.SHOW_TIME:
+        return ""
     from datetime import datetime
     now = datetime.now()
     h = now.hour
@@ -85,6 +96,8 @@ def system_message():
     return {
         "role": "system",
         "content": (config.system_prompt()
+                    + persona.profile_block()
+                    + persona.examples_block()
                     + (memory.as_prompt_block() if _recall() else "")
                     + tools.prompt_addition()
                     + _stable_context()
@@ -254,6 +267,31 @@ def _request_extras(kw):
     return kw
 
 
+ON_BACKUP = (
+    "\n\nRight now the machine you normally think with isn't answering, so you "
+    "are running on a small backup and are not as sharp as usual. Keep to one "
+    "or two short sentences. Don't attempt anything involved, and never claim "
+    "to have done, checked or remembered something. If they want something "
+    "that needs your tools or a proper think, tell them plainly, as yourself, "
+    "that your brain is offline at the moment."
+)
+
+
+def _is_backup(which):
+    return backend_mode() == "auto" and which == "local" and len(backend.NAMES) > 1
+
+
+def _for_backup(messages, kw):
+    """The same request, cut down for the small backup model: no tools, which
+    it calls at random, and a word to her about the state she is in."""
+    kw = {k: v for k, v in kw.items() if k not in ("tools", "tool_choice")}
+    first = messages[0] if messages else None
+    if (first and first.get("role") == "system" and _recall()
+            and str(first.get("content", "")).startswith(config.system_prompt())):
+        messages = [{**first, "content": first["content"] + ON_BACKUP}] + list(messages[1:])
+    return messages, kw
+
+
 def chat_completion(messages, **kw):
     """Call the selected backend. In auto mode, fall through to the next one
     whenever a backend can't be reached."""
@@ -262,9 +300,10 @@ def chat_completion(messages, **kw):
     kw = _request_extras(kw)
     order = _order()
     for i, which in enumerate(order):
+        send, send_kw = _for_backup(messages, kw) if _is_backup(which) else (messages, kw)
         try:
             out = _clients[which].chat.completions.create(
-                model=model_for(which), messages=messages, **kw)
+                model=model_for(which), messages=send, **send_kw)
         except (APIConnectionError, APITimeoutError):
             if i == len(order) - 1:
                 raise
@@ -281,18 +320,30 @@ def chat_completion(messages, **kw):
 
 def _flatten(message):
     content = message.get("content")
-    if isinstance(content, str):
-        return {"role": message["role"], "content": content}
-
     if isinstance(content, list):
-        text = "".join(
+        content = "".join(
             part.get("text", "")
             for part in content
             if isinstance(part, dict)
         )
-        return {"role": message["role"], "content": text}
+    elif not isinstance(content, str):
+        content = str(content)
+    out = {"role": message["role"], "content": content}
+    if isinstance(message.get("at"), str):
+        out["at"] = message["at"]   # when it was said; see process.gap
+    return out
 
-    return {"role": message["role"], "content": str(content)}
+
+def _bare(history):
+    """The conversation as the model is sent it: who and what, without the
+    times kept alongside."""
+    return [{k: v for k, v in m.items() if k != "at"} for m in history]
+
+
+def _stamped(messages):
+    from datetime import datetime
+    now = datetime.now().astimezone().isoformat(timespec="seconds")
+    return [m if m.get("at") else {**m, "at": now} for m in messages]
 
 
 def _shared_history():
@@ -358,35 +409,47 @@ def _extract_backend():
 
 
 def append_local(messages):
-    """Add messages to this bridge's own conversation file."""
+    """Add messages to this bridge's own conversation file. When that moves
+    her window on, what has just scrolled out of it is kept as an episode."""
     with _history_lock:
-        history = _window(load_local_history())
+        everything = load_local_history()
+        history = _window(everything)
+        gone = everything[:len(everything) - len(history)]
         history.extend(messages)
         save_history(history)
+    if gone and _remember():
+        episode.remember_async(gone)
 
 
 def append_history(messages):
     """Add messages to the conversation. Appending, rather than saving the
     whole thing, is what lets the desktop and Telegram both write to the
     shared one without either losing what the other just said."""
+    messages = _stamped(messages)
     if _shared_history():
         if shared.call("POST", "/shared/history", {"messages": messages}) is not None:
             return
     append_local(messages)
 
 
+_STRAY_START = re.compile(r"^[.,;:]\s*(?=[A-Za-z*])")
+
+
 def save_turn(user_text, assistant_text):
-    assistant_text = (assistant_text or "").strip()
+    assistant_text = _STRAY_START.sub("", (assistant_text or "").strip())
     if not assistant_text:
         return
     turn = [] if user_text is None else [{"role": "user", "content": user_text}]
     append_history(turn + [{"role": "assistant", "content": assistant_text}])
-    if _remember() and user_text is not None:
+    if _remember() and user_text is not None and not backend.on_fallback():
         memory_extract.remember_async(*_extract_backend(), user_text, assistant_text)
 
 
 def reset_history():
     lore.reset()
+    recall.reset()
+    followup.reset()
+    mood.reset()
     if _shared_history():
         shared.call("DELETE", "/shared/history")
     reset_local_history()
@@ -413,20 +476,66 @@ def note_exchange(user_text, assistant_text):
                     {"role": "assistant", "content": assistant_text}])
 
 
+def _plain(user_input):
+    """The words of a message that may be text and images."""
+    if isinstance(user_input, list):
+        return " ".join(p.get("text", "") for p in user_input if isinstance(p, dict))
+    return user_input or ""
+
+
+def turn_notes(history, user_input=None):
+    """Everything that rides on her newest message for this reply only:
+    memories that have come up, something to ask about, her own day, her
+    mood, and what to do differently from her last few replies. None of it
+    is saved, and none of it goes in the system prompt.
+
+    When they are low, the notes that make her lively are left out and one
+    about being a friend goes last, where it carries most weight."""
+    text = _plain(user_input)
+    gentle = care.note(history, text)
+    personal = _recall() and not gentle
+    working = _asked_for_work(user_input)
+    feeling = mood.note(text) if personal else ""   # her mood moves either way
+    # Most important first. Each of these is reasonable alone; five at once
+    # and she answers the notes instead of them, so only the first few that
+    # have something to say are kept.
+    notes = []
+    room = max(1, int(config.setting("notes", "max", 2)))
+
+    def offer(make):
+        if len(notes) < room:
+            note = make()
+            if note:
+                notes.append(note)
+
+    if personal:
+        offer(lambda: followup.note(their_message=text))
+    offer(lambda: lore.note(history, text))
+    if personal:
+        offer(lambda: gap.note(history))
+        offer(lambda: recall.note(text))
+        if not working and user_input is not None:
+            offer(lambda: fresh.steer(history, text))
+        offer(lambda: feeling)
+    offer(lambda: fresh.note(history, text))
+    if personal and not working:
+        offer(lambda: persona.as_prompt_block(roll=None if user_input is not None else 0.0))
+    return "".join(notes) + gentle
+
+
 def llm_response(user_input):
-    history = _window(load_history())
-    history.append({"role": "user", "content": user_input + lore.note(history, user_input)
-                    + fresh.note(history, user_input)})
+    history = _merge_her_runs(_window(load_history()))
+    history.append({"role": "user", "content": user_input + turn_notes(history, user_input)})
 
     reply = scripted_reply(user_input)
     if reply is None:
-        completion = get_reply([system_message()] + history)
+        completion = get_reply([system_message()] + _bare(history))
         reply = (completion.choices[0].message.content or "").strip()
 
     append_history([{"role": "user", "content": user_input},
                     {"role": "assistant", "content": reply}])
 
-    if _remember():
+    if _remember() and not backend.on_fallback():
         memory_extract.remember_async(*_extract_backend(), user_input, reply)
 
     return reply
@@ -507,6 +616,84 @@ def _rejects_tools(e):
     return "tool" in body or "function" in body or e.status_code in (404, 501)
 
 
+class _Unspoken:
+    """Takes reasoning out of streamed text. A thinking model's server
+    normally keeps it apart from the reply; when it doesn't, it arrives
+    inside <think> tags, and she would say it aloud."""
+
+    OPEN, CLOSE = "<think>", "</think>"
+
+    def __init__(self):
+        self._buf = ""
+        self._inside = False
+
+    def feed(self, piece):
+        self._buf += piece
+        out = []
+        while True:
+            if self._inside:
+                end = self._buf.find(self.CLOSE)
+                if end < 0:
+                    # Keep only what could be the start of the closing tag.
+                    self._buf = self._buf[-(len(self.CLOSE) - 1):]
+                    break
+                self._buf = self._buf[end + len(self.CLOSE):]
+                self._inside = False
+                continue
+            start = self._buf.find(self.OPEN)
+            if start >= 0:
+                out.append(self._buf[:start])
+                self._buf = self._buf[start + len(self.OPEN):]
+                self._inside = True
+                continue
+            hold = 0   # a tag may be split across pieces: keep back "<thi"
+            for n in range(min(len(self.OPEN) - 1, len(self._buf)), 0, -1):
+                if self.OPEN.startswith(self._buf[-n:]):
+                    hold = n
+                    break
+            cut = len(self._buf) - hold
+            out.append(self._buf[:cut])
+            self._buf = self._buf[cut:]
+            break
+        return "".join(out)
+
+    def flush(self):
+        out, self._buf = ("" if self._inside else self._buf), ""
+        return out
+
+
+def _after_reasoning(text):
+    """Drop reasoning whose opening tag was in the prompt, so only its
+    closing tag shows up in what she wrote."""
+    return text.rsplit("</think>", 1)[-1] if "</think>" in text else text
+
+
+_LIKE_A_CALL = re.compile(r"\{|<tool_call|<function|```(?:json)?\s*\{")
+
+
+def _call_in_text(text, offer):
+    """The tool call a reply is, when the model wrote one out as text
+    ({"name": ..., "arguments": ...}) instead of making it. None unless the
+    whole reply is exactly that and names a tool she has."""
+    body = re.sub(r"^```(?:json)?|```$|</?tool_call>", "", text.strip(), flags=re.M).strip()
+    if not offer or not body.startswith("{"):
+        return None
+    try:
+        data = json.loads(body)
+    except ValueError:
+        return None
+    if not isinstance(data, dict):
+        return None
+    name = data.get("name")
+    arguments = data.get("arguments", data.get("parameters", {}))
+    known = {t["function"]["name"] for t in offer}
+    if name not in known:
+        return None
+    if not isinstance(arguments, str):
+        arguments = json.dumps(arguments)
+    return {"id": "", "name": name, "arguments": arguments}
+
+
 def _merge_her_runs(history):
     """Several of her messages in a row (texts they haven't answered yet)
     become one, as servers only accept one assistant turn at a time."""
@@ -515,7 +702,7 @@ def _merge_her_runs(history):
         if (out and m.get("role") == "assistant" == out[-1].get("role")
                 and not m.get("tool_calls") and not out[-1].get("tool_calls")
                 and isinstance(m.get("content"), str) and isinstance(out[-1].get("content"), str)):
-            out[-1] = {**out[-1], "content": out[-1]["content"] + "\n\n" + m["content"]}
+            out[-1] = {**out[-1], **m, "content": out[-1]["content"] + "\n\n" + m["content"]}
         else:
             out.append(m)
     return out
@@ -534,25 +721,25 @@ def llm_stream(user_input=None, extra_system=None, use_tools=True, history=None)
         yield scripted
         return
     history = _window(load_history()) if history is None else list(history)
+    # Servers refuse a conversation that ends on two of her messages, and
+    # some refuse two in a row anywhere, so her unanswered ones run together.
+    history = _merge_her_runs(history)
     if user_input is not None:
         # The clock goes on this message only, never into the saved history
         # or the system prompt, so the cached prefix stays the same.
-        note = (ambient.as_note() + lore.note(history, user_input)
-                + fresh.note(history, user_input))
+        note = ambient.as_note() + turn_notes(history, user_input)
         if isinstance(user_input, list):  # text and images, from a chat UI
             content = user_input + ([{"type": "text", "text": note.strip()}] if note else [])
         else:
             content = user_input + note
         history.append({"role": "user", "content": content})
     else:
-        # Speaking up unprompted. Servers refuse a conversation that ends on
-        # her own message, so the app's nudge goes in as a turn of its own
-        # (never saved), after her earlier unanswered messages run together.
-        history = _merge_her_runs(history)
+        # Speaking up unprompted. The conversation can't end on her own
+        # message, so the app's nudge goes in as a turn of its own (never
+        # saved).
         history.append({"role": "user", "content":
                         "(No new message from them; the app is giving you a chance "
-                        "to speak first.)" + ambient.as_note() + lore.note(history)
-                        + fresh.note(history)})
+                        "to speak first.)" + ambient.as_note() + turn_notes(history)})
 
     system = system_message()
     if extra_system:
@@ -560,7 +747,7 @@ def llm_stream(user_input=None, extra_system=None, use_tools=True, history=None)
 
     global _tools_supported
 
-    messages = [system] + history
+    messages = [system] + _bare(history)
     offer = tools.definitions() if (use_tools and _tools_supported) else None
 
     rounds = _tool_rounds()
@@ -568,11 +755,19 @@ def llm_stream(user_input=None, extra_system=None, use_tools=True, history=None)
     last_calls = []
     nudged = False
     consented = set()  # things they have said yes to for this reply
+    retried_garbled = False
     while True:
         calls = {}
         said = []
+        working = done_rounds > 0
+        # Whether this round's words go out as they arrive. While she is
+        # working they wait: if the round ends in another tool call they
+        # were a note to herself ("now let me check the config"), and only
+        # the round that ends the job is her talking to them. A round that
+        # opens like a tool call written out as text waits too.
+        aloud = False if working else None
+        unspoken = _Unspoken()
         try:
-            working = done_rounds > 0
             stream = (get_reply_stream(messages, working, tools=offer, tool_choice="auto")
                       if offer else get_reply_stream(messages, working))
             for event in stream:
@@ -580,11 +775,23 @@ def llm_stream(user_input=None, extra_system=None, use_tools=True, history=None)
                     continue
                 delta = event.choices[0].delta
                 _collect_tool_calls(delta, calls)
-                piece = getattr(delta, "content", None)
+                piece = unspoken.feed(getattr(delta, "content", None) or "")
                 if not piece:
                     continue
                 said.append(piece)
-                yield piece
+                if aloud is None:
+                    start = "".join(said).lstrip()
+                    if not start:
+                        continue
+                    aloud = not _LIKE_A_CALL.match(start)
+                    piece = "".join(said)
+                if aloud:
+                    yield piece
+            tail = unspoken.flush()
+            if tail:
+                said.append(tail)
+                if aloud:
+                    yield tail
         except Exception as e:
             if offer is None or not _rejects_tools(e):
                 raise
@@ -593,6 +800,26 @@ def llm_stream(user_input=None, extra_system=None, use_tools=True, history=None)
             _tools_supported = False
             offer = None
             continue
+
+        if not aloud and said:
+            text = _after_reasoning("".join(said))
+            written = None if calls else _call_in_text(text, offer)
+            if written:
+                # A tool call that came as text instead of as a call: run it.
+                calls, text = {0: written}, ""
+            elif not calls and tools.garbled(text):
+                # Half a tool call and nothing else. Have her answer in words.
+                print("[llm] a mangled tool call instead of a reply", flush=True)
+                if retried_garbled:
+                    return
+                retried_garbled, offer = True, None
+                continue
+            if calls:
+                if text.strip():
+                    print(f"[llm] (to herself, working) {text.strip()[:200]}", flush=True)
+            elif text:
+                yield text
+            said = [text]
 
         if not calls and offer is not None and not nudged and tools.wants_long_loop() \
                 and _asked_for_work(user_input) and _promised("".join(said)):

@@ -270,7 +270,12 @@ WORKING = """
 While you're working on a machine, between one tool call and the next, you
 don't need to perform: say nothing, or a few plain words about what you're
 doing. Save your voice and personality for when you're done and talk to
-them about how it went, which should sound like you."""
+them about how it went, which should sound like you: a sentence or two,
+spoken aloud, so no code, lists or emoji in it.
+
+Do what they asked for and stop there. Asked to draft an intro, draft the
+intro; don't build a website around it. If you can see a bigger version
+worth doing, say so in a line afterwards and let them decide."""
 
 
 def wants_long_loop():
@@ -290,6 +295,13 @@ def definitions():
 
 
 _GARBLED = re.compile(r"<tool_call>|</?function[=>]|</?parameter[=>]")
+
+
+def garbled(text):
+    """Whether a reply is the remains of a tool call rather than words."""
+    text = (text or "").strip()
+    return bool(_GARBLED.search(text)) or (
+        text.startswith("{") and '"name"' in text and '"arguments"' in text)
 
 
 def run(name, arguments):

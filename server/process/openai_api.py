@@ -119,6 +119,22 @@ def _remember(user_text, reply):
         memory_extract.remember_async(*llm_scr._extract_backend(), user_text, reply)
 
 
+def rehearse(messages):
+    """Her reply to a conversation as she is when spoken to, for the replay
+    test: nothing said is remembered, moves her mood or uses her tools.
+    None unless the last message is theirs."""
+    from process import state
+    chat = [m for m in messages or []
+            if isinstance(m, dict) and m.get("role") in ("user", "assistant")]
+    if not chat or chat[-1]["role"] != "user":
+        return None
+    with state.rehearsal():
+        return "".join(llm_scr.llm_stream(
+            _text(chat[-1]["content"]), use_tools=False,
+            history=[{"role": m["role"], "content": _text(m.get("content"))}
+                     for m in chat[:-1]])).strip()
+
+
 def mount(app):
     @app.get("/v1/models")
     def models():
@@ -147,6 +163,13 @@ def mount(app):
                 return StreamingResponse(plain(), media_type="text/event-stream")
             out = llm_scr.chat_completion(body.get("messages") or [], **kw)
             return JSONResponse(out.model_dump(exclude_none=True))
+
+        if model == "marina-test":
+            reply = rehearse(body.get("messages"))
+            if reply is None:
+                return JSONResponse({"error": {"message": "The last message has to be "
+                                               "from the user."}}, status_code=400)
+            return JSONResponse(_completion(cid, "marina-test", reply))
 
         voice = model == "marina-voice"
         stream, user_text, _before = _her(body, voice)

@@ -95,7 +95,8 @@ def _kokoro_gen(text):
     semitones = float(cfg.get("pitch", 0.0))
     ratio = 2.0 ** (semitones / 12.0)
 
-    speed = float(cfg.get("speed", 1.0)) / ratio
+    from process import mood
+    speed = float(cfg.get("speed", 1.0)) * mood.voice_speed() / ratio
 
     try:
         audio, sample_rate, timings = kokoro.create_timed(
