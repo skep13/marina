@@ -14,7 +14,18 @@ llm:
   work_temperature: 0.6
   think_while_working: true
   work_max_tokens: 4096
+  # Sampling while working. These suit Qwen; for Gemma 4 use 64 and 0.95.
+  # work_top_k: 20
+  # work_top_p: 0.8
   max_tokens: 2048
+  # Habits of the model in use. Gemma 4 opens nearly every reply with a
+  # *gesture*: action_every: 3 lets her do that at most once in three replies
+  # (the rest just start talking), and style_note is extra words for the model,
+  # added at the end of her system prompt.
+  # action_every: 3
+  # style_note: >-
+  #   Mostly just talk. Describe what you're doing in asterisks only now and
+  #   then, in two or three words, never at the start of every message.
   history_turns: 12
   remember: true
   # Rounds of tool calls one reply may take, 0 for no limit. Only matters with the

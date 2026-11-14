@@ -1,0 +1,14 @@
+  # As deployed in ct110's /opt/llama-swap/config.yaml, right after Marina's own entry.
+  # ---- Gemma 4 for Marina (2026-11-14). Best of the companion trial; ready to
+  # take over from the entry above. Same Q5 that was benchmarked: with its
+  # vision projector it's smaller than Qwen3.6 + projector. Sampling is
+  # Google's recommendation for Gemma 4.
+  marina-gemma:
+    cmd: |
+      ${llama}
+      -m /models/gemma-4-26B-A4B-it-UD-Q5_K_M.gguf
+      --alias marina-gemma -ngl 999 -c 131072 -ctk q8_0 -ctv q8_0 -np 2 -fa on --jinja
+      --load-mode none --cache-reuse 256 --metrics --cache-ram 1024
+      --ctx-checkpoints 4 --mmproj /models/gemma-4-26B-A4B-it-mmproj-F16.gguf
+      --temp 1.0 --top-k 64 --top-p 0.95 --min-p 0.0
+    ttl: 0

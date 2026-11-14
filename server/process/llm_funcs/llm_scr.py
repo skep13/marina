@@ -34,6 +34,7 @@ from process.memory import recall
 from process.memory import store as memory
 from process.tools import context as ambient
 from process.llm_funcs import fresh
+from process.llm_funcs import style
 from process.tools import registry as tools
 
 char_config = load_config()
@@ -92,6 +93,13 @@ LET_IT_GO = (
 )
 
 
+def _style_note():
+    """Words for the model in use, about habits of its own: one model
+    narrates, another writes essays. Set as llm.style_note."""
+    note = (config.setting("llm", "style_note", "") or "").strip()
+    return f"\n\n{note}" if note else ""
+
+
 def system_message():
     return {
         "role": "system",
@@ -102,7 +110,8 @@ def system_message():
                     + tools.prompt_addition()
                     + _stable_context()
                     + (ambient.NOTE_EXPLAINED if ambient.ENABLED else "")
-                    + LET_IT_GO),
+                    + LET_IT_GO
+                    + _style_note()),
     }
 
 
@@ -530,7 +539,7 @@ def llm_response(user_input):
     reply = scripted_reply(user_input)
     if reply is None:
         completion = get_reply([system_message()] + _bare(history))
-        reply = (completion.choices[0].message.content or "").strip()
+        reply = style.pace((completion.choices[0].message.content or "").strip(), history)
 
     append_history([{"role": "user", "content": user_input},
                     {"role": "assistant", "content": reply}])
@@ -550,11 +559,16 @@ WORK_THINKING = bool(_llm.get("think_while_working", True))
 WORK_MAX_TOKENS = int(_llm.get("work_max_tokens", 4096))
 
 
+# Qwen's recommended values; Gemma wants top_k 64 and top_p 0.95.
+WORK_TOP_K = int(_llm.get("work_top_k", 20))
+WORK_TOP_P = float(_llm.get("work_top_p", 0.8))
+
+
 def _work_settings():
-    extra = {"top_k": 20, "repeat_penalty": 1.0}
+    extra = {"top_k": WORK_TOP_K, "repeat_penalty": 1.0}
     if WORK_THINKING:
         extra["chat_template_kwargs"] = {"enable_thinking": True}
-    return {"temperature": WORK_TEMPERATURE, "top_p": 0.8, "frequency_penalty": 0.0,
+    return {"temperature": WORK_TEMPERATURE, "top_p": WORK_TOP_P, "frequency_penalty": 0.0,
             "max_tokens": WORK_MAX_TOKENS, "extra_body": extra}
 
 
@@ -709,6 +723,28 @@ def _merge_her_runs(history):
 
 
 def llm_stream(user_input=None, extra_system=None, use_tools=True, history=None):
+    """Yield reply text as it arrives, with her opening gesture paced
+    (see style). Arguments as for `_stream`."""
+    past = _window(load_history()) if history is None else history
+    pacer = style.Pacer(past)
+    for piece in _stream(user_input, extra_system, use_tools, history):
+        if isinstance(piece, Activity):
+            held = pacer.flush()
+            if held:
+                yield held
+            yield piece
+        elif piece:
+            piece = pacer.feed(piece)
+            if piece:
+                yield piece
+        else:
+            yield piece   # nothing said: the caller's chance to notice a hang-up
+    held = pacer.flush()
+    if held:
+        yield held
+
+
+def _stream(user_input=None, extra_system=None, use_tools=True, history=None):
     """Yield reply text as it arrives. The caller saves the turn with
     `save_turn`, since only it knows how much was actually spoken.
 

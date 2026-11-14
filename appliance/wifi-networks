@@ -1,0 +1,167 @@
+#!/bin/bash
+# The Wi-Fi networks lab3 joins for internet, kept for good. "Local AI Box"
+# stays up throughout, on whichever network's channel lab3 is on.
+#
+#   wifi-networks add [PRIORITY]   asks for a network's name and password (you
+#                                  type them), saves it, and switches to it now.
+#                                  Higher PRIORITY wins when several are in
+#                                  range at boot (home: 10, hotspot: 0).
+#   wifi-networks use SSID         switch to a saved network now
+#   wifi-networks forget SSID      remove a saved network
+#   wifi-networks list | status
+#
+# Once saved, lab3 roams by itself: if the network it's on goes away, the
+# uplink watcher moves "Local AI Box" to the channel of the strongest saved
+# network in range and lab3 joins that. It doesn't leave a working network
+# just because another one appears; use `use` for that.
+#
+# The home network is 192.168.1.0/24, the same range lab3's containers use on
+# vmbr0. A dhclient hook handles that: on a 192.168.1.x uplink the containers
+# keep host routes on vmbr0 and the rest of the range goes out over Wi-Fi;
+# on any other uplink it's put back.
+set -u
+UPCONF=/etc/appliance/uplink.conf          # network={} blocks, hashed keys only
+WPACONF=/etc/appliance/wpa-uplink.conf     # what wpa_supplicant reads
+HCONF=/etc/hostapd/hostapd.conf
+UP=wls1
+HOOK=/etc/dhcp/dhclient-exit-hooks.d/appliance-lan-overlap
+log() { echo "[wifi-networks] $*"; logger -t wifi-networks "$*"; }
+need_root() { [ "$(id -u)" = 0 ] || { echo "run as root"; exit 1; }; }
+
+install_hook() {
+  install -d /etc/dhcp/dhclient-exit-hooks.d
+  cat > "$HOOK" <<'EOF'
+# Installed by appliance/wifi-networks. The home Wi-Fi uses 192.168.1.0/24,
+# like lab3's containers on vmbr0: on such an uplink the containers keep host
+# routes on vmbr0 and the rest of the range goes out over the Wi-Fi.
+if [ "$interface" = wls1 ]; then
+  _cts="192.168.1.15 192.168.1.17 192.168.1.30"
+  _lan_off() {
+    for _ip in $_cts; do ip route replace "$_ip/32" dev vmbr0 src 192.168.1.13; done
+    ip route del 192.168.1.0/24 dev vmbr0 2>/dev/null
+    ip route replace 192.168.1.0/24 dev wls1 src "$1"
+    [ -n "$2" ] && ip route replace default via "$2" dev wls1 metric 600
+    # devices at home look for the containers on the Wi-Fi, and the
+    # containers look for them on vmbr0: lab3 answers for both and passes
+    # the traffic through
+    sysctl -qw net.ipv4.conf.wls1.proxy_arp=1 net.ipv4.conf.vmbr0.proxy_arp=1
+    for _ip in $_cts; do ip neigh replace proxy "$_ip" dev wls1; done
+  }
+  _lan_on() {
+    ip route del 192.168.1.0/24 dev wls1 2>/dev/null
+    ip route replace 192.168.1.0/24 dev vmbr0 proto kernel scope link src 192.168.1.13
+    for _ip in $_cts; do ip route del "$_ip/32" dev vmbr0 2>/dev/null; done
+    for _ip in $_cts; do ip neigh del proxy "$_ip" dev wls1 2>/dev/null; done
+    sysctl -qw net.ipv4.conf.wls1.proxy_arp=0 net.ipv4.conf.vmbr0.proxy_arp=0
+  }
+  case "$reason" in
+    BOUND|RENEW|REBIND|REBOOT)
+      case "$new_ip_address" in
+        192.168.1.*) _lan_off "$new_ip_address" "${new_routers%% *}" ;;
+        *) _lan_on ;;
+      esac ;;
+    EXPIRE|FAIL|RELEASE|STOP|TIMEOUT) _lan_on ;;
+  esac
+fi
+true
+EOF
+}
+
+# wpa_supplicant's file is a fixed header plus uplink.conf
+rebuild() {
+  local header
+  header=$(sed -n '1,/^network=/p' "$WPACONF" | sed '$d' | grep -v '^\s*$')
+  [ -n "$header" ] || header=$(printf 'ctrl_interface=/run/wpa_supplicant\nap_scan=1')
+  { echo "$header"; echo; cat "$UPCONF"; } > "$WPACONF.new"
+  chmod 600 "$WPACONF.new"; mv -f "$WPACONF.new" "$WPACONF"
+  wpa_cli -i "$UP" reconfigure >/dev/null
+}
+
+backup() { cp -p "$UPCONF" "$UPCONF.bak-$(date +%Y%m%d-%H%M%S)"; cp -p "$WPACONF" "$WPACONF.bak-$(date +%Y%m%d-%H%M%S)"; }
+
+net_id() {   # wpa_supplicant's id for an SSID
+  wpa_cli -i "$UP" list_networks | awk -F'\t' -v s="$1" 'NR>1 && $2==s {print $1; exit}'
+}
+
+wait_assoc() {  # $1 = ssid; echoes the freq
+  for _ in $(seq 1 45); do
+    sleep 2
+    st=$(wpa_cli -i "$UP" status 2>/dev/null)
+    if echo "$st" | grep -q '^wpa_state=COMPLETED' && echo "$st" | grep -qxF "ssid=$1"; then
+      echo "$st" | awk -F= '/^freq=/{print $2}'; return 0
+    fi
+  done
+  return 1
+}
+
+ap_on() {   # $1 = MHz
+  sed -i "s/^channel=.*/channel=$(( ($1 - 2407) / 5 ))/" "$HCONF"
+  systemctl restart hostapd; sleep 3; systemctl restart appliance-ap-ip dnsmasq
+}
+
+# The card can only be on one channel, so a switch is: watcher off, AP down,
+# join, AP up on the new channel, watcher on. Afterwards every saved network
+# is enabled again (select_network disables the rest), so roaming still works.
+switch_to() {
+  local ssid=$1 id freq old
+  id=$(net_id "$ssid"); [ -n "$id" ] || { log "'$ssid' isn't saved"; return 1; }
+  old=$(awk -F= '/^channel=/{print 2407 + 5 * $2}' "$HCONF")
+  log "switching to '$ssid': Local AI Box drops for about a minute"
+  systemctl stop appliance-uplink-watch hostapd appliance-ap-ip
+  wpa_cli -i "$UP" select_network "$id" >/dev/null
+  if freq=$(wait_assoc "$ssid"); then
+    log "joined '$ssid' at $freq MHz"; ok=0
+  else
+    log "couldn't join '$ssid' (out of range or wrong password)"; ok=1; freq=$old
+  fi
+  wpa_cli -i "$UP" enable_network all >/dev/null
+  ap_on "$freq"
+  systemctl restart appliance-uplink-dhcp
+  systemctl start appliance-uplink-watch
+  [ $ok = 0 ] || return 1
+  for _ in $(seq 1 20); do
+    sleep 3
+    curl -s -o /dev/null -m 8 https://deb.debian.org && { log "on '$ssid', internet OK ($(ip -4 -br addr show $UP | awk '{print $3}'))"; return 0; }
+  done
+  log "on '$ssid' but no internet yet"
+}
+
+ssids() { sed -n 's/^[[:space:]]*ssid="\(.*\)"[[:space:]]*$/\1/p' "$UPCONF"; }
+
+case "${1:-}" in
+  add)
+    need_root
+    prio=${2:-10}
+    read -rp "Wi-Fi name, exactly as your phone or Mac shows it: " SSID
+    [ -n "$SSID" ] || exit 1
+    read -rsp "Its password (not shown): " PASS; echo
+    block=$(wpa_passphrase "$SSID" "$PASS") || { echo "wpa_passphrase rejected that (8-63 characters)"; exit 1; }
+    unset PASS
+    backup
+    if ssids | grep -qxF "$SSID"; then "$0" _drop "$SSID"; fi
+    umask 077
+    { echo; echo "$block" | grep -v '^\s*#psk=' | sed "s/^}\$/\tpriority=$prio\n}/"; } >> "$UPCONF"
+    install_hook
+    rebuild
+    echo "Saved '$SSID' (hashed key, on lab3 only). Switching in the background."
+    systemd-run --unit=wifi-networks-switch --collect "$0" use "$SSID" >/dev/null
+    ;;
+  use)  need_root; install_hook; switch_to "$2" ;;
+  forget)
+    need_root; backup; "$0" _drop "$2"; rebuild; log "forgot '$2'" ;;
+  _drop)   # remove the network={} block for SSID $2 from uplink.conf
+    awk -v s="$2" '
+      /^network=\{/ {buf=$0 "\n"; inb=1; drop=0; next}
+      inb { buf=buf $0 "\n"; if ($0 ~ "^[[:space:]]*ssid=\"" ) { v=$0; sub(/^[[:space:]]*ssid="/,"",v); sub(/"[[:space:]]*$/,"",v); if (v==s) drop=1 }
+            if ($0 ~ /^\}/) { if (!drop) printf "%s", buf; inb=0 } ; next }
+      {print}' "$UPCONF" > "$UPCONF.new" && chmod 600 "$UPCONF.new" && mv -f "$UPCONF.new" "$UPCONF"
+    ;;
+  list) ssids ;;
+  status)
+    wpa_cli -i "$UP" status | grep -E '^(ssid|ip_address|freq)='
+    grep ^channel "$HCONF"
+    ip route | grep -E 'default|192\.168\.1\.0/24'
+    echo "saved:"; ssids | sed 's/^/  /'
+    ;;
+  *) sed -n '2,20p' "$0"; exit 1 ;;
+esac
