@@ -1,0 +1,9 @@
+# Marina's model as it runs today on lab3 ct110, reached through its llama-swap.
+# Keeps the current deployment usable from AIWS while lab3 is still Proxmox.
+name: lab3-marina
+label: Qwen3.6 35B-A3B on lab3 (current deployment)
+runtime: remote
+base_url: http://192.168.1.15:8080
+remote_model: marina
+key_env: AIWS_KEY_LAB3
+roles: [chat, code, vision]

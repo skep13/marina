@@ -1,0 +1,13 @@
+# The same model, run locally once AIWS is on lab3's hardware.
+name: qwen3.6-35b-a3b
+label: Qwen3.6 35B-A3B (UD-Q4_K_M)
+file: Qwen3.6-35B-A3B-UD-Q4_K_M.gguf
+mmproj: Qwen3.6-35B-A3B-mmproj-F16.gguf
+url: https://huggingface.co/unsloth/Qwen3.6-35B-A3B-GGUF
+roles: [chat, code, vision]
+gpu_gb: 25.3            # measured on lab3 at -c 131072 -np 2 q8 KV
+ttl: 0
+profiles:
+  interactive: {ctx: 32768, slots: 2, kv: q8_0, cache_ram: 512, ctx_checkpoints: 4, vision: false}
+  vision:      {ctx: 32768, slots: 1, kv: q8_0, cache_ram: 512, extra: [--image-min-tokens, 1024]}
+  long:        {ctx: 131072, slots: 2, kv: q8_0, cache_ram: 1024, ctx_checkpoints: 4}

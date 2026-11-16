@@ -1,0 +1,16 @@
+name: demo
+repos:
+  - path: .
+models:
+  code: lab3-marina
+  fast: qwen2.5-coder-1.5b
+env:
+  kind: none
+terminals:
+  - name: shell
+  - name: tests
+    run: make test
+editor: codium
+agent:
+  tools: [files, terminal, desktop, jobs]
+  paths: ["."]

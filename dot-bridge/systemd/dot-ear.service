@@ -1,0 +1,15 @@
+[Unit]
+Description=Marina's ear on the Drop In: hears her name in what the Dot hears, answers down the call
+After=dot-audio.service
+Requires=dot-audio.service
+
+[Service]
+Environment=PULSE_SERVER=unix:/tmp/pulse.sock
+# MARINA_BRIDGE, MARINA_SPEECH and MARINA_KEY
+EnvironmentFile=-/etc/dot-bridge.env
+ExecStart=/usr/bin/python3 -u /opt/dot-bridge/dot_ear.py
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

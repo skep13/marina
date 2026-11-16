@@ -33,3 +33,6 @@ songbird-kali/agent/kali_agent.py
 songbird-kali/webui/kali_tool.py
 mood.json
 mood.json.tmp
+
+# huggingface / model download cache (regenerable, oversized)
+cache/

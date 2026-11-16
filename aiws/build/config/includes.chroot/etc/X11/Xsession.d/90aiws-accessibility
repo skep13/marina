@@ -1,0 +1,5 @@
+# Apps expose their controls over AT-SPI, so the assistant can read the
+# focused window's structure instead of taking a screenshot.
+export QT_ACCESSIBILITY=1
+export QT_LINUX_ACCESSIBILITY_ALWAYS_ON=1
+export GTK_A11Y=atspi

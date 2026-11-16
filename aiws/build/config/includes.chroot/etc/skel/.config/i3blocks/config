@@ -1,0 +1,19 @@
+# Left click the AI block: Control Centre. Right click: stop the assistant.
+separator_block_width=18
+markup=none
+
+[ai]
+command=aiws-panel i3blocks
+interval=3
+
+[memory]
+command=awk '/MemTotal/{t=$2}/MemAvailable/{a=$2}END{printf "mem %.1f/%.1fG\n",(t-a)/1048576,t/1048576}' /proc/meminfo
+interval=5
+
+[load]
+command=cut -d' ' -f1 /proc/loadavg | sed 's/^/load /'
+interval=5
+
+[time]
+command=date '+%a %d %b  %H:%M'
+interval=10

@@ -1,0 +1,13 @@
+[Unit]
+Description=Rename a user account once, before anyone logs in
+ConditionPathExists=/etc/rename-user.pending
+After=local-fs.target home.mount
+Before=systemd-user-sessions.service greetd.service display-manager.service sshd.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/rename-user
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,15 @@
+# llama-swap upstream release binary, pinned (same version as lab3 runs).
+pkgname=llama-swap
+pkgver=265
+pkgrel=1
+pkgdesc="Loads, swaps and unloads llama.cpp models on demand"
+arch=(x86_64)
+url="https://github.com/mostlygeek/llama-swap"
+license=(MIT)
+options=(!debug)
+source=("https://github.com/mostlygeek/llama-swap/releases/download/v${pkgver}/llama-swap_${pkgver}_linux_amd64.tar.gz")
+sha256sums=('cb1f9a94be05afa129d3c17868f1dd2ca710b919333c7b868239dc31575dcfa1')
+
+package() {
+  install -Dm755 "$srcdir/llama-swap" "$pkgdir/usr/bin/llama-swap"
+}

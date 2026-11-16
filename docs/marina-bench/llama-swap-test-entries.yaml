@@ -1,0 +1,38 @@
+  # ---- Companion-model trial (2026-11-13). Test entries only: Marina's own
+  # entry above is untouched. Remove these once a winner is picked.
+  test-rpr:
+    cmd: |
+      ${llama}
+      -m /models/test-rpr-v4-fast.i1-Q4_K_M.gguf
+      --alias test-rpr -ngl 999 -c 32768 -ctk q8_0 -ctv q8_0 -np 1 -fa on --jinja
+      --load-mode mmap --cache-reuse 256 --metrics
+    ttl: 300
+  test-designant:
+    cmd: |
+      ${llama}
+      -m /models/test-designant-Q4_K_M.gguf
+      --alias test-designant -ngl 999 -c 32768 -ctk q8_0 -ctv q8_0 -np 1 -fa on --jinja
+      --load-mode mmap --cache-reuse 256 --metrics
+    ttl: 300
+  test-qwen3-instruct:
+    cmd: |
+      ${llama}
+      -m /models/test-qwen3-30b-instruct-2507-Q4_K_M.gguf
+      --alias test-qwen3-instruct -ngl 999 -c 32768 -ctk q8_0 -ctv q8_0 -np 1 -fa on --jinja
+      --load-mode mmap --cache-reuse 256 --metrics
+    ttl: 300
+  test-gpt-oss:
+    cmd: |
+      ${llama}
+      -m /models/test-gpt-oss-20b-Q4_K_M.gguf
+      --alias test-gpt-oss -ngl 999 -c 32768 -np 1 -fa on --jinja
+      --load-mode mmap --cache-reuse 256 --metrics
+    ttl: 300
+  test-gemma4:
+    cmd: |
+      ${llama}
+      -m /models/gemma-4-26B-A4B-it-UD-Q5_K_M.gguf
+      --alias test-gemma4 -ngl 999 -c 32768 -ctk q8_0 -ctv q8_0 -np 1 -fa on --jinja
+      --load-mode mmap --cache-reuse 256 --metrics
+    ttl: 300
+

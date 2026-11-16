@@ -1,0 +1,7 @@
+# lab2's build container (ct120). CPU work: builds, tests, dataset prep.
+name: lab2
+host: 192.168.1.229
+user: aiws
+tags: [cpu, build, lab2]
+max_mem: 1G
+cpu_weight: 50

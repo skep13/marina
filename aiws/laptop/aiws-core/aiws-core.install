@@ -1,0 +1,8 @@
+post_install() {
+  echo ">> Add yourself to the aiws group:  sudo gpasswd -a \$USER aiws  (then log out and in)"
+  echo ">> Start the services:              sudo systemctl enable --now llama-swap aiwsd"
+}
+post_upgrade() {
+  systemctl daemon-reload 2>/dev/null || true
+  systemctl try-restart aiwsd.service 2>/dev/null || true
+}

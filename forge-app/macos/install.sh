@@ -111,6 +111,21 @@ touch "$APP" "$APP/Contents/Info.plist"
 LSREG="/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister"
 [ -x "$LSREG" ] && "$LSREG" -f "$APP" 2>/dev/null || true
 
+# --- 4b. pair the YubiKey -------------------------------------------------
+# Forge only opens after a tap on the YubiKey whose SSH key is
+# ~/.ssh/id_ed25519_sk; pin its public key so no other key can unlock it.
+SIGNERS="$HOME/.forge/yubikey_allowed_signers"
+if [ -f "$HOME/.ssh/id_ed25519_sk.pub" ]; then
+  if [ ! -f "$SIGNERS" ]; then
+    ( umask 077; printf 'forge %s\n' "$(cut -d' ' -f1,2 "$HOME/.ssh/id_ed25519_sk.pub")" > "$SIGNERS" )
+    echo "paired YubiKey ($SIGNERS)"
+  else
+    echo "YubiKey already paired"
+  fi
+else
+  echo "warning: no ~/.ssh/id_ed25519_sk.pub — Forge will stay locked until a YubiKey SSH key exists"
+fi
+
 # --- 5. Dock --------------------------------------------------------------
 if [ "$ADD_TO_DOCK" = "1" ]; then
   if defaults read com.apple.dock persistent-apps 2>/dev/null | grep -q "Forge.app"; then

@@ -1,0 +1,12 @@
+# Local, on the RTX 5050 (8 GB): offline use and fast completions.
+# ~4.7 GB weights + 16k context fits in VRAM. Fetch with:
+#   sudo -u aiws curl -L -o /var/lib/aiws/models/qwen2.5-coder-7b-instruct-q4_k_m.gguf <url>
+name: qwen2.5-coder-7b
+label: Qwen2.5 Coder 7B Instruct (Q4_K_M, local GPU)
+file: qwen2.5-coder-7b-instruct-q4_k_m.gguf
+url: https://huggingface.co/Qwen/Qwen2.5-Coder-7B-Instruct-GGUF/resolve/main/qwen2.5-coder-7b-instruct-q4_k_m.gguf
+roles: [fast, code]
+gpu_gb: 6.2
+ttl: 900
+profiles:
+  default: {ctx: 16384, slots: 1, kv: q8_0}

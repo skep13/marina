@@ -1,0 +1,366 @@
+#!/usr/bin/env python3
+"""Keyboard Colours: a colour wheel for the MSI keyboard lighting.
+
+LightShow (the daemon that drives the MysticLight controller) takes its
+colours from an Omarchy theme file, which this machine doesn't have. This
+writes that file from a colour wheel and asks the daemon to re-apply, so the
+keys follow the wheel as you drag.
+
+  ~/.local/state/omarchy/current/theme/colors.toml   up to four colours
+  http://127.0.0.1:8787/api/apply                    LightShow's own API
+
+Needs GTK4 + libadwaita (python-gobject). Nothing else.
+"""
+import colorsys
+import json
+import math
+import os
+import threading
+import urllib.request
+
+import cairo
+import gi
+
+gi.require_version("Gtk", "4.0")
+gi.require_version("Adw", "1")
+from gi.repository import Adw, Gdk, GLib, Gtk  # noqa: E402
+
+THEME = os.path.expanduser("~/.local/state/omarchy/current/theme/colors.toml")
+API = "http://127.0.0.1:8787/api"
+# LightShow reads these names in this order; the first is "static".
+KEYS = ["accent", "blue", "magenta", "cyan"]
+EFFECTS = [("static", "Solid"), ("breathe", "Breathe"), ("cycle", "Cycle"),
+           ("wave", "Wave"), ("smatter", "Smatter"), ("aurora", "Aurora"),
+           ("ember", "Ember"), ("tide", "Tide"), ("heartbeat", "Heartbeat"),
+           ("rainbow", "Rainbow"), ("off", "Off")]
+PRESETS = {
+    "Forest":    ["#00a01a"],
+    "Frieren":   ["#0050ff"],
+    "Electric":  ["#1f5bff", "#3a77fd", "#9ab8ff"],
+    "Night":     ["#3459d0", "#7f9cff", "#c31f33"],
+    "Paper":     ["#6f9a5a", "#c0534b", "#b39a4f", "#e9e4dc"],
+    "Sage":      ["#6f9a5a"],
+    "Crimson":   ["#c0534b"],
+    "Brass":     ["#b39a4f"],
+    "Ice":       ["#7fd4ff", "#ffffff"],
+    "Synth":     ["#ff3ea5", "#7a5cff", "#29d3ff"],
+}
+CSS = """
+window, .main { background: #0f1514; color: #e3ebe8; }
+.title { font-weight: 700; font-size: 15pt; }
+.dim { color: alpha(#a9bbb5, .6); }
+.slot { min-width: 42px; min-height: 42px; border-radius: 21px; padding: 0;
+        border: 2px solid alpha(#a9bbb5, .15); }
+.slot.sel { border: 3px solid #cfe0ff; }
+.addslot { min-width: 42px; min-height: 42px; border-radius: 21px; }
+.preset { border-radius: 8px; padding: 4px 10px; }
+.hex { font-family: monospace; }
+"""
+
+
+def hex_rgb(h):
+    h = h.lstrip("#")
+    return tuple(int(h[i:i + 2], 16) / 255 for i in (0, 2, 4))
+
+
+def rgb_hex(rgb):
+    return "#%02x%02x%02x" % tuple(round(max(0, min(1, c)) * 255) for c in rgb)
+
+
+def read_theme():
+    cols = {}
+    try:
+        for line in open(THEME):
+            k, _, v = line.partition("=")
+            v = v.strip().strip('"')
+            if k.strip() in KEYS and len(v) == 7 and v.startswith("#"):
+                cols[k.strip()] = v
+    except OSError:
+        pass
+    return [cols[k] for k in KEYS if k in cols] or list(PRESETS["Forest"])
+
+
+def write_theme(colours):
+    os.makedirs(os.path.dirname(THEME), exist_ok=True)
+    tmp = THEME + ".tmp"
+    with open(tmp, "w") as f:
+        f.write("# Written by keyboard-colours\n")
+        for k, c in zip(KEYS, colours):
+            f.write(f'{k} = "{c}"\n')
+    os.replace(tmp, THEME)
+
+
+def api(path, body=None):
+    req = urllib.request.Request(API + path, data=None if body is None else json.dumps(body).encode(),
+                                 headers={"Content-Type": "application/json"})
+    with urllib.request.urlopen(req, timeout=2) as r:
+        return json.load(r)
+
+
+class Wheel(Gtk.DrawingArea):
+    """Hue round the rim, saturation from the centre out."""
+
+    def __init__(self, on_pick):
+        super().__init__(content_width=300, content_height=300)
+        self.on_pick = on_pick
+        self.h, self.s = 0.0, 1.0
+        self.set_draw_func(self.draw)
+        drag = Gtk.GestureDrag()
+        drag.connect("drag-begin", lambda g, x, y: self.pick(x, y))
+        drag.connect("drag-update", self.dragged)
+        self.add_controller(drag)
+
+    def geom(self):
+        w, h = self.get_width(), self.get_height()
+        return w / 2, h / 2, min(w, h) / 2 - 8
+
+    def draw(self, _a, cr, w, h):
+        cx, cy, r = self.geom()
+        steps = 180
+        for i in range(steps):
+            a0 = i / steps * 2 * math.pi
+            a1 = (i + 1.5) / steps * 2 * math.pi
+            rr, gg, bb = colorsys.hsv_to_rgb(i / steps, 1, 1)
+            grad = cairo.RadialGradient(cx, cy, 0, cx, cy, r)
+            grad.add_color_stop_rgb(0, 1, 1, 1)
+            grad.add_color_stop_rgb(1, rr, gg, bb)
+            cr.move_to(cx, cy)
+            cr.arc(cx, cy, r, a0, a1)
+            cr.close_path()
+            cr.set_source(grad)
+            cr.fill()
+        # the marker
+        a = self.h * 2 * math.pi
+        mx, my = cx + math.cos(a) * self.s * r, cy + math.sin(a) * self.s * r
+        cr.arc(mx, my, 9, 0, 2 * math.pi)
+        cr.set_source_rgb(*colorsys.hsv_to_rgb(self.h, self.s, 1))
+        cr.fill_preserve()
+        cr.set_line_width(3)
+        cr.set_source_rgb(1, 1, 1)
+        cr.stroke_preserve()
+        cr.set_line_width(1)
+        cr.set_source_rgba(0, 0, 0, .6)
+        cr.stroke()
+
+    def dragged(self, g, dx, dy):
+        ok, sx, sy = g.get_start_point()
+        if ok:
+            self.pick(sx + dx, sy + dy)
+
+    def pick(self, x, y):
+        cx, cy, r = self.geom()
+        dx, dy = x - cx, y - cy
+        self.h = (math.atan2(dy, dx) / (2 * math.pi)) % 1
+        self.s = min(1.0, math.hypot(dx, dy) / r)
+        self.queue_draw()
+        self.on_pick(rgb_hex(colorsys.hsv_to_rgb(self.h, self.s, 1)))
+
+    def set_colour(self, hexc):
+        h, s, _v = colorsys.rgb_to_hsv(*hex_rgb(hexc))
+        self.h, self.s = h, s
+        self.queue_draw()
+
+
+class App(Adw.Application):
+    def __init__(self):
+        super().__init__(application_id="dev.marina.KeyboardColours")
+        self.colours = read_theme()
+        self.sel = 0
+        self.effect, self.bright, self.speed = "static", 1.0, 1.0
+        self.pending = None
+        self.sending = False
+
+    def do_activate(self):
+        Adw.StyleManager.get_default().set_color_scheme(Adw.ColorScheme.FORCE_DARK)
+        prov = Gtk.CssProvider()
+        prov.load_from_string(CSS)
+        Gtk.StyleContext.add_provider_for_display(Gdk.Display.get_default(), prov,
+                                                  Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
+        self.slot_css = Gtk.CssProvider()
+        Gtk.StyleContext.add_provider_for_display(Gdk.Display.get_default(), self.slot_css,
+                                                  Gtk.STYLE_PROVIDER_PRIORITY_USER)
+        try:
+            cur = api("/state")["current"]
+            self.effect = cur.get("effect", "static")
+            self.bright = float(cur.get("brightness", 1.0))
+            self.speed = float(cur.get("speed", 1.0))
+            self.online = True
+        except OSError:
+            self.online = False
+
+        win = Adw.ApplicationWindow(application=self, title="Keyboard Colours",
+                                    default_width=420, default_height=720)
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=14,
+                      margin_top=18, margin_bottom=18, margin_start=20, margin_end=20)
+        box.add_css_class("main")
+        win.set_content(box)
+
+        box.append(Gtk.Label(label="Keyboard Colours", xalign=0, css_classes=["title"]))
+        self.status = Gtk.Label(xalign=0, wrap=True, css_classes=["dim"])
+        box.append(self.status)
+
+        self.wheel = Wheel(self.picked)
+        box.append(self.wheel)
+
+        hexrow = Gtk.Box(spacing=8)
+        self.hex = Gtk.Entry(max_length=7, width_chars=8, css_classes=["hex"])
+        self.hex.connect("activate", self.hex_entered)
+        hexrow.append(Gtk.Label(label="Hex", css_classes=["dim"]))
+        hexrow.append(self.hex)
+        box.append(hexrow)
+
+        box.append(Gtk.Label(label="Colours (effects use them in order; Solid uses the first)",
+                             xalign=0, wrap=True, css_classes=["dim"]))
+        self.slots = Gtk.Box(spacing=10)
+        box.append(self.slots)
+
+        box.append(Gtk.Label(label="Presets", xalign=0, css_classes=["dim"]))
+        presets = Gtk.FlowBox(selection_mode=Gtk.SelectionMode.NONE, max_children_per_line=6,
+                              column_spacing=6, row_spacing=6)
+        for name, cols in PRESETS.items():
+            b = Gtk.Button(label=name, css_classes=["preset"])
+            b.connect("clicked", lambda _b, c=cols: self.use(list(c)))
+            presets.append(b)
+        box.append(presets)
+
+        grid = Gtk.Grid(column_spacing=12, row_spacing=10)
+        names = [n for _e, n in EFFECTS]
+        self.fx = Gtk.DropDown.new_from_strings(names)
+        ids = [e for e, _n in EFFECTS]
+        self.fx.set_selected(ids.index(self.effect) if self.effect in ids else 0)
+        self.fx.connect("notify::selected", self.fx_changed)
+        grid.attach(Gtk.Label(label="Effect", xalign=0), 0, 0, 1, 1)
+        grid.attach(self.fx, 1, 0, 1, 1)
+        self.bscale = Gtk.Scale.new_with_range(Gtk.Orientation.HORIZONTAL, 0.05, 1, 0.05)
+        self.bscale.set_value(self.bright)
+        self.bscale.set_hexpand(True)
+        self.bscale.connect("value-changed", self.bright_changed)
+        grid.attach(Gtk.Label(label="Brightness", xalign=0), 0, 1, 1, 1)
+        grid.attach(self.bscale, 1, 1, 1, 1)
+        self.sscale = Gtk.Scale.new_with_range(Gtk.Orientation.HORIZONTAL, 0.25, 3, 0.25)
+        self.sscale.set_value(self.speed)
+        self.sscale.connect("value-changed", self.speed_changed)
+        grid.attach(Gtk.Label(label="Speed", xalign=0), 0, 2, 1, 1)
+        grid.attach(self.sscale, 1, 2, 1, 1)
+        box.append(grid)
+
+        self.rebuild_slots()
+        self.select(0)
+        self.set_status()
+        win.present()
+
+    # -- slots ------------------------------------------------------------
+
+    def rebuild_slots(self):
+        self.slot_css.load_from_string("".join(
+            f".slot{i} {{ background: {c}; }}" for i, c in enumerate(self.colours)))
+        while (c := self.slots.get_first_child()):
+            self.slots.remove(c)
+        for i, c in enumerate(self.colours):
+            b = Gtk.Button(css_classes=["slot", f"slot{i}"] + (["sel"] if i == self.sel else []),
+                           tooltip_text=f"{c}  (right-click to remove)")
+            b.connect("clicked", lambda _b, i=i: self.select(i))
+            rc = Gtk.GestureClick(button=3)
+            rc.connect("pressed", lambda *_a, i=i: self.remove(i))
+            b.add_controller(rc)
+            self.slots.append(b)
+        if len(self.colours) < len(KEYS):
+            add = Gtk.Button(label="+", css_classes=["addslot"], tooltip_text="Add a colour")
+            add.connect("clicked", self.add)
+            self.slots.append(add)
+
+    def select(self, i):
+        self.sel = i
+        self.wheel.set_colour(self.colours[i])
+        self.hex.set_text(self.colours[i])
+        self.rebuild_slots()
+
+    def add(self, _b):
+        self.colours.append(self.colours[self.sel])
+        self.select(len(self.colours) - 1)
+        self.push()
+
+    def remove(self, i):
+        if len(self.colours) > 1:
+            del self.colours[i]
+            self.select(min(self.sel, len(self.colours) - 1))
+            self.push()
+
+    def use(self, cols):
+        self.colours = cols[:len(KEYS)]
+        self.select(0)
+        self.push()
+
+    # -- inputs ---------------------------------------------------------------
+
+    def picked(self, hexc):
+        self.colours[self.sel] = hexc
+        self.hex.set_text(hexc)
+        self.rebuild_slots()
+        self.push()
+
+    def hex_entered(self, e):
+        t = e.get_text().strip()
+        t = t if t.startswith("#") else "#" + t
+        try:
+            hex_rgb(t)
+        except ValueError:
+            return
+        if len(t) == 7:
+            self.wheel.set_colour(t)
+            self.picked(t.lower())
+
+    def fx_changed(self, d, _p):
+        self.effect = EFFECTS[d.get_selected()][0]
+        self.push()
+
+    def bright_changed(self, s):
+        self.bright = round(s.get_value(), 2)
+        self.push()
+
+    def speed_changed(self, s):
+        self.speed = round(s.get_value(), 2)
+        self.push()
+
+    # -- talking to LightShow -----------------------------------------------
+
+    def push(self):
+        """Coalesce: at most one request in flight, and the last state wins."""
+        split = os.path.expanduser("~/.local/state/kbd-split.json")
+        if os.path.exists(split):                     # a colour picked here replaces a split look
+            os.remove(split)
+        self.pending = {"effect": self.effect, "brightness": self.bright, "speed": self.speed}
+        write_theme(self.colours)
+        if not self.sending:
+            self.send()
+
+    def send(self):
+        body, self.pending = self.pending, None
+        if body is None:
+            self.sending = False
+            return
+        self.sending = True
+
+        def work():
+            try:
+                api("/apply", body)
+                ok = True
+            except OSError:
+                ok = False
+            GLib.idle_add(self.sent, ok)
+        threading.Thread(target=work, daemon=True).start()
+
+    def sent(self, ok):
+        self.online = ok
+        self.set_status()
+        GLib.timeout_add(60, lambda: (self.send(), False)[1])
+        return False
+
+    def set_status(self):
+        self.status.set_label(
+            "Drag on the wheel; the keys follow." if self.online else
+            "LightShow isn't running. Start it with: systemctl --user start lightshow")
+
+
+if __name__ == "__main__":
+    App().run([])

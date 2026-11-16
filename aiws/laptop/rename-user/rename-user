@@ -1,0 +1,48 @@
+#!/bin/bash
+# One-shot account rename, run by rename-user.service at boot before the
+# login screen (an account can't be renamed while it's logged in).
+#
+#   OLD=marina NEW=friereon  (from /etc/rename-user.pending: "OLD NEW")
+#
+# Renames the user and its group, moves the home folder, leaves a symlink
+# at the old home so anything missed keeps working, and rewrites the
+# /home/OLD paths in the user's own config files. Then disables itself.
+set -euo pipefail
+exec >>/var/log/rename-user.log 2>&1
+echo "== $(date -Is) rename-user"
+
+PENDING=/etc/rename-user.pending
+[ -f "$PENDING" ] || { echo "nothing pending"; exit 0; }
+read -r OLD NEW <"$PENDING"
+[[ $OLD =~ ^[a-z_][a-z0-9_-]*$ && $NEW =~ ^[a-z_][a-z0-9_-]*$ ]] || { echo "bad names: $OLD $NEW"; exit 1; }
+
+done_ok() { rm -f "$PENDING"; systemctl disable rename-user.service || true; echo "done"; }
+
+if id "$NEW" >/dev/null 2>&1; then echo "$NEW already exists"; done_ok; exit 0; fi
+id "$OLD" >/dev/null 2>&1 || { echo "$OLD doesn't exist"; exit 1; }
+if pgrep -u "$OLD" >/dev/null; then echo "$OLD has processes; not renaming this boot"; pgrep -a -u "$OLD"; exit 1; fi
+
+usermod -l "$NEW" "$OLD"
+getent group "$OLD" >/dev/null && groupmod -n "$NEW" "$OLD"
+usermod -d "/home/$NEW" -m "$NEW"
+ln -sfn "/home/$NEW" "/home/$OLD"          # safety net for paths not rewritten below
+sed -i "s/^$OLD:/$NEW:/" /etc/subuid /etc/subgid
+
+for f in /etc/sudoers.d/*; do
+  [ -f "$f" ] || continue
+  if grep -qw "$OLD" "$f"; then
+    cp "$f" "/root/$(basename "$f").before-rename"
+    sed -i "s/\b$OLD\b/$NEW/g" "$f"
+    visudo -cf "$f" || { echo "sudoers check failed, restoring $f"; cp "/root/$(basename "$f").before-rename" "$f"; }
+  fi
+done
+
+H="/home/$NEW"
+for d in .config/hypr .config/fish .config/systemd/user .config/noctalia .config/kitty .config/fastfetch \
+         .local/bin .local/share/applications .local/state/noctalia; do
+  [ -d "$H/$d" ] || continue
+  { grep -rlIZ --exclude='*.before-*' "/home/$OLD" "$H/$d" 2>/dev/null || true; } | xargs -0r sed -i "s#/home/$OLD\b#/home/$NEW#g"
+done
+grep -rlI "/home/$NEW" "$H/.config/systemd/user" >/dev/null 2>&1 && echo "user units updated" || true
+
+done_ok

@@ -1,0 +1,13 @@
+[Unit]
+Description=Virtual screen for the Android emulator, viewable in a browser (noVNC on :6080)
+After=network-online.target
+
+[Service]
+Environment=DISPLAY=:1
+ExecStartPre=/bin/sh -c 'rm -f /tmp/.X1-lock /tmp/.X11-unix/X1'
+ExecStart=/bin/sh -c 'Xvfb :1 -screen 0 720x1280x24 & sleep 2; openbox & x11vnc -display :1 -rfbauth /root/.vnc/passwd -forever -shared -localhost -quiet & exec websockify --web /usr/share/novnc 6080 localhost:5900'
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target

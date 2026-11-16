@@ -1,0 +1,18 @@
+[Unit]
+Description=llama-swap: loads, swaps and unloads models for AIWS
+After=network.target
+
+[Service]
+User=aiws
+Group=aiws
+SupplementaryGroups=render video
+ExecStartPre=/bin/sh -c 'test -s /var/lib/aiws/llama-swap.yaml || printf "models: {}\\n" > /var/lib/aiws/llama-swap.yaml'
+ExecStart=/usr/bin/llama-swap -config /var/lib/aiws/llama-swap.yaml -listen 127.0.0.1:8080 -watch-config
+Restart=on-failure
+Slice=aiws-inference.slice
+# Weights are mmapped; let the kernel keep them, but give the desktop first call on CPU.
+Nice=2
+LimitMEMLOCK=infinity
+
+[Install]
+WantedBy=multi-user.target

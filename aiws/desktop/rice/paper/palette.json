@@ -1,0 +1,16 @@
+{
+  "_about": "Paper theme: colours taken from the wallpaper (white ground, warm grey hair, sage-green eyes, crimson marks, brass staff).",
+  "paper":   "#f6f4f1",
+  "surface": "#e7e1df",
+  "line":    "#c7c2c2",
+  "ink":     "#3a312b",
+  "inkSoft": "#7b716f",
+  "dim":     "#a6a4a6",
+  "sage":    "#4c6838",
+  "sageLight": "#708e5c",
+  "crimson": "#a43c35",
+  "crimsonLight": "#bf443c",
+  "gold":    "#8a6d2b",
+  "brass":   "#b09b50",
+  "blush":   "#d8c9c3"
+}

@@ -1,0 +1,9 @@
+#!/bin/sh
+# System defaults that keep the desktop responsive next to inference.
+set -e
+systemctl enable systemd-oomd.service 2>/dev/null || true
+systemctl enable zramswap.service 2>/dev/null || true
+# The image must not carry a job key or tokens; aiwsd makes them on first start.
+rm -rf /var/lib/aiws/ssh/id_ed25519* /var/lib/aiws/desktop.token /var/lib/aiws/aiws.db*
+# alacritty is the terminal everything opens (x-terminal-emulator).
+update-alternatives --set x-terminal-emulator /usr/bin/alacritty 2>/dev/null || true

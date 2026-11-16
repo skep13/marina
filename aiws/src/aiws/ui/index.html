@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AI Control Centre</title>
+<style>
+:root{--bg:#0d1117;--panel:#141a22;--line:#263040;--ink:#d8dee9;--dim:#7d8899;--acc:#f2a541;--ok:#5fd38d;--warn:#f2c14e;--bad:#ef6461;--mono:"JetBrains Mono",ui-monospace,monospace}
+@media (prefers-color-scheme: light){:root:not([data-theme="dark"]){--bg:#f4f1ea;--panel:#fffdf8;--line:#ddd5c4;--ink:#1e2430;--dim:#6b7280;--acc:#b8650f}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.45 system-ui,sans-serif}
+header{display:flex;align-items:center;gap:16px;padding:10px 16px;border-bottom:1px solid var(--line);position:sticky;top:0;background:var(--bg);z-index:2}
+header h1{font:600 15px var(--mono);letter-spacing:.2em;margin:0;color:var(--acc)}
+nav{display:flex;gap:4px;flex-wrap:wrap}nav button{background:none;border:1px solid transparent;color:var(--dim);padding:5px 10px;border-radius:6px;cursor:pointer;font:inherit}
+nav button.on{color:var(--ink);border-color:var(--line);background:var(--panel)}
+#stop{margin-left:auto;background:var(--bad);color:#fff;border:0;border-radius:6px;padding:7px 14px;font-weight:700;cursor:pointer}
+#pause{background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:6px;padding:6px 12px;cursor:pointer}
+main{padding:16px;max-width:1200px;margin:auto}section{display:none}section.on{display:block}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px 14px}
+.card h3{margin:0 0 8px;font:600 12px var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--dim)}
+.big{font:600 22px var(--mono)}.dim{color:var(--dim)}.mono{font-family:var(--mono);font-size:12.5px}
+.bar{height:8px;background:var(--line);border-radius:4px;overflow:hidden;margin:4px 0 8px;display:flex}.bar i{display:block;height:100%}
+table{width:100%;border-collapse:collapse}td,th{text-align:left;padding:5px 6px;border-bottom:1px solid var(--line);vertical-align:top}th{color:var(--dim);font-weight:500;font-size:12px}
+.pill{font:11px var(--mono);padding:1px 7px;border-radius:9px;border:1px solid var(--line)}.ok{color:var(--ok)}.bad{color:var(--bad)}.warn{color:var(--warn)}
+input,select,textarea{background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:6px;padding:6px 8px;font:inherit;max-width:100%}
+textarea{width:100%;min-height:70px}button.act{background:var(--acc);color:#111;border:0;border-radius:6px;padding:6px 12px;font-weight:600;cursor:pointer}
+pre{background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:8px;max-height:360px;overflow:auto;white-space:pre-wrap;font:12px var(--mono)}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:6px 0}
+@media (max-width:640px){header{flex-wrap:wrap}#stop{margin-left:0}main{padding:12px 16px}}
+</style>
+</head>
+<body>
+<header>
+  <h1>AI</h1>
+  <nav id="nav"></nav>
+  <button id="pause" title="Hold the assistant before its next action">Pause</button>
+  <button id="stop" title="Stop the assistant now (Super+Esc)">■ Stop</button>
+</header>
+<main>
+<section id="overview">
+  <div class="grid">
+    <div class="card"><h3>Memory</h3><div id="mem"></div></div>
+    <div class="card"><h3>GPU (shared memory)</h3><div id="gpu"></div></div>
+    <div class="card"><h3>Now</h3><div id="now"></div></div>
+  </div>
+  <div class="card" style="margin-top:12px"><h3>Recent requests</h3><table id="reqs"></table></div>
+</section>
+<section id="models">
+  <div class="card"><h3>Roles</h3><div id="roles"></div>
+  <div class="row"><button class="act" id="unload">Unload all models</button><span class="dim">frees GPU memory; the next request loads what it needs</span></div></div>
+  <div class="card" style="margin-top:12px"><h3>Library</h3><table id="lib"></table></div>
+</section>
+<section id="projects"><div class="card"><h3>Projects</h3><table id="projs"></table>
+  <p class="dim">Add one from a terminal: <span class="mono">ai init ~/src/thing</span>, restore it with <span class="mono">ai open thing</span>.</p></div></section>
+<section id="assistant">
+  <div class="card"><h3>Ask</h3>
+    <textarea id="prompt" placeholder="e.g. Run the tests, find why test_merge fails and fix it."></textarea>
+    <div class="row"><button class="act" id="ask">Give task</button><span class="dim" id="askproj"></span></div></div>
+  <div class="grid" style="margin-top:12px">
+    <div class="card"><h3>Tasks</h3><table id="tasks"></table></div>
+    <div class="card" style="grid-column:span 2"><h3>Action history</h3><table id="actions"></table></div>
+  </div>
+</section>
+<section id="jobs">
+  <div class="card"><h3>Run on the homelab</h3>
+    <div class="row"><input id="jcmd" placeholder="command" style="flex:1;min-width:200px"><input id="jtags" placeholder="tags (cpu,build)" size="14">
+    <select id="jworker"></select><button class="act" id="jrun">Run</button></div></div>
+  <div class="card" style="margin-top:12px"><h3>Jobs</h3><table id="jlist"></table><pre id="jlog" hidden></pre></div>
+</section>
+<section id="homelab"><div class="grid" id="workers"></div><div class="card" style="margin-top:12px"><h3>Proxmox</h3><div id="pve"></div></div></section>
+</main>
+<script>
+const TABS=["overview","models","projects","assistant","jobs","homelab"];
+let token=(location.hash.match(/token=([^&]+)/)||[])[1];
+try{ if(token) sessionStorage.setItem("aiws",token); else token=sessionStorage.getItem("aiws"); }catch(e){}
+if(location.hash) history.replaceState(null,"",location.pathname);
+if(!token){ token=prompt("AIWS token (ai token new <name> --scopes admin)"); }
+const $=id=>document.getElementById(id), esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+async function api(p,body,method){const r=await fetch("/api/"+p,{method:method||(body?"POST":"GET"),headers:{"Authorization":"Bearer "+token,"Content-Type":"application/json"},body:body?JSON.stringify(body):undefined});if(!r.ok)throw new Error(await r.text());return r.json()}
+let tab=(()=>{try{return localStorage.getItem("aiws-tab")}catch(e){}})()||"overview";
+function show(t){tab=t;try{localStorage.setItem("aiws-tab",t)}catch(e){};for(const s of TABS){$(s).classList.toggle("on",s===t)}[...$("nav").children].forEach(b=>b.classList.toggle("on",b.dataset.t===t));refresh()}
+for(const t of TABS){const b=document.createElement("button");b.textContent=t[0].toUpperCase()+t.slice(1);b.dataset.t=t;b.onclick=()=>show(t);$("nav").append(b)}
+const gb=mb=>mb==null?"?":(mb/1024).toFixed(1)+" GB";
+function bar(parts,total){return `<div class="bar">${parts.map(([v,c])=>`<i style="width:${Math.max(0,100*v/total)}%;background:${c}"></i>`).join("")}</div>`}
+let agentState="running";
+async function overview(){const s=await api("status");agentState=s.agent;const m=s.memory||{},g=m.gpu||{};
+ $("mem").innerHTML=m.total_mb?`<div class="big">${gb(m.available_mb)} <span class="dim" style="font-size:13px">free of ${gb(m.total_mb)}</span></div>${bar([[m.total_mb-m.available_mb,"var(--acc)"]],m.total_mb)}<div class="dim">swap in use ${gb(m.swap_used_mb)} · load ${s.load.map(x=>x.toFixed(2)).join(" ")}</div>`:"–";
+ $("gpu").innerHTML=g.gtt_total_mb?`<div class="mono">carve-out ${gb(g.vram_used_mb)} / ${gb(g.vram_total_mb)}</div>${bar([[g.vram_used_mb,"var(--ok)"]],g.vram_total_mb)}<div class="mono">GTT (system RAM) ${gb(g.gtt_used_mb)} / ${gb(g.gtt_total_mb)}</div>${bar([[g.gtt_used_mb,"var(--warn)"]],g.gtt_total_mb)}<div class="dim">GTT comes out of the free memory on the left.</div>`:`<span class="dim">no GPU memory counters (VM?)</span>`;
+ $("now").innerHTML=`<div>project <b>${esc(s.active_project||"–")}</b></div><div>loaded ${s.running.map(r=>`<span class="pill">${esc(r.model)} ${esc(r.state||"")}</span>`).join(" ")||'<span class="dim">nothing</span>'}</div><div>assistant <span class="pill ${s.agent==="running"?"ok":s.agent==="paused"?"warn":"bad"}">${esc(s.agent)}</span></div>`;
+ $("reqs").innerHTML="<tr><th>when</th><th>client</th><th>model</th><th>lane</th><th>TTFT</th><th>wall</th></tr>"+s.requests.map(r=>`<tr><td>${new Date(r.ts*1000).toLocaleTimeString()}</td><td>${esc(r.client)}</td><td class="mono">${esc(r.model)}</td><td>${r.lane}</td><td>${r.ttft_s??"–"}</td><td>${r.wall_s}</td></tr>`).join("");
+ $("pause").textContent=agentState==="paused"?"Resume":"Pause"}
+async function modelsTab(){const r=await api("models"),served=r.models.flatMap(m=>m.served);
+ const roles=["chat","code","vision","embed","fast"];
+ $("roles").innerHTML=roles.map(role=>`<div class="row"><span style="width:60px">${role}</span><select data-role="${role}"><option value="">default</option>${served.map(s=>`<option ${r.roles[role]===s?"selected":""}>${esc(s)}</option>`).join("")}</select></div>`).join("");
+ $("roles").querySelectorAll("select").forEach(sel=>sel.onchange=()=>sel.value&&api("models/roles",{role:sel.dataset.role,model:sel.value}));
+ $("lib").innerHTML="<tr><th>model</th><th>roles</th><th>runtime</th><th>GPU</th><th>profiles</th><th></th></tr>"+r.models.map(m=>`<tr><td><b>${esc(m.label||m.name)}</b><div class="dim mono">${esc(m.name)}</div></td><td>${esc((m.roles||[]).join(", "))}</td><td>${esc(m.runtime||"llama.cpp")}</td><td>${m.gpu_gb?m.gpu_gb+" GB":"–"}</td><td class="mono">${esc(Object.keys(m.profiles||{}).join(" · "))}</td><td>${m.present?'<span class="ok">ready</span>':'<span class="bad">missing</span>'}</td></tr>`).join("")}
+async function projectsTab(){const r=await api("projects");$("projs").innerHTML="<tr><th>project</th><th>path</th><th>models</th><th></th></tr>"+r.projects.map(p=>`<tr><td><b>${esc(p.name)}</b></td><td class="mono">${esc(p.root)}</td><td class="mono">${esc(Object.entries(p.models||{}).map(([k,v])=>k+"="+v).join(" "))}</td><td>${p.name===r.active?'<span class="pill ok">active</span>':`<button class="act" data-p="${esc(p.name)}">Make active</button>`}</td></tr>`).join("");
+ $("projs").querySelectorAll("button").forEach(b=>b.onclick=()=>api(`projects/${b.dataset.p}/activate`,{}).then(refresh))}
+async function assistantTab(){const [t,a,s]=await Promise.all([api("agent/tasks"),api("agent/actions?limit=60"),api("status")]);
+ $("askproj").textContent=s.active_project?`in project ${s.active_project}`:"open a project first";
+ $("tasks").innerHTML=t.tasks.map(x=>`<tr><td>#${x.id}</td><td>${esc(x.prompt.slice(0,80))}<div class="dim">${esc((x.result||"").slice(0,300))}</div></td><td><span class="pill ${x.status==="done"?"ok":x.status==="running"?"warn":x.status==="queued"?"":"bad"}">${x.status}</span></td></tr>`).join("");
+ $("actions").innerHTML="<tr><th>time</th><th>action</th><th>result</th></tr>"+a.actions.map(x=>`<tr><td class="mono">${new Date(x.ts*1000).toLocaleTimeString()}</td><td class="mono"><b>${esc(x.tool)}</b> ${esc(x.args.slice(0,160))}</td><td><span class="pill ${x.status==="ok"?"ok":x.status==="running"?"warn":"bad"}">${x.status}</span> <span class="dim mono">${esc((x.result||"").slice(0,200))}</span></td></tr>`).join("")}
+let openJob=null;
+async function jobsTab(){const r=await api("jobs");$("jworker").innerHTML=`<option value="">any worker</option>`+r.workers.map(w=>`<option>${esc(w)}</option>`).join("");
+ $("jlist").innerHTML="<tr><th>#</th><th>command</th><th>worker</th><th>status</th><th>time</th></tr>"+r.jobs.map(j=>`<tr data-j="${j.id}" style="cursor:pointer"><td>${j.id}</td><td class="mono">${esc(j.command.slice(0,80))}</td><td>${esc(j.worker)}</td><td><span class="pill ${j.status==="done"?"ok":j.status==="running"?"warn":"bad"}">${j.status}</span></td><td>${(((j.finished||Date.now()/1000)-(j.started||j.ts))).toFixed(1)}s</td></tr>`).join("");
+ $("jlist").querySelectorAll("tr[data-j]").forEach(tr=>tr.onclick=()=>{openJob=tr.dataset.j;jobLog()});if(openJob)jobLog()}
+async function jobLog(){const j=await api("jobs/"+openJob);$("jlog").hidden=false;$("jlog").textContent=`# job ${j.id} on ${j.worker}: ${j.command}\n`+j.log}
+async function homelabTab(){const r=await api("cluster");$("workers").innerHTML=r.workers.map(w=>`<div class="card"><h3>${esc(w.name)}</h3><div class="mono">${esc(w.host)}</div><div>${w.up?`<span class="ok">up</span> · ${w.cpus} cpu · load ${w.load1} · ${gb(w.mem_avail_mb)} free`:`<span class="bad">down</span> <span class="dim">${esc(w.error||"")}</span>`}</div><div class="dim">${esc(w.tags.join(", "))}</div></div>`).join("");
+ const p=r.proxmox;$("pve").innerHTML=!p.configured?'<span class="dim">Not configured: set proxmox.url in /etc/aiws/aiws.yaml and AIWS_PVE_TOKEN (a PVEAuditor token) in secrets.env.</span>':p.error?`<span class="bad">${esc(p.error)}</span>`:`<div>cluster <b>${esc(p.cluster)}</b> ${p.quorate?'<span class="pill ok">quorate</span>':'<span class="pill bad">no quorum</span>'}</div><table><tr><th>node</th><th>status</th><th>cpu</th><th>memory</th></tr>${p.nodes.map(n=>`<tr><td>${n.name}</td><td>${n.status}</td><td>${n.cpu}%</td><td>${n.mem_used_gb} / ${n.mem_total_gb} GB</td></tr>`).join("")}</table><table style="margin-top:8px"><tr><th>id</th><th>guest</th><th>node</th><th>status</th><th>memory</th></tr>${p.guests.map(g=>`<tr><td>${g.vmid}</td><td>${esc(g.name)}</td><td>${g.node}</td><td>${g.status}</td><td>${g.mem_used_gb} / ${g.mem_max_gb} GB</td></tr>`).join("")}</table>`}
+const RENDER={overview,models:modelsTab,projects:projectsTab,assistant:assistantTab,jobs:jobsTab,homelab:homelabTab};
+async function refresh(){try{await RENDER[tab]()}catch(e){console.error(e)}}
+$("stop").onclick=()=>api("agent/state",{state:"stopped"}).then(refresh); // stays stopped until the next task
+$("pause").onclick=()=>api("agent/state",{state:agentState==="paused"?"running":"paused"}).then(()=>{api("status").then(s=>{agentState=s.agent;$("pause").textContent=agentState==="paused"?"Resume":"Pause"})});
+$("unload").onclick=()=>api("models/unload",{}).then(refresh);
+$("ask").onclick=()=>{const p=$("prompt").value.trim();if(p)api("agent/tasks",{prompt:p}).then(()=>{$("prompt").value="";refresh()}).catch(e=>alert(e.message))};
+$("jrun").onclick=()=>api("jobs",{command:$("jcmd").value,tags:$("jtags").value.split(",").map(s=>s.trim()).filter(Boolean),worker:$("jworker").value||null}).then(r=>{openJob=r.id;refresh()}).catch(e=>alert(e.message));
+show(tab);setInterval(refresh,(tab==="homelab")?10000:2000);
+</script>
+</body>
+</html>

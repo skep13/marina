@@ -1,0 +1,3 @@
+# ydotool (the assistant's clicks on Wayland) writes to /dev/uinput.
+# Only members of group "input" may; setup.sh adds the desktop user.
+KERNEL=="uinput", GROUP="input", MODE="0660", OPTIONS+="static_node=uinput"

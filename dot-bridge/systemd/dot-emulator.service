@@ -1,0 +1,20 @@
+[Unit]
+Description=Android emulator running the Alexa app for the Drop In
+After=dot-display.service dot-audio.service
+Requires=dot-display.service dot-audio.service
+
+[Service]
+Environment=DISPLAY=:1
+Environment=ANDROID_SDK_ROOT=/opt/android
+Environment=ANDROID_AVD_HOME=/root/.android/avd
+Environment=PULSE_SERVER=unix:/tmp/pulse.sock
+Environment=PULSE_SINK=dot_ear
+Environment=PULSE_SOURCE=dot_mouth.monitor
+# Bigger audio buffers: without them a busy moment comes out as crackling.
+Environment=PULSE_LATENCY_MSEC=60
+ExecStart=/opt/android/emulator/emulator -avd dot -no-snapshot-save -no-boot-anim -gpu swiftshader_indirect -memory 2048 -cores 2 -allow-host-audio -no-metrics
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

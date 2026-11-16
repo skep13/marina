@@ -12,6 +12,14 @@ The app (Rust, `tao` + `wry` WebKit window):
 - stops the server when you quit (⌘Q or close the window). A small `sh`
   supervisor also stops it within ~2 s if the app is force-quit or crashes.
 
+**YubiKey lock.** Forge opens only after you plug in your YubiKey and tap it.
+The key signs a fresh random challenge with its SSH key (`~/.ssh/id_ed25519_sk`)
+and the app checks the signature against the public key pinned in
+`~/.forge/yubikey_allowed_signers` (written by `install.sh`). Unplugging the
+key while Forge is open stops the harness and shows a locked screen; plug it
+back in and press **Unlock**. Needs Homebrew OpenSSH (`brew install openssh`).
+The `forge` command-line launcher is not gated.
+
 Menus: **View → Reload** (⌘R), **View → Open in Browser** (⇧⌘O), and a
 standard Edit menu, so copy and paste work. Server output goes to
 `~/.forge/app.log`.

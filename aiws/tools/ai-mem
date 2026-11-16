@@ -1,0 +1,113 @@
+#!/usr/bin/env python3
+"""Where the memory is: proportional set size (PSS) grouped by what the
+workstation is doing, plus the GPU's carve-out and GTT.
+
+PSS splits shared pages between the processes sharing them, so the groups
+add up to real usage. Run as root to see every process.
+
+  ai-mem            table
+  ai-mem --json     for bench/results
+"""
+import glob
+import json
+import os
+import re
+import sys
+
+GROUPS = [
+    ("inference", r"llama-server|llama-swap|whisper|kokoro"),
+    ("aiws", r"aiwsd|aiws\.server|aiws-agent|aiws\.agent|aiws-control|ai-ask"),
+    ("browser", r"firefox|chromium|WebKitWebProcess|WebKitNetwork"),
+    ("editor", r"codium|code-oss|electron|nvim"),
+    ("desktop", r"\bi3|i3bar|i3blocks|dunst|rofi|picom|nm-applet|polkit-mate|xss-lock|"
+                r"xfce4|xfwm4|Thunar|lightdm|Xorg|pulse|pipewire|"
+                r"wireplumber|at-spi|dbus-daemon|gvfs|polkit|nm-applet|xdg-|tumbler|panel"),
+    ("terminals", r"tmux|alacritty|xfce4-terminal|bash|zsh"),
+    ("containers", r"podman|conmon|crun|distrobox|slirp4netns|pasta"),
+    ("marina", r"marina"),
+]
+
+
+def pss_kb(pid):
+    try:
+        with open(f"/proc/{pid}/smaps_rollup") as f:
+            for line in f:
+                if line.startswith("Pss:"):
+                    return int(line.split()[1])
+    except OSError:
+        pass
+    return 0
+
+
+def cmdline(pid):
+    try:
+        raw = open(f"/proc/{pid}/cmdline", "rb").read().replace(b"\0", b" ").decode(errors="replace")
+        return raw.strip() or open(f"/proc/{pid}/comm").read().strip()
+    except OSError:
+        return ""
+
+
+def meminfo():
+    m = {}
+    for line in open("/proc/meminfo"):
+        k, v = line.split(":")
+        m[k] = int(v.split()[0])
+    return m
+
+
+def gpu():
+    for dev in glob.glob("/sys/class/drm/card*/device"):
+        try:
+            return {f"{k}_{w}_mb": int(open(f"{dev}/mem_info_{k}_{w}").read()) // 2**20
+                    for k in ("vram", "gtt") for w in ("used", "total")}
+        except OSError:
+            continue
+    return {}
+
+
+def main():
+    groups = {g: 0 for g, _ in GROUPS}
+    groups["other"] = 0
+    top = []
+    for pid in filter(str.isdigit, os.listdir("/proc")):
+        kb = pss_kb(pid)
+        if not kb:
+            continue
+        cmd = cmdline(pid)
+        for g, pat in GROUPS:
+            if re.search(pat, cmd):
+                groups[g] += kb
+                break
+        else:
+            groups["other"] += kb
+        top.append((kb, pid, cmd[:70]))
+    m = meminfo()
+    used = m["MemTotal"] - m["MemAvailable"]
+    procs = sum(groups.values())
+    out = {
+        "total_mb": m["MemTotal"] // 1024, "available_mb": m["MemAvailable"] // 1024,
+        "used_mb": used // 1024,
+        "kernel_and_cache_mb": (used - procs) // 1024,  # slab, page tables, GTT, …
+        "groups_mb": {g: v // 1024 for g, v in sorted(groups.items(), key=lambda x: -x[1])},
+        "gpu": gpu(),
+        "top": [{"mb": kb // 1024, "pid": int(p), "cmd": c} for kb, p, c in sorted(top, reverse=True)[:12]],
+    }
+    if "--json" in sys.argv:
+        print(json.dumps(out, indent=2))
+        return
+    print(f"memory  {out['used_mb']} MB used of {out['total_mb']} MB, {out['available_mb']} MB available")
+    for g, mb in out["groups_mb"].items():
+        if mb:
+            print(f"  {g:<12}{mb:>7} MB")
+    print(f"  {'kernel+GTT':<12}{out['kernel_and_cache_mb']:>7} MB  (not owned by a process)")
+    if out["gpu"]:
+        g = out["gpu"]
+        print(f"gpu     carve-out {g['vram_used_mb']}/{g['vram_total_mb']} MB, "
+              f"GTT {g['gtt_used_mb']}/{g['gtt_total_mb']} MB (GTT is part of 'used')")
+    print("top")
+    for t in out["top"]:
+        print(f"  {t['mb']:>6} MB  {t['pid']:>7}  {t['cmd']}")
+
+
+if __name__ == "__main__":
+    main()

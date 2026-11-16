@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Marina frame baker</title>
+<style>
+  :root { --bg:#14161c; --ink:#e8e8ee; --dim:#8a90a0; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:13px/1.4 ui-monospace, Menlo, monospace; }
+  header { padding:10px 14px; display:flex; gap:12px; align-items:center; }
+  #status { color:var(--dim); }
+  #grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(150px, 1fr)); gap:8px; padding:8px 14px 24px; }
+  figure { margin:0; background:repeating-conic-gradient(#20232b 0 25%, #191b22 0 50%) 0 0/16px 16px; border-radius:6px; }
+  figure img { width:100%; display:block; }
+  figcaption { padding:3px 6px; color:var(--dim); background:var(--bg); }
+  canvas#out { display:none; }
+</style>
+</head>
+<body>
+<header><b>Marina · cel frame baker</b><span id="status">loading…</span></header>
+<div id="grid"></div>
+<canvas id="out"></canvas>
+<script type="module" src="./bake.js"></script>
+</body>
+</html>

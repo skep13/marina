@@ -1,0 +1,7 @@
+# cava: same gradient as the Mac (rest are defaults)
+[color]
+gradient = 1
+gradient_count = 3
+gradient_color_1 = '#3D4F8B'
+gradient_color_2 = '#627DC7'
+gradient_color_3 = '#C4CDF2'

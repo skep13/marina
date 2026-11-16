@@ -1,0 +1,3 @@
+#!/bin/sh
+# Marina, the sphere. `aiws-orb --toggle` opens or closes her chat (Super+Space).
+exec electron --ozone-platform-hint=auto /usr/lib/aiws/orb "$@"

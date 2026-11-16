@@ -1,0 +1,4 @@
+[Unit]
+Description=AIWS services
+[Slice]
+CPUWeight=100

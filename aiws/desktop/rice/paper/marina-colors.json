@@ -1,0 +1,14 @@
+{
+  "colors": {
+    "core": "#5a7c49",
+    "glow": "#b09b50",
+    "pulse": "#cfe0c0",
+    "idle": "#708e5c",
+    "listening": "#b09b50",
+    "thinking": "#7b716f",
+    "speaking": "#4c6838",
+    "acting": "#8a6d2b",
+    "approval": "#b09b50",
+    "error": "#a43c35"
+  }
+}

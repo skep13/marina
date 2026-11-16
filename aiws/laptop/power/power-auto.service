@@ -1,0 +1,11 @@
+[Unit]
+Description=Pick the MSI shift mode and power profile from the charger state
+After=systemd-modules-load.service power-profiles-daemon.service
+Wants=power-profiles-daemon.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/power-auto
+
+[Install]
+WantedBy=multi-user.target

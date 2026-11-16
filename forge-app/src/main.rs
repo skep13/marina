@@ -11,7 +11,10 @@ use std::{
     os::unix::process::CommandExt,
     path::PathBuf,
     process::{Child, Command, Stdio},
-    sync::{Arc, Mutex},
+    sync::{
+        atomic::{AtomicU64, Ordering},
+        Arc, Mutex,
+    },
     thread,
     time::Duration,
 };
@@ -29,12 +32,34 @@ use wry::{NewWindowResponse, WebViewBuilder};
 const LAB3: &str = "192.168.1.15:8080";
 const NODE_BIN: &str = "/opt/homebrew/opt/node@24/bin";
 
+/// The startup stages shown on the opening screen's heat bar.
+#[derive(Debug, Clone, Copy)]
+enum Step {
+    Key,
+    Tap,
+    Lab3,
+    Harness,
+}
+
+impl Step {
+    fn id(self) -> &'static str {
+        match self {
+            Step::Key => "key",
+            Step::Tap => "tap",
+            Step::Lab3 => "lab3",
+            Step::Harness => "harness",
+        }
+    }
+}
+
 #[derive(Debug)]
 enum UserEvent {
-    Status(String),
+    Status(Step, String),
     Ready(String),
-    Failed { title: String, detail: String },
+    Failed { step: Step, title: String, detail: String },
     ServerExited(String),
+    /// The YubiKey was unplugged while Forge was running.
+    Locked,
     Retry,
     Menu(MenuEvent),
 }
@@ -73,6 +98,118 @@ fn stop_server(server: &Server) {
     }
 }
 
+/// Homebrew's OpenSSH: Apple's build can't talk to FIDO security keys.
+const SSH_KEYGEN: &str = "/opt/homebrew/bin/ssh-keygen";
+/// Signature namespace, so an unlock signature can't be reused as anything else.
+const UNLOCK_NAMESPACE: &str = "forge-unlock";
+
+/// Is a YubiKey plugged in over USB?
+fn yubikey_present() -> bool {
+    Command::new("/usr/sbin/ioreg")
+        .args(["-p", "IOUSB", "-w0"])
+        .output()
+        .map(|o| String::from_utf8_lossy(&o.stdout).to_lowercase().contains("yubikey"))
+        .unwrap_or(false)
+}
+
+/// Prove the user's YubiKey is here and touched: have it sign a fresh random
+/// challenge with its SSH key (`~/.ssh/id_ed25519_sk`, needs a tap) and check
+/// the signature against the public key pinned in
+/// `~/.forge/yubikey_allowed_signers`.
+fn yubikey_unlock() -> Result<(), (Step, String)> {
+    let key = home().join(".ssh/id_ed25519_sk");
+    let signers = home().join(".forge/yubikey_allowed_signers");
+    if !key.exists() || !signers.exists() {
+        return Err((
+            Step::Key,
+            "The YubiKey isn't set up for Forge (missing ~/.ssh/id_ed25519_sk or \
+             ~/.forge/yubikey_allowed_signers)."
+                .into(),
+        ));
+    }
+    yubikey_sign_and_verify(&key, &signers)
+}
+
+fn yubikey_sign_and_verify(
+    key: &std::path::Path,
+    signers: &std::path::Path,
+) -> Result<(), (Step, String)> {
+    let tap = |e: String| (Step::Tap, e);
+    let mut nonce = [0u8; 32];
+    fs::File::open("/dev/urandom")
+        .and_then(|mut f| std::io::Read::read_exact(&mut f, &mut nonce))
+        .map_err(|e| tap(format!("Couldn't make a challenge: {e}")))?;
+    let dir = home().join(".forge/run");
+    let _ = fs::create_dir_all(&dir);
+    let challenge = dir.join(format!("unlock-{}", std::process::id()));
+    let sig = challenge.with_extension("sig");
+    let _ = fs::remove_file(&sig);
+    fs::write(&challenge, nonce).map_err(|e| tap(format!("Couldn't write the challenge: {e}")))?;
+
+    let result = (|| -> Result<(), String> {
+        let out = Command::new(SSH_KEYGEN)
+            .args(["-Y", "sign", "-n", UNLOCK_NAMESPACE, "-f"])
+            .arg(&key)
+            .arg(&challenge)
+            .stdin(Stdio::null())
+            .output()
+            .map_err(|e| format!("Couldn't run ssh-keygen: {e}"))?;
+        if !out.status.success() {
+            let err = String::from_utf8_lossy(&out.stderr);
+            log_line(&format!("--- yubikey sign failed: {}", err.trim()));
+            return Err(if err.contains("device not found") {
+                "The YubiKey wasn't found. Plug it in and press Unlock.".into()
+            } else {
+                "The YubiKey wasn't tapped in time. Press Unlock and tap the gold contact \
+                 when it flashes."
+                    .into()
+            });
+        }
+        let ok = Command::new(SSH_KEYGEN)
+            .args(["-Y", "verify", "-I", "forge", "-n", UNLOCK_NAMESPACE, "-f"])
+            .arg(&signers)
+            .arg("-s")
+            .arg(&sig)
+            .stdin(fs::File::open(&challenge).map_err(|e| e.to_string())?)
+            .output()
+            .map_err(|e| format!("Couldn't run ssh-keygen: {e}"))?;
+        if ok.status.success() {
+            Ok(())
+        } else {
+            log_line(&format!(
+                "--- yubikey verify failed: {}",
+                String::from_utf8_lossy(&ok.stderr).trim()
+            ));
+            Err("That key isn't the YubiKey Forge is paired with.".into())
+        }
+    })();
+    let _ = fs::remove_file(&challenge);
+    let _ = fs::remove_file(&sig);
+    // A missing key sends the user back to the "plug in" stage; anything
+    // else is a tap that didn't happen (or the wrong key).
+    result.map_err(|e| {
+        if e.starts_with("The YubiKey wasn't found") { (Step::Key, e) } else { tap(e) }
+    })
+}
+
+/// While Forge is unlocked, watch for the YubiKey being unplugged. Stops
+/// quietly once `generation` moves on (a retry or relaunch started).
+fn watch_yubikey(proxy: EventLoopProxy<UserEvent>, generation: Arc<AtomicU64>, mine: u64) {
+    thread::spawn(move || {
+        while generation.load(Ordering::SeqCst) == mine {
+            if !yubikey_present() {
+                // Re-check once so a USB hiccup doesn't lock Forge.
+                thread::sleep(Duration::from_millis(800));
+                if generation.load(Ordering::SeqCst) == mine && !yubikey_present() {
+                    let _ = proxy.send_event(UserEvent::Locked);
+                }
+                return;
+            }
+            thread::sleep(Duration::from_secs(2));
+        }
+    });
+}
+
 fn lab3_reachable() -> bool {
     let addr: SocketAddr = LAB3.parse().unwrap();
     TcpStream::connect_timeout(&addr, Duration::from_secs(3)).is_ok()
@@ -80,12 +217,35 @@ fn lab3_reachable() -> bool {
 
 /// Check lab3, start `dsh web`, and report the URL (or the failure) back to
 /// the UI thread.
-fn launch(proxy: EventLoopProxy<UserEvent>, server: Server) {
+fn launch(proxy: EventLoopProxy<UserEvent>, server: Server, generation: Arc<AtomicU64>) {
+    let mine = generation.fetch_add(1, Ordering::SeqCst) + 1;
     thread::spawn(move || {
         let send = |e| {
             let _ = proxy.send_event(e);
         };
-        send(UserEvent::Status("Checking the connection to lab3…".into()));
+
+        // Forge only opens with the user's YubiKey: plugged in, then tapped.
+        if !yubikey_present() {
+            send(UserEvent::Status(Step::Key, "Plug in your YubiKey to open Forge.".into()));
+            while !yubikey_present() {
+                if generation.load(Ordering::SeqCst) != mine {
+                    return;
+                }
+                thread::sleep(Duration::from_secs(1));
+            }
+        }
+        send(UserEvent::Status(
+            Step::Tap,
+            "Tap your YubiKey to unlock Forge — the gold contact, when it flashes.".into(),
+        ));
+        if let Err((step, detail)) = yubikey_unlock() {
+            send(UserEvent::Failed { step, title: "Forge is locked".into(), detail });
+            return;
+        }
+        log_line("--- unlocked with YubiKey");
+        watch_yubikey(proxy.clone(), generation.clone(), mine);
+
+        send(UserEvent::Status(Step::Lab3, "Reaching lab3…".into()));
         // The first connection can trigger macOS's "allow local network"
         // prompt and fail while it is open, so keep trying for a while.
         let mut ok = lab3_reachable();
@@ -95,6 +255,7 @@ fn launch(proxy: EventLoopProxy<UserEvent>, server: Server) {
             }
             if i == 0 {
                 send(UserEvent::Status(
+                    Step::Lab3,
                     "Waiting for lab3… (if macOS asks to allow local network access, click Allow)"
                         .into(),
                 ));
@@ -104,6 +265,7 @@ fn launch(proxy: EventLoopProxy<UserEvent>, server: Server) {
         }
         if !ok {
             send(UserEvent::Failed {
+                step: Step::Lab3,
                 title: "Can't reach lab3".into(),
                 detail: format!(
                     "Nothing answered at {LAB3}. Check the ethernet cable. If it is plugged in, \
@@ -120,6 +282,7 @@ fn launch(proxy: EventLoopProxy<UserEvent>, server: Server) {
             Ok(k) => k.trim().to_string(),
             Err(e) => {
                 send(UserEvent::Failed {
+                    step: Step::Harness,
                     title: "Forge isn't set up".into(),
                     detail: format!("Couldn't read ~/.forge/lab3.key ({e})."),
                 });
@@ -128,13 +291,14 @@ fn launch(proxy: EventLoopProxy<UserEvent>, server: Server) {
         };
         if !dsh.exists() {
             send(UserEvent::Failed {
+                step: Step::Harness,
                 title: "Forge isn't set up".into(),
                 detail: "DeepSeek Harness is missing from ~/.forge/app.".into(),
             });
             return;
         }
 
-        send(UserEvent::Status("Starting Forge…".into()));
+        send(UserEvent::Status(Step::Harness, "Lighting the harness…".into()));
         let path = format!(
             "{NODE_BIN}:{}:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin",
             home().join(".local/bin").display()
@@ -171,6 +335,7 @@ wait "$srv"; exit $?"#;
             Ok(c) => c,
             Err(e) => {
                 send(UserEvent::Failed {
+                    step: Step::Harness,
                     title: "Forge didn't start".into(),
                     detail: format!("Couldn't run DeepSeek Harness: {e}"),
                 });
@@ -219,49 +384,22 @@ fn esc(s: &str) -> String {
     s.replace('&', "&amp;").replace('<', "&lt;").replace('>', "&gt;")
 }
 
-/// The loading / error screen shown before the harness UI is ready.
-fn splash(status: &str, error: Option<(&str, &str)>) -> String {
-    let body = match error {
-        None => format!(
-            r#"<div class="spin"></div><p id="status">{}</p>"#,
-            esc(status)
-        ),
-        Some((title, detail)) => format!(
-            r#"<h2>{}</h2><p class="detail">{}</p>
-               <button onclick="window.ipc.postMessage('retry')">Retry</button>
-               <p class="hint">Log: ~/.forge/app.log</p>"#,
-            esc(title),
-            esc(detail)
-        ),
+/// The opening screen (src/splash.html): the heat bar shows which startup
+/// stage is running; `error` turns it into the "quenched" failure view.
+fn splash(step: Step, status: &str, error: Option<(&str, &str)>) -> String {
+    const PAGE: &str = include_str!("splash.html");
+    let (mode, title, detail) = match error {
+        Some((t, d)) => ("error", t, d),
+        None => ("work", "", ""),
     };
-    format!(
-        r#"<!doctype html><html><head><meta charset="utf-8"><style>
-:root {{ --bg:#f6f4ef; --fg:#1d1b18; --muted:#6b665d; --accent:#d9682b; --line:#e2ddd2; }}
-@media (prefers-color-scheme: dark) {{
-  :root {{ --bg:#16140f; --fg:#efe9df; --muted:#9a9284; --accent:#ef8a4c; --line:#2c2820; }}
-}}
-html,body {{ height:100%; margin:0; background:var(--bg); color:var(--fg);
-  font:15px/1.5 -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif; }}
-body {{ display:flex; align-items:center; justify-content:center; -webkit-user-select:none; }}
-.card {{ text-align:center; max-width:440px; padding:24px; }}
-h1 {{ font-size:34px; letter-spacing:-0.02em; margin:0 0 4px; }}
-h1 span {{ color:var(--accent); }}
-.sub {{ color:var(--muted); margin:0 0 32px; font-size:13px; }}
-h2 {{ font-size:18px; margin:0 0 8px; }}
-.detail {{ color:var(--muted); margin:0 0 20px; }}
-.hint {{ color:var(--muted); font-size:12px; margin-top:18px; }}
-#status {{ color:var(--muted); }}
-.spin {{ width:26px; height:26px; margin:0 auto 14px; border-radius:50%;
-  border:3px solid var(--line); border-top-color:var(--accent); animation:s 0.9s linear infinite; }}
-@keyframes s {{ to {{ transform:rotate(360deg); }} }}
-button {{ font:inherit; padding:8px 22px; border-radius:8px; border:1px solid var(--line);
-  background:var(--accent); color:#fff; cursor:pointer; }}
-</style></head><body><div class="card">
-<h1><span>◆</span> Forge</h1><p class="sub">KAT-Coder on lab3 · DeepSeek Harness</p>
-{body}
-</div><script>window.setStatus = t => {{ const e = document.getElementById('status'); if (e) e.textContent = t; }};</script>
-</body></html>"#
-    )
+    // Locked screens unlock with the YubiKey; everything else retries.
+    let button = if title.contains("locked") { "Unlock" } else { "Retry" };
+    PAGE.replace("{{STEP}}", step.id())
+        .replace("{{MODE}}", mode)
+        .replace("{{STATUS}}", &esc(status))
+        .replace("{{ERR_TITLE}}", &esc(title))
+        .replace("{{ERR_DETAIL}}", &esc(detail))
+        .replace("{{BUTTON}}", button)
 }
 
 fn build_menu() -> (Menu, MenuItem, MenuItem, MenuItem) {
@@ -344,7 +482,7 @@ fn main() -> wry::Result<()> {
 
     let ipc_proxy = proxy.clone();
     let webview = WebViewBuilder::new()
-        .with_html(splash("Starting…", None))
+        .with_html(splash(Step::Key, "Waking up…", None))
         .with_devtools(cfg!(debug_assertions))
         .with_ipc_handler(move |req| {
             if req.body() == "retry" {
@@ -359,15 +497,18 @@ fn main() -> wry::Result<()> {
         .build(&window)?;
 
     let server: Server = Arc::new(Mutex::new(None));
+    // Bumped on every (re)launch so stale unlock waits and USB watchers stop.
+    let generation = Arc::new(AtomicU64::new(0));
     let mut current_url: Option<String> = None;
-    launch(proxy.clone(), server.clone());
+    launch(proxy.clone(), server.clone(), generation.clone());
 
     event_loop.run(move |event, _, control_flow| {
         *control_flow = ControlFlow::Wait;
         match event {
-            Event::UserEvent(UserEvent::Status(s)) => {
+            Event::UserEvent(UserEvent::Status(step, s)) => {
                 let _ = webview.evaluate_script(&format!(
-                    "window.setStatus && window.setStatus({})",
+                    "window.setStep && window.setStep({}, {})",
+                    serde_json::to_string(step.id()).unwrap(),
                     serde_json::to_string(&s).unwrap()
                 ));
             }
@@ -375,20 +516,37 @@ fn main() -> wry::Result<()> {
                 current_url = Some(url.clone());
                 let _ = webview.load_url(&url);
             }
-            Event::UserEvent(UserEvent::Failed { title, detail }) => {
-                let _ = webview.load_html(&splash("", Some((&title, &detail))));
+            Event::UserEvent(UserEvent::Failed { step, title, detail }) => {
+                let _ = webview.load_html(&splash(step, "", Some((&title, &detail))));
+            }
+            Event::UserEvent(UserEvent::Locked) => {
+                generation.fetch_add(1, Ordering::SeqCst);
+                stop_server(&server);
+                current_url = None;
+                log_line("--- locked: YubiKey unplugged");
+                let _ = webview.load_html(&splash(
+                    Step::Key,
+                    "",
+                    Some((
+                        "Forge is locked",
+                        "Your YubiKey was unplugged, so Forge stopped. Plug it back in and press \
+                         Unlock. Your sessions are kept.",
+                    )),
+                ));
             }
             Event::UserEvent(UserEvent::ServerExited(status)) => {
+                generation.fetch_add(1, Ordering::SeqCst);
                 current_url = None;
                 let _ = webview.load_html(&splash(
+                    Step::Harness,
                     "",
                     Some(("Forge stopped", &format!("The harness exited ({status}).")))
                 ));
             }
             Event::UserEvent(UserEvent::Retry) => {
                 stop_server(&server);
-                let _ = webview.load_html(&splash("Starting…", None));
-                launch(proxy.clone(), server.clone());
+                let _ = webview.load_html(&splash(Step::Key, "Waking up…", None));
+                launch(proxy.clone(), server.clone(), generation.clone());
             }
             Event::UserEvent(UserEvent::Menu(e)) => {
                 if e.id == *quit_item.id() {

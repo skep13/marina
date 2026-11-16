@@ -1,0 +1,2 @@
+# Stick-drift deadzone for the PS5 DualSense / DualSense Edge (USB or Bluetooth).
+SUBSYSTEM=="input", KERNEL=="event*", ACTION=="add", ATTRS{id/vendor}=="054c", ATTRS{name}=="*DualSense Wireless Controller", RUN+="/usr/local/bin/dualsense-deadzone $env{DEVNAME} 9"

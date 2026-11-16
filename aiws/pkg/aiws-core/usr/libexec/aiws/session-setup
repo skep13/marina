@@ -1,0 +1,16 @@
+#!/bin/sh
+# Runs at every desktop login (from Hyprland, or an X11 window manager's
+# config): hand the session to the user's systemd so the assistant can see
+# the display, reach hyprctl and the accessibility bus, then start it.
+systemctl --user import-environment DISPLAY XAUTHORITY WAYLAND_DISPLAY HYPRLAND_INSTANCE_SIGNATURE \
+  DBUS_SESSION_BUS_ADDRESS XDG_SESSION_TYPE XDG_CURRENT_DESKTOP \
+  QT_ACCESSIBILITY QT_LINUX_ACCESSIBILITY_ALWAYS_ON
+# Window managers don't start the accessibility bus; start it for GTK and Qt apps.
+for l in /usr/libexec/at-spi-bus-launcher /usr/lib/at-spi-bus-launcher /usr/lib/at-spi2-core/at-spi-bus-launcher; do
+  [ -x "$l" ] && { "$l" --launch-immediately >/dev/null 2>&1 & break; }
+done
+gsettings set org.gnome.desktop.interface toolkit-accessibility true 2>/dev/null
+# ydotool's daemon does the assistant's clicks on Wayland.
+systemctl --user start ydotool.service 2>/dev/null
+systemctl --user start aiws-agent.service
+exit 0

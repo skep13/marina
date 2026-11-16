@@ -1,0 +1,130 @@
+#!/bin/bash
+# Temporarily put lab3's Wi-Fi uplink (wls1) on the home Wi-Fi, for big downloads.
+#   home-wifi join    asks for the network name and password (typed by you), then
+#                     switches in the background. Falls back to the hotspot by
+#                     itself if there's no internet within a few minutes.
+#   home-wifi retry   switch again with the saved (hashed) key, no prompt
+#   home-wifi leave   back to the phone hotspot; the home network and its key are deleted
+#   home-wifi status
+#
+# The card hosts "Local AI Box" (wlap0) and the uplink (wls1) on ONE channel, so
+# the order matters: watcher off, AP down, join home, AP up on home's channel.
+# While joined, lab3's 192.168.1.x LAN moves off vmbr0 onto wls1, except the
+# containers (.15 .17 .30), which keep host routes on vmbr0. `leave` undoes it.
+set -u
+CONF=/etc/appliance/wpa-uplink.conf
+SAVE=/etc/appliance/wpa-uplink.conf.pre-home
+BLOCK=/etc/appliance/home-temp.block        # hashed key only; deleted by `leave`
+HCONF=/etc/hostapd/hostapd.conf
+CTS="192.168.1.15 192.168.1.17 192.168.1.30"
+GW=192.168.1.254
+log() { echo "[home-wifi] $*"; logger -t home-wifi "$*"; }
+
+ap_on() {   # $1 = MHz of the network wls1 is on
+  local chan=$(( ($1 - 2407) / 5 ))
+  sed -i "s/^channel=.*/channel=$chan/" "$HCONF"
+  systemctl restart hostapd; sleep 3; systemctl restart appliance-ap-ip dnsmasq
+  log "Local AI Box up on channel $chan"
+}
+
+wait_assoc() {  # $1 = id_str to wait for ("" = any), echoes the freq
+  for i in $(seq 1 45); do
+    sleep 2
+    st=$(wpa_cli -i wls1 status 2>/dev/null)
+    if echo "$st" | grep -q '^wpa_state=COMPLETED' && { [ -z "$1" ] || echo "$st" | grep -q "^id_str=$1\$"; }; then
+      echo "$st" | awk -F= '/^freq=/{print $2}'; return 0
+    fi
+  done
+  return 1
+}
+
+restore_routes() {
+  for ip in $CTS; do ip route del "$ip/32" dev vmbr0 2>/dev/null; done
+  ip route replace 192.168.1.0/24 dev vmbr0 proto kernel scope link src 192.168.1.13
+  ip route del 192.168.1.0/24 dev wls1 2>/dev/null
+}
+
+back_to_hotspot() {
+  [ -f "$SAVE" ] && mv -f "$SAVE" "$CONF"
+  restore_routes
+  systemctl stop appliance-uplink-watch hostapd appliance-ap-ip 2>/dev/null
+  wpa_cli -i wls1 reconfigure >/dev/null
+  ip -4 addr flush dev wls1
+  if freq=$(wait_assoc ""); then
+    ap_on "$freq"
+    systemctl restart appliance-uplink-dhcp
+    for i in $(seq 1 20); do
+      sleep 2
+      ip -4 addr show wls1 | grep -q 'inet 172\.20\.10\.' && { ip route replace default via 172.20.10.1 dev wls1; break; }
+    done
+    log "back on the hotspot"
+  else
+    ap_on "$(awk -F= '/^channel=/{print 2407 + 5 * $2}' "$HCONF")"
+    log "hotspot not in range; Local AI Box is back up, uplink will rejoin when it can"
+  fi
+  systemctl start appliance-uplink-watch
+}
+
+apply() {
+  [ -f "$BLOCK" ] || { log "no saved home network; run: home-wifi join"; return 1; }
+  [ -f "$SAVE" ] || cp -p "$CONF" "$SAVE"
+  { cat "$SAVE"; echo; cat "$BLOCK"; } > "$CONF"; chmod 600 "$CONF"
+  log "switching: Local AI Box goes down for a minute"
+  systemctl stop appliance-uplink-watch hostapd appliance-ap-ip
+  wpa_cli -i wls1 reconfigure >/dev/null; sleep 2
+  id=$(wpa_cli -i wls1 list_networks | awk -F'\t' 'NR>1 {n=$1} END{print n}')   # the block is last
+  wpa_cli -i wls1 select_network "$id" >/dev/null
+  if ! freq=$(wait_assoc home-temp); then
+    log "couldn't join the home Wi-Fi (wrong password?); going back"; back_to_hotspot; return 1
+  fi
+  log "joined the home Wi-Fi at $freq MHz"
+  ap_on "$freq"
+  ip -4 addr flush dev wls1
+  systemctl restart appliance-uplink-dhcp
+  addr=
+  for i in $(seq 1 30); do
+    sleep 2
+    addr=$(ip -4 addr show wls1 | awk '/inet 192\.168\.1\./{print $2; exit}')
+    [ -n "$addr" ] && break
+  done
+  [ -n "$addr" ] || { log "no address from the home router; going back"; back_to_hotspot; return 1; }
+  for ip in $CTS; do ip route replace "$ip/32" dev vmbr0 src 192.168.1.13; done
+  ip route del 192.168.1.0/24 dev vmbr0 2>/dev/null
+  ip route replace 192.168.1.0/24 dev wls1 src "${addr%/*}"
+  ip route replace default via "$GW" dev wls1
+  systemctl start appliance-uplink-watch
+  for i in 1 2 3 4 5 6; do
+    curl -s -o /dev/null -m 8 https://huggingface.co && { log "on the home Wi-Fi as $addr, internet OK"; return 0; }
+    sleep 5
+  done
+  log "no internet over the home Wi-Fi; going back"; back_to_hotspot; return 1
+}
+
+case "${1:-}" in
+  join)
+    [ -f "$SAVE" ] && { echo "Already switched. Run: $0 leave (or $0 retry)"; exit 1; }
+    read -rp "Home Wi-Fi name, exactly as the Mac shows it: " SSID
+    read -rsp "Its password (not shown): " PASS; echo
+    block=$(wpa_passphrase "$SSID" "$PASS") || { echo "wpa_passphrase rejected that (password must be 8-63 characters)"; exit 1; }
+    unset PASS
+    umask 077
+    echo "$block" | grep -v '^\s*#psk=' | sed 's/^}$/\tpriority=10\n\tid_str="home-temp"\n}/' > "$BLOCK"
+    echo "Saved as a hashed key on lab3 only (deleted by '$0 leave')."
+    echo "Switching in the background; Local AI Box drops for about a minute."
+    systemd-run --unit=home-wifi-switch --collect "$0" apply >/dev/null
+    ;;
+  retry)
+    [ -f "$SAVE" ] && { echo "Already switched."; exit 1; }
+    systemd-run --unit=home-wifi-switch --collect "$0" apply >/dev/null && echo "switching in the background"
+    ;;
+  apply) apply ;;
+  leave) back_to_hotspot; rm -f "$BLOCK"; log "home network and its key deleted" ;;
+  status)
+    wpa_cli -i wls1 status | grep -E '^(ssid|id_str|ip_address|freq)='
+    grep ^channel "$HCONF"
+    ip route | grep -E 'default|192.168.1.0/24'
+    [ -f "$SAVE" ] && echo "home network: in use" || echo "home network: not in use"
+    [ -f "$BLOCK" ] && echo "saved key: yes" || echo "saved key: none"
+    ;;
+  *) echo "usage: $0 join|retry|leave|status"; exit 1 ;;
+esac

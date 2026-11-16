@@ -1,0 +1,13 @@
+[Unit]
+Description=Keeps the Alexa Drop In to the Echo Dot open, redialling when it drops
+After=dot-emulator.service
+Requires=dot-emulator.service
+
+[Service]
+EnvironmentFile=-/etc/dot-bridge.env
+ExecStart=/usr/bin/python3 -u /opt/dot-bridge/dot_call.py
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

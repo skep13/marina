@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=Stop AIWS assistant
+Comment=Stop the assistant immediately (Super+Esc)
+Exec=ai agent stop
+Icon=process-stop
+Categories=System;

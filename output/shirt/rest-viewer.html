@@ -1,0 +1,21 @@
+<!doctype html><html><body style="margin:0;overflow:hidden"><script type="module">
+import {THREE,GLTFLoader,VRMLoaderPlugin} from 'file:///Users/jacobmatthews/marina/app/renderer/vendor/vrm-bundle.js';
+window.renderModel=async(path,angle,view="face")=>{
+ const renderer=new THREE.WebGLRenderer({antialias:true,preserveDrawingBuffer:true});renderer.setSize(1000,1000);renderer.setPixelRatio(1);renderer.outputColorSpace=THREE.SRGBColorSpace;document.body.append(renderer.domElement);
+ const scene=new THREE.Scene();scene.background=new THREE.Color('#dce0e8'); const key=new THREE.DirectionalLight(0xffffff,2); key.position.set(1,2,3);scene.add(key);scene.add(new THREE.AmbientLight(0xffffff,1.2));
+ const loader=new GLTFLoader();loader.register(p=>new VRMLoaderPlugin(p));const gltf=await loader.loadAsync('file://'+path);const vrm=gltf.userData.vrm;scene.add(vrm.scene);vrm.scene.traverse(o=>o.frustumCulled=false);if(view!=='face'&&view!=='extended'){
+ const h=vrm.humanoid; const rest={leftShoulder:[0,0,.05],rightShoulder:[0,0,-.06],leftUpperArm:[.06,0,-1.24],rightUpperArm:[.04,0,1.20],leftLowerArm:[0,.24,-.10],rightLowerArm:[0,-.20,.09],leftHand:[0,0,-.07],rightHand:[0,0,.05],spine:[.02,0,0],chest:[.01,0,0]}; for(const [bone,value] of Object.entries(rest))h.getNormalizedBoneNode(bone).rotation.set(...value);
+}
+if(view==='motion'){
+ vrm.humanoid.getNormalizedBoneNode('head').rotation.set(.10,.24,-.07);
+ vrm.humanoid.getNormalizedBoneNode('leftLowerArm').rotation.y=.35;
+ vrm.expressionManager.setValue('blink',.7);
+ for(let i=0;i<60;i++)vrm.update(1/60);
+}
+vrm.update(0);vrm.scene.updateMatrixWorld(true);
+ const head=new THREE.Vector3();vrm.humanoid.getNormalizedBoneNode('head').getWorldPosition(head);
+ const camera=new THREE.PerspectiveCamera(25,1,0.01,10);const radius=view==='face'?1.5:view==='full'?4.4:view==='extended'?3.8:2.65;const aimY=view==='face'?head.y+.045:view==='full'?.88:1.24;camera.position.set(head.x+Math.sin(angle)*radius,aimY,head.z+Math.cos(angle)*radius);camera.lookAt(head.x,aimY,head.z);renderer.render(scene,camera);
+let badVertices=0,sampledVertices=0;const vertex=new THREE.Vector3();vrm.scene.traverse(o=>{if(o.isSkinnedMesh){for(let i=0;i<o.geometry.attributes.position.count;i+=31){o.getVertexPosition(i,vertex);sampledVertices++;if(!vertex.toArray().every(Number.isFinite))badVertices++;}}});
+return {head:head.toArray(),meshes:gltf.scene.children.length,badVertices,sampledVertices,expressions:Object.keys(vrm.expressionManager.expressionMap)};
+};
+</script></body></html>

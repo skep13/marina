@@ -1,0 +1,100 @@
+#!/usr/bin/env python3
+"""Switch the keyboard lighting for what the laptop is doing.
+
+  kbd-mode working   save the current look, then run an orange wave (Claude busy)
+  kbd-mode idle      put the look from before "working" back
+  kbd-mode off       save the current look and turn the lights off (you're away)
+  kbd-mode on        put the look from before "off" back
+
+"working"/"idle" come from Claude Code hooks (UserPromptSubmit, Stop);
+"off"/"on" from Noctalia's idle behaviour, so the LEDs aren't lit while
+nobody is using the laptop. If Claude finishes while the lights are off,
+the restored look is remembered for "on" instead of lighting the keys.
+Talks to the LightShow daemon through keyboard-colours; a split look
+(kbd-split) is reapplied whenever a solid look comes back.
+"""
+import importlib.machinery
+import importlib.util
+import json
+import os
+import subprocess
+import sys
+
+KC = os.path.expanduser("~/.local/bin/keyboard-colours")
+STATE = os.path.expanduser("~/.local/state")
+WORKING = os.path.join(STATE, "kbd-mode.json")   # look from before "working"
+AWAY = os.path.join(STATE, "kbd-off.json")       # look from before "off"
+ORANGE = ["#ff6a00", "#ffa040"]
+SPLIT = os.path.join(STATE, "kbd-split.json")       # per-zone colours from kbd-split
+
+
+def load_kc():
+    loader = importlib.machinery.SourceFileLoader("keyboard_colours", KC)
+    spec = importlib.util.spec_from_loader("keyboard_colours", loader)
+    kc = importlib.util.module_from_spec(spec)
+    loader.exec_module(kc)
+    return kc
+
+
+def snapshot(kc):
+    return {"colours": kc.read_theme(), "current": kc.api("/state")["current"]}
+
+
+def save(path, look):
+    os.makedirs(STATE, exist_ok=True)
+    with open(path, "w") as f:
+        json.dump(look, f)
+
+
+def take(path):
+    with open(path) as f:
+        look = json.load(f)
+    os.remove(path)
+    return look
+
+
+def apply(kc, look):
+    kc.write_theme(look["colours"])
+    kc.api("/apply", look["current"])
+    if look["current"].get("effect") == "static" and os.path.exists(SPLIT):
+        subprocess.run([os.path.expanduser("~/.local/bin/kbd-split")], check=False)
+
+
+def main():
+    mode = sys.argv[1] if len(sys.argv) > 1 else ""
+    kc = load_kc()
+    away = os.path.exists(AWAY)
+    try:
+        if mode == "working":
+            if not os.path.exists(WORKING):       # keep the first saved look across prompts
+                save(WORKING, json.load(open(AWAY)) if away else snapshot(kc))
+            wave = {"colours": ORANGE,
+                    "current": {"effect": "wave", "brightness": 1.0, "speed": 1.5}}
+            if away:
+                save(AWAY, wave)                  # show it when you come back
+            else:
+                apply(kc, wave)
+        elif mode == "idle":
+            if not os.path.exists(WORKING):
+                return
+            look = take(WORKING)
+            if away:
+                save(AWAY, look)
+            else:
+                apply(kc, look)
+        elif mode == "off":
+            if away:
+                return
+            save(AWAY, snapshot(kc))
+            kc.api("/apply", {"effect": "off"})
+        elif mode == "on":
+            if away:
+                apply(kc, take(AWAY))
+        else:
+            sys.exit(__doc__)
+    except OSError:
+        pass                                      # LightShow not running: never block anything
+
+
+if __name__ == "__main__":
+    main()

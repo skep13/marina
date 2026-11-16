@@ -1,0 +1,12 @@
+[Unit]
+Description=AIWS assistant (desktop user, no admin rights)
+
+[Service]
+ExecStart=/usr/bin/aiws-agent
+Restart=always
+RestartSec=2
+# Nothing it runs can gain privileges: sudo, su and setuid helpers fail.
+NoNewPrivileges=yes
+MemoryMax=768M
+CPUWeight=50
+KillMode=control-group

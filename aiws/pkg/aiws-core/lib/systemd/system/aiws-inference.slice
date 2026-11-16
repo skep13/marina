@@ -1,0 +1,5 @@
+[Unit]
+Description=AIWS model inference
+[Slice]
+CPUWeight=80
+IOWeight=80

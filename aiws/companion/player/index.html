@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Marina 2D player</title>
+<style>
+  :root { --bg0:#0b0e1a; --bg1:#1d2240; --ink:#e9e9f2; --dim:#8b91a8; --acc:#ff3d7f; --acc2:#3de1ff; }
+  * { box-sizing:border-box; }
+  body { margin:0; min-height:100vh; color:var(--ink); font:13px/1.4 ui-monospace, Menlo, monospace;
+         background: radial-gradient(120% 80% at 70% 100%, #3a1d4a 0, transparent 60%),
+                     linear-gradient(180deg, var(--bg0), var(--bg1)); overflow:hidden; }
+  #stage { position:fixed; inset:0; }
+  #marina { position:absolute; width:min(42vh, 360px); aspect-ratio:3/4; left:58%; bottom:0;
+            image-rendering:auto; transition:none; }
+  #bubble { position:absolute; max-width:300px; padding:8px 12px; background:rgba(10,12,24,.88);
+            border:1px solid var(--acc2); color:var(--ink); font-size:14px; display:none;
+            clip-path: polygon(0 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%); }
+  #bubble b { color:var(--acc2); font-weight:600; letter-spacing:.08em; font-size:11px; display:block; }
+  #controls { position:fixed; left:12px; top:12px; display:flex; flex-wrap:wrap; gap:6px; max-width:520px; }
+  #controls button { background:rgba(255,255,255,.06); color:var(--ink); border:1px solid rgba(255,255,255,.15);
+                     padding:4px 9px; border-radius:4px; cursor:pointer; font:inherit; }
+  #controls button:hover { border-color:var(--acc2); }
+  #controls .label { width:100%; color:var(--dim); margin-top:4px; }
+  #say { width:340px; background:rgba(0,0,0,.4); color:var(--ink); border:1px solid rgba(255,255,255,.2);
+         padding:5px 8px; font:inherit; border-radius:4px; }
+</style>
+</head>
+<body>
+<div id="stage">
+  <canvas id="marina" width="768" height="1024"></canvas>
+  <div id="bubble"><b>MARINA</b><span id="btext"></span></div>
+</div>
+<div id="controls">
+  <span class="label">mood</span>
+  <span id="moods"></span>
+  <span class="label">pose</span>
+  <span id="poses"></span>
+  <span class="label">do</span>
+  <button id="glitch">glitch</button><button id="teleport">teleport</button>
+  <input id="say" value="ok that's cursed. give me a sec, I'll fix your merge.">
+  <button id="talk">say it</button>
+</div>
+<script type="module" src="./player.js"></script>
+</body>
+</html>

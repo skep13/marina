@@ -1,0 +1,9 @@
+# What the emulator plays, which is the Dot's microphone during a Drop In.
+# Marina listens on dot_ear.monitor.
+load-module module-null-sink sink_name=dot_ear sink_properties=device.description=dot_ear
+# What Marina says. The emulator's microphone is dot_mouth.monitor, so it
+# goes down the call and out of the Dot.
+load-module module-null-sink sink_name=dot_mouth sink_properties=device.description=dot_mouth
+load-module module-native-protocol-unix auth-anonymous=1 socket=/tmp/pulse.sock
+set-default-sink dot_ear
+set-default-source dot_mouth.monitor
