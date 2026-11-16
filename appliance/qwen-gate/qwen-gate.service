@@ -1,0 +1,17 @@
+[Unit]
+Description=qwen-gate: keyed OpenAI API that only serves Qwen3.8-27B (forge-deep)
+After=network-online.target llama-swap.service
+Wants=network-online.target
+
+[Service]
+ExecStart=/usr/bin/python3 /opt/qwen-gate/qwen-gate.py
+Restart=on-failure
+User=qwen-gate
+Group=qwen-gate
+ProtectSystem=strict
+ProtectHome=yes
+NoNewPrivileges=yes
+PrivateTmp=yes
+
+[Install]
+WantedBy=multi-user.target
