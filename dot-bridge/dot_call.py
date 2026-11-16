@@ -5,7 +5,7 @@ the Alexa app on the Dot's page and taps Drop In, finding each control by its
 label in the screen's accessibility tree rather than by position, so a layout
 change only breaks it if the labels change too.
 
-    DOT_NAME="Jacob's Echo Dot" python3 dot_call.py
+    DOT_NAME="Echo Dot" python3 dot_call.py
 """
 import os
 import re
@@ -13,7 +13,7 @@ import subprocess
 import time
 
 ADB = os.environ.get("ADB", "/opt/android/platform-tools/adb")
-DOT = os.environ.get("DOT_NAME", "Jacob's Echo Dot")
+DOT = os.environ.get("DOT_NAME", "Echo Dot")
 APP = "com.amazon.dee.app"
 CHECK_EVERY = 20       # seconds between checks while the call is up
 BACKOFF = [30, 60, 120, 300]  # seconds between failed redials

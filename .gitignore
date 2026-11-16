@@ -36,3 +36,11 @@ mood.json.tmp
 
 # huggingface / model download cache (regenerable, oversized)
 cache/
+
+# generated output, personal notes and stray copies (kept locally, not published)
+output/
+docs/marina-handover-*.md
+aiws/handoff/
+aiws/tester@/
+docx-qa-oakfield*/
+result.json

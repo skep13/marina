@@ -19,7 +19,7 @@ Runs in container 114 (`dot-bridge`) on lab2.
   `/etc/dot-bridge.env`. The bridge needs `satellite.enabled` and `api.key`.
   It points at the always-on bridge on lab3 (ct110, 192.168.1.15).
 - `dot-call` (`dot_call.py`): keeps the Drop In open, redialling when it
-  drops. Set `DOT_NAME` if the Dot isn't called "Jacob's Echo Dot".
+  drops. Set `DOT_NAME` in `/etc/dot-bridge.env` to the Dot's name as the Alexa app shows it.
 
 The Alexa app only allows Drop In once the profile has a verified mobile
 number (Alexa app, More, Settings, Your Profile, Set Mobile Number).
