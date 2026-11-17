@@ -39,3 +39,21 @@ Privacy & Security → Local Network.
 
 Needs the Forge setup in `~/.forge` (`app/` with `@deepseek-ai/dsh`, `home/`
 config, `lab3.key`) and `brew install node@24`.
+
+## Look
+
+The theme is the `dsh-forge-theme` plugin in this folder: an ember-on-charcoal
+palette, the FORGE wordmark, drifting sparks, and plain time-of-day greetings
+on the start screen. `~/.forge/home/profiles/web/package.json` links it in, so
+an edit shows up after ⌘R in Forge. Edit `client.template.js` or `build.py`,
+then regenerate the bundle (`lib/` is generated; don't edit it by hand):
+
+```bash
+python3 dsh-forge-theme/build.py
+```
+
+The flame logo is the same pair of 24-unit SVG paths in three places: the web
+UI mark (`dsh-forge-theme/client.template.js`), the splash emblem
+(`src/splash.html`, scaled 9×), and the app icon (`macos/make_icon.py`). Change
+all three together. The splash and icon are built into the app, so rerun
+`./macos/install.sh --build` after changing them.

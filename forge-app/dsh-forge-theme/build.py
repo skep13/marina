@@ -227,5 +227,5 @@ client = HERE / 'lib' / 'client.js'
 src = (HERE / 'client.template.js').read_text()
 src = src.replace('/*TOKENS*/', json.dumps(TOKENS, indent='\t')).replace('/*CSS*/', json.dumps(CSS))
 client.write_text(src)
-(HERE / 'lib' / 'tokens.json').write_text(json.dumps(TOKENS, indent=1))
+(HERE / 'lib' / 'tokens.json').write_text(json.dumps(TOKENS, indent=2) + '\n')
 print(f'wrote {client} ({len(TOKENS)} tokens, {len(CSS)} bytes css)')
