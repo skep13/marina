@@ -342,7 +342,7 @@ $("clear").addEventListener("click", () => {
   const empty = document.createElement("div");
   empty.id = "empty";
   empty.className = "empty";
-  empty.innerHTML = '<p class="prompt">&gt; ready_</p><p>New session.</p>';
+  empty.innerHTML = '<p class="prompt">&gt; ready_</p><p>Cleared. New session.</p>';
   log.append(empty);
   input.focus();
 });

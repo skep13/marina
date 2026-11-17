@@ -48,7 +48,7 @@ in the extension's storage.
 - First run: if a bar says it has no page access, click **allow page access**.
 - **think** toggles reasoning: on is slower and better at multi-step tasks; the
   trace is folded under "thought".
-- **new** starts a fresh session; the conversation isn't saved anywhere.
+- **clear** wipes the conversation and starts fresh; nothing is saved anywhere.
 - **Enter** runs, **Shift+Enter** adds a line, **Esc** or **stop** cuts the
   reply off.
 
