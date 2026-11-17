@@ -54,6 +54,30 @@ means each screenshot makes llama-swap swap to `marina` and back, so GUI tasks
 as Songbird are noticeably slower (~80s/step). Marina drives the screen faster
 because her own model has the eyes — prefer Marina for heavy GUI work.
 
+## Web UI (drive it from a browser or phone)
+
+Prefer a browser over the terminal — the same loop, streamed live:
+
+```
+server/agent/bin/agent-web                     # http://127.0.0.1:7420
+server/agent/bin/agent-web --host 0.0.0.0 --port 7420   # serve on the LAN
+```
+
+Open the page, pick **Marina** or **Songbird** (each card shows its policy —
+home-only vs anywhere, safe vs unrestricted shell, secrets shielded, screen),
+type a task, optionally set a step cap or tick **dry-run**, and press **Run**.
+The timeline streams every tool call with its arguments and result, colour-coded
+**ok / refused / error** and collapsible; the model's own text and the final
+answer show inline. The red **Stop** button touches the same
+`~/.marina/agent.stop` the CLI uses, halting the loop before its next step.
+
+It's stdlib-only (no FastAPI needed) and runs under the same `python3` as the
+CLI, so there's nothing extra to install. One run at a time; a phone that
+reloads mid-run reattaches to the live stream. Host/port also come from
+`AGENT_WEB_HOST` / `AGENT_WEB_PORT`. Keep it on `127.0.0.1` unless you mean to
+expose it — the UI applies each persona's full policy, but it adds no auth of
+its own, so anyone who can reach the port can drive the agent.
+
 ## The lab3 key (not in the repo)
 
 Each persona reads its key from the environment or a git-ignored keys file:

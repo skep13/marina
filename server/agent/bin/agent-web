@@ -1,0 +1,7 @@
+#!/bin/sh
+# Serve the Mac agent's web UI. See server/agent/README.md.
+# Default http://127.0.0.1:7420 ; pass --host/--port (or AGENT_WEB_HOST/PORT).
+DIR="$(cd "$(dirname "$0")/.." && pwd)"
+SERVER="$(cd "$DIR/.." && pwd)"
+cd "$SERVER" || exit 1
+exec python3 -m agent.web.server "$@"
