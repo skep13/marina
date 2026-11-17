@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
-cd "$(dirname "$0")"
+cd "$(dirname "$0")/.."   # repo root
 ROOT="$(pwd)"
 
 [ -d .venv ] || { echo "No .venv here. Run ./setup-mac.sh first." >&2; exit 1; }

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
-cd "$(dirname "$0")"
+cd "$(dirname "$0")/.."   # repo root
 PY="$(pwd)/.venv/bin/python"
 [ -x "$PY" ] || { echo "No venv. Run ./setup-mac.sh" >&2; exit 1; }
 STEPS="${*:-0 0.5 1 1.5 2 2.5}" "$PY" - <<'PY'

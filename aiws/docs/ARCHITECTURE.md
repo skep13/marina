@@ -297,7 +297,7 @@ irreversible step.
 * `server/process/vision/look.py` — image shrinking + vision call.
 * `server/process/confirm.py` — ask/answer flow → pause/approve actions.
 * `server/process/openai_api.py` — streaming OpenAI shapes for the gateway.
-* `bench-llm.sh` → superseded by `ai-bench`.
+* `scripts/bench-llm.sh` → superseded by `ai-bench`.
 * `songbird-display/webui` — the retro-futurist look for AIWS's branding.
 * Marina herself runs on AIWS as an application against the gateway
   (`ai:chat` alias → her model).
