@@ -1,5 +1,5 @@
 #!/bin/sh
-# sudo sh mac/home-routes/install.sh
+# sudo sh homelab/mac-routes/install.sh
 set -e; cd "$(dirname "$0")"
 install -d /usr/local/sbin
 install -m755 home-lab-routes /usr/local/sbin/home-lab-routes

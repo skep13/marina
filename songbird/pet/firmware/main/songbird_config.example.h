@@ -30,7 +30,7 @@
 // yellow strip either way)
 #define PET_SCREEN_ROTATION 0
 
-// Feed from the Mac (songbird-pet/host/pet_feed.py) through the Songbird
+// Feed from the Mac (songbird/pet/host/pet_feed.py) through the Songbird
 // broker. Set PET_FEED_ENABLED to 0 to run as a plain offline desk pet.
 #define PET_FEED_ENABLED 1
 #define PET_MQTT_URI   "mqtts://homelab.tail35b6c6.ts.net:10000"

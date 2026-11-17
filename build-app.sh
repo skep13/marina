@@ -19,7 +19,7 @@ STAGE="app/build/backend"
 PY="$STAGE/python/bin/python3.12"
 
 if [ ! -d models/kokoro ] || [ ! -s models/kokoro/kokoro-v1.0.onnx ]; then
-  echo "No Kokoro voice model. Run ./download-kokoro.sh first." >&2
+  echo "No Kokoro voice model. Run scripts/download-kokoro.sh first." >&2
   exit 1
 fi
 

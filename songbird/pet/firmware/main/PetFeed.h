@@ -1,6 +1,6 @@
 #pragma once
 // ============================================================
-// PetFeed - what the Mac is up to, from songbird-pet/host/pet_feed.py
+// PetFeed - what the Mac is up to, from songbird/pet/host/pet_feed.py
 // ============================================================
 // The Mac publishes a small retained JSON message to PET_FEED_TOPIC on the
 // Songbird broker; we subscribe over TLS (the broker's own cert is embedded

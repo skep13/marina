@@ -11,7 +11,7 @@ Songbird rather than Marina. Code lives in `firefox/`.
 |---|---|
 | What it's for | Fill forms and surveys, ask about the page, multi-tab research, chores on sites |
 | Personality | None: a terse task agent, like Forge or Songbird, not Marina |
-| Look | Songbird's steel and crimson, monospace, square corners (`songbird-display/webui/owui-crimson.css`) |
+| Look | Songbird's steel and crimson, monospace, square corners (`songbird/display/webui/owui-crimson.css`) |
 | Brain | lab3's llama-swap directly, model id `browser`, with its own API key |
 | Model | Qwen3.6 35B-A3B now; trial MolmoWeb 8B against it once the agent can act (milestone 3) |
 | Autonomy | Reads, clicks, types and switches tabs freely; **stops before any submit, send, buy or delete** |

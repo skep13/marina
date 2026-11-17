@@ -11,7 +11,7 @@ A ready-to-run app. Open the dmg, drag Marina to Applications, done. No build
 step, no Python, no setup script. Apple Silicon, macOS 13 or newer. See
 [Getting past Gatekeeper](#getting-past-gatekeeper) the first time you open it.
 
-![Marina on my desktop](screenshot.jpg)
+![Marina on my desktop](docs/screenshot.jpg)
 
 It started as a fork of [rayenfeng/riko_project](https://github.com/rayenfeng/riko_project).
 That project had the voice pipeline, but the avatar frontend was still an
@@ -156,8 +156,8 @@ the AI box's Wi-Fi, the page listens instead. The bridge side is
 
 ## Rainy Day Café
 
-[`cozy-cafe/`](cozy-cafe/) is an isometric coffee shop game, built as a
-native Mac app (`cozy-cafe/build-app.sh` installs it to /Applications).
+[`games/cozy-cafe/`](games/cozy-cafe/) is an isometric coffee shop game, built as a
+native Mac app (`games/cozy-cafe/build-app.sh` installs it to /Applications).
 You run the counter across 13 stations, hire staff, and decorate. Marina
 works shifts there, and the game connects to her bridge, so it's really
 her: she reacts to a perfect cup, a customer walking out, a new
@@ -188,11 +188,11 @@ on the server and never get them.
 
 ## Hardware
 
-**A desk pet.** [`songbird-pet/`](songbird-pet/) turns an ESP32-S3 with a
+**A desk pet.** [`songbird/pet/`](songbird/pet/) turns an ESP32-S3 with a
 small OLED into a desk pet that follows what the Mac is doing. While music
 plays, a spinning record replaces her eyes. She shows a terminal while you
 code and a radar sweep while you browse. She looks around for you when you
-step away and suggests a stretch after 90 minutes. `songbird-pet/host/pet_feed.py`
+step away and suggests a stretch after 90 minutes. `songbird/pet/host/pet_feed.py`
 publishes the Mac's state to the pet over MQTT, and the pet's button
 plays and pauses music.
 
@@ -459,8 +459,9 @@ app/
   models/model.vrm            your avatar
   test/                       Electron scripts that load the avatar and check it
   build/backend/              staged by build-app.sh, copied into the bundle
-cozy-cafe/                    Rainy Day Café, the game she works in
-songbird-pet/                 ESP32-S3 desk pet and its Mac feed
+games/cozy-cafe/              Rainy Day Café, the game she works in
+songbird/pet/                 ESP32-S3 desk pet and its Mac feed
+scripts/                      occasional helpers (build-dmg.sh, download-kokoro.sh…)
 appliance/                    the plug-in AI box (setup-lab3.sh)
 ```
 

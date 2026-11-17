@@ -4,7 +4,7 @@
 # bridge config's MQTT_BROKER to homelab.tail35b6c6.ts.net:10000.
 #
 #   sudo useradd --system --no-create-home --shell /usr/sbin/nologin songbird
-#   sudo cp -r songbird-token /opt/songbird-token
+#   sudo cp -r songbird/token /opt/songbird-token
 #   sudo chown -R songbird:songbird /opt/songbird-token
 #   # point ExecStart at YOUR harness entrypoint that imports
 #   #   bridge.handle_tool_call / bridge.run_action and feeds Songbird's tool calls

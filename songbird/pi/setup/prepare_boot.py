@@ -5,7 +5,7 @@
 #  Run on the Mac after writing the image to an SD card or USB stick,
 #  with its boot partition mounted:
 #
-#      python3 songbird-pi/setup/prepare_boot.py /Volumes/bootfs
+#      python3 songbird/pi/setup/prepare_boot.py /Volumes/bootfs
 #
 #  Writes cloud-init first-boot config: host songbird-pi, user skep
 #  (SSH key only, auto-login on the HDMI console, no password), Wi-Fi
@@ -20,9 +20,9 @@ import shutil
 import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-REPO = os.path.dirname(os.path.dirname(HERE))
-PET_CONFIG = os.path.join(REPO, "songbird-pet", "firmware", "main", "songbird_config.h")
-OLED_DIR = os.path.join(REPO, "songbird-pi", "oled")
+SONGBIRD = os.path.dirname(os.path.dirname(HERE))   # songbird/
+PET_CONFIG = os.path.join(SONGBIRD, "pet", "firmware", "main", "songbird_config.h")
+OLED_DIR = os.path.join(SONGBIRD, "pi", "oled")
 SSH_KEY = os.path.expanduser("~/.ssh/id_ed25519.pub")
 
 USER_DATA = """#cloud-config

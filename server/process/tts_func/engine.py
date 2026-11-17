@@ -44,7 +44,7 @@ def _load_kokoro():
             if not path.exists():
                 raise TTSError(
                     f"Kokoro {what} file missing at {path}. "
-                    "Run ./download-kokoro.sh to fetch it."
+                    "Run scripts/download-kokoro.sh to fetch it."
                 )
 
         print("Loading Kokoro...", flush=True)

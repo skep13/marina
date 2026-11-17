@@ -48,7 +48,7 @@ echo "==> Installing Python dependencies (~500 MB the first time)"
 pip install -r server/requirements-mac.txt
 
 echo "==> Fetching the Kokoro voice model (~340 MB)"
-./download-kokoro.sh
+scripts/download-kokoro.sh
 
 echo "==> Installing desktop app dependencies"
 ( cd app && npm install )

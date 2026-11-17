@@ -179,7 +179,7 @@ CRIMSON = dict(
   ink="#e4e6ec", inkdim="#96959d",
   imgpos="center 12%", scrimTop="rgba(18,17,22,.52)", scrimMid="rgba(18,17,22,.66)", scrimBot="rgba(18,17,22,.93)",
 )
-OUT="/Users/jacobmatthews/marina/songbird-display/webui"
+OUT="/Users/jacobmatthews/marina/songbird/display/webui"
 for cfg, img, fname in [(DAISY,A+"owui-daisy.jpg","owui-daisy.css"),(REZE,A+"owui-reze.jpg","owui-reze.css"),(CRIMSON,A+"owui-crimson.jpg","owui-crimson.css")]:
     cfg=dict(cfg); cfg["img"]=datauri(img)
     open(f"{OUT}/{fname}","w").write(TEMPLATE.format(**cfg))

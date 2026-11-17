@@ -71,7 +71,7 @@ change it. Fill the rest:
 
 Re-copy the device config after editing:
 ```bash
-cd songbird-token/device
+cd songbird/token/device
 mpremote connect /dev/cu.usbmodem1101 fs cp config.py :config.py
 mpremote connect /dev/cu.usbmodem1101 reset
 ```

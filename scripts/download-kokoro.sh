@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
-cd "$(dirname "$0")"
+cd "$(dirname "$0")/.."   # repo root
 
 BASE="https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.0"
 DIR="models/kokoro"

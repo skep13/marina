@@ -4,20 +4,20 @@
 #   Marina.app            the companion (app/, built by ./build-app.sh)
 #   Forge.app             the coding agent window (forge-app/)
 #   modelctl.app          lab3 model switcher TUI (modelctl/)
-#   Rainy Day Café.app    the café game (cozy-cafe/)
+#   Rainy Day Café.app    the café game (games/cozy-cafe/)
 #
 # Output: dist/Marina-Suite-<date>.dmg, with an Applications shortcut to drag
 # the apps onto.
 #
-#   ./build-dmg.sh               rebuild Forge, modelctl and the café; reuse
+#   scripts/build-dmg.sh               rebuild Forge, modelctl and the café; reuse
 #                                Marina.app if it's newer than its source
-#   ./build-dmg.sh --marina      also rebuild Marina (slow; installs it too)
-#   ./build-dmg.sh --no-build    package whatever is already built
+#   scripts/build-dmg.sh --marina      also rebuild Marina (slow; installs it too)
+#   scripts/build-dmg.sh --no-build    package whatever is already built
 #
 # Forge and modelctl are installed to ~/Applications by their own install
 # scripts as part of the build; the Dock is left alone.
 set -euo pipefail
-cd "$(dirname "$0")"
+cd "$(dirname "$0")/.."   # repo root
 ROOT="$(pwd)"
 
 BUILD=1
@@ -34,7 +34,7 @@ done
 MARINA_APP="$ROOT/app/dist/mac-arm64/Marina.app"
 FORGE_APP="$HOME/Applications/Forge.app"
 MODELCTL_APP="$HOME/Applications/modelctl.app"
-CAFE_APP="$ROOT/cozy-cafe/dist/Rainy Day Café.app"
+CAFE_APP="$ROOT/games/cozy-cafe/dist/Rainy Day Café.app"
 
 if [ "$BUILD" = 1 ]; then
   stale_marina=0
@@ -54,7 +54,7 @@ if [ "$BUILD" = 1 ]; then
   echo "==> modelctl"
   ./modelctl/macos/install.sh --build --no-dock
   echo "==> Rainy Day Café"
-  ./cozy-cafe/build-app.sh --no-install
+  ./games/cozy-cafe/build-app.sh --no-install
 fi
 
 for a in "$MARINA_APP" "$FORGE_APP" "$MODELCTL_APP" "$CAFE_APP"; do
