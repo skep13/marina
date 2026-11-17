@@ -44,3 +44,6 @@ aiws/handoff/
 aiws/tester@/
 docx-qa-oakfield*/
 result.json
+
+# build-dmg.sh output
+/dist/
