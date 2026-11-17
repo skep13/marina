@@ -1,0 +1,4 @@
+#!/bin/sh
+# Drive this Mac as Songbird (full, un-gated). See server/agent/README.md.
+DIR="$(cd "$(dirname "$0")/.." && pwd)"
+exec python3 "$DIR/runner.py" --persona songbird "$@"
