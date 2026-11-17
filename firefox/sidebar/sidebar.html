@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Browser agent</title>
+  <link rel="stylesheet" href="sidebar.css">
+  <script type="module" src="sidebar.js"></script>
+</head>
+<body>
+  <header>
+    <span class="mark" aria-hidden="true">▚</span>
+    <span class="name">browser&nbsp;agent</span>
+    <span id="status" class="status" data-state="checking" title="Checking lab3…">
+      <i></i><span id="status-text">checking</span>
+    </span>
+    <button id="think" class="icon" type="button" aria-pressed="true"
+            title="Thinking: on" aria-label="Thinking">think</button>
+    <button id="clear" class="icon" type="button" title="New session" aria-label="New session">new</button>
+    <button id="settings" class="icon" type="button" title="Settings" aria-label="Settings">cfg</button>
+  </header>
+
+  <main id="log" aria-live="polite">
+    <div id="empty" class="empty">
+      <p class="prompt">&gt; ready_</p>
+      <p>Ask about anything. Page reading, clicking and tabs come next.</p>
+    </div>
+  </main>
+
+  <form id="composer">
+    <span class="caret" aria-hidden="true">&gt;</span>
+    <textarea id="input" rows="1" placeholder="task or question" autocomplete="off"></textarea>
+    <button id="send" type="submit" class="send" aria-label="Run">run</button>
+    <button id="stop" type="button" class="send stop" aria-label="Stop" hidden>stop</button>
+  </form>
+</body>
+</html>
