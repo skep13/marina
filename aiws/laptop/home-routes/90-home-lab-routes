@@ -1,0 +1,3 @@
+#!/bin/sh
+# NetworkManager dispatcher: re-check whenever a network comes up or changes
+case "$2" in up|dhcp4-change|down|connectivity-change) /usr/local/sbin/home-lab-routes ;; esac

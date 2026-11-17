@@ -1,0 +1,24 @@
+#!/bin/sh
+# Mac: reach the home lab over Tailscale when the local network also uses 192.168.1.0/24
+# but isn't home (e.g. college Cyberlab). Removed again at home / elsewhere.
+HOSTS="10 13 15 16 17"
+HOME_GW_MAC="a8:a2:37:88:ac:2a"
+PATH=/usr/sbin:/sbin:/usr/bin:/bin
+ts=$(ifconfig | awk '/^utun/{i=$1} /inet 100\./{sub(":","",i); print i; exit}')
+# the Wi-Fi/Ethernet router, not the default route (that is Tailscale when an exit node is on)
+gw=""; for ifc in en0 en1 en2 en3 en4 en5 en6 en7 en8 en9 en10 en11 en12 en13; do
+  r=$(ipconfig getoption $ifc router 2>/dev/null); case "$r" in 192.168.1.*) gw=$r; break;; esac; done
+clash=0
+case "$gw" in 192.168.1.*)
+  ping -c1 -t1 "$gw" >/dev/null 2>&1
+  mac=$(arp -n "$gw" | awk '{print $4}')
+  # macOS arp drops leading zeros (08:00:.. -> 8:0:..), so pad each part back to two digits
+  mac=$(echo "$mac" | awk -F: '{for(i=1;i<=NF;i++) printf "%s%02s", (i>1?":":""), $i}' | tr ' ' 0)
+  [ -n "$ts" ] && [ -n "$mac" ] && [ "$mac" != "$HOME_GW_MAC" ] && clash=1 ;;
+esac
+for h in $HOSTS; do
+  route -n delete -host 192.168.1.$h >/dev/null 2>&1
+  # deleting can remove the LAN's own arp entry for that IP; harmless
+  [ $clash = 1 ] && route -n add -host 192.168.1.$h -interface "$ts" >/dev/null
+done
+logger -t home-lab-routes "clash=$clash gw=$gw mac=$mac ts=$ts"

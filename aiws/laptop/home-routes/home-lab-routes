@@ -1,0 +1,21 @@
+#!/bin/sh
+# Reach the home lab over Tailscale when the local network also uses 192.168.1.0/24
+# (e.g. college Cyberlab) but isn't home. At home, or on other subnets, the routes are removed.
+HOSTS="10 13 15 16 17"            # lab1, lab3, ct110 (Forge/Marina models), marina-chat lab1, lab3
+HOME_GW_MAC="a8:a2:37:88:ac:2a"   # home router at 192.168.1.254
+gw=$(ip -4 route show default table main | awk '/192\.168\.1\./{print $3; exit}')
+clash=0
+if [ -n "$gw" ] && ip link show tailscale0 >/dev/null 2>&1; then
+  ping -c1 -W1 "$gw" >/dev/null 2>&1
+  mac=$(ip neigh show "$gw" | awk '{for(i=1;i<=NF;i++) if($i=="lladdr") print $(i+1)}')
+  [ -n "$mac" ] && [ "$mac" != "$HOME_GW_MAC" ] && clash=1
+fi
+for h in $HOSTS; do
+  ip rule del to 192.168.1.$h/32 priority 2400 2>/dev/null
+  ip route del 192.168.1.$h/32 table 100 2>/dev/null
+  if [ $clash = 1 ]; then
+    ip route replace 192.168.1.$h/32 dev tailscale0 table 100
+    ip rule add to 192.168.1.$h/32 lookup 100 priority 2400
+  fi
+done
+logger -t home-lab-routes "clash=$clash gw=$gw mac=$mac"

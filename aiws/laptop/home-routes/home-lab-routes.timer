@@ -1,0 +1,9 @@
+[Unit]
+Description=Re-check home lab routes
+
+[Timer]
+OnBootSec=30s
+OnUnitActiveSec=1min
+
+[Install]
+WantedBy=timers.target

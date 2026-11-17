@@ -1,0 +1,6 @@
+[Unit]
+Description=Unlock the desktop when the enrolled YubiKey is plugged in
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/libexec/yubikey-unlock friereon

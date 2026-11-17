@@ -1,0 +1,11 @@
+[Unit]
+Description=Allow Wake-on-LAN (magic packet) on the wired NIC
+After=network-pre.target
+Wants=network-pre.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/sbin/ethtool -s nic0 wol g
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,6 @@
+[Unit]
+Description=Wake lab1 if it has been down for 5 minutes
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/lab1-waker
