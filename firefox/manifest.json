@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Browser agent",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "A plain AI agent in the Firefox sidebar, running on lab3.",
   "icons": {
     "48": "icons/icon-48.png",
@@ -25,26 +25,44 @@
     }
   },
   "background": {
-    "scripts": ["background.js"]
+    "scripts": [
+      "background.js"
+    ]
   },
   "commands": {
     "_execute_sidebar_action": {
-      "suggested_key": { "default": "Alt+Shift+B" },
+      "suggested_key": {
+        "default": "Alt+Shift+B"
+      },
       "description": "Open or close the browser agent"
     }
   },
   "options_ui": {
     "page": "options/options.html",
-    "open_in_tab": false
+    "open_in_tab": true
   },
-  "permissions": ["storage"],
-  "host_permissions": ["http://192.168.1.15/*"],
-  "optional_host_permissions": ["http://*/*", "https://*/*"],
+  "permissions": [
+    "storage"
+  ],
+  "host_permissions": [
+    "http://192.168.1.15/*"
+  ],
+  "optional_host_permissions": [
+    "http://*/*",
+    "https://*/*"
+  ],
   "browser_specific_settings": {
     "gecko": {
       "id": "browser-agent@skep13",
       "strict_min_version": "140.0",
-      "data_collection_permissions": { "required": ["none"] }
+      "data_collection_permissions": {
+        "required": [
+          "none"
+        ]
+      }
     }
+  },
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self'"
   }
 }

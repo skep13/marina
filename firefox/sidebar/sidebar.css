@@ -100,12 +100,12 @@ details.thinking .trace {
 .note.error { color: var(--c1); }
 
 /* --- composer ---------------------------------------------------------- */
-form {
+#composer {
   display: flex; align-items: flex-end; gap: 8px;
   margin: 6px 10px 10px; padding: 6px 6px 6px 10px;
   background: var(--panel); border: 1px solid var(--bezel); border-radius: 3px;
 }
-form:focus-within { border-color: var(--c1-dim); box-shadow: 0 0 0 1px var(--c1-dim), 0 0 14px -6px var(--c1-glow); }
+#composer:focus-within { border-color: var(--c1-dim); box-shadow: 0 0 0 1px var(--c1-dim), 0 0 14px -6px var(--c1-glow); }
 .caret { color: var(--c1); padding: 4px 0; }
 textarea {
   flex: 1; resize: none; border: 0; outline: 0; background: transparent; color: var(--ink);

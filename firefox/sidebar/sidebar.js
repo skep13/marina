@@ -158,6 +158,10 @@ form.addEventListener("submit", (e) => {
   e.preventDefault();
   const text = input.value.trim();
   if (!text || busy) return;
+  if (!settings.key) {
+    note("no key: click cfg and paste lab3's browser key first.", true);
+    return;
+  }
   input.value = "";
   autosize();
   run(text);
