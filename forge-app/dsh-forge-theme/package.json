@@ -1,0 +1,21 @@
+{
+  "name": "dsh-forge-theme",
+  "version": "0.1.0",
+  "description": "Forge look for DeepSeek Harness: ember-on-charcoal palette, Forge wordmark, Avenir/SF Mono type",
+  "private": true,
+  "type": "module",
+  "main": "lib/index.js",
+  "exports": {
+    ".": "./lib/index.js",
+    "./client": "./lib/client.js",
+    "./cordis.patch.yml": "./cordis.patch.yml",
+    "./package.json": "./package.json"
+  },
+  "dsh": {
+    "bundle": { "patch": "./cordis.patch.yml" },
+    "client": {
+      "platform": "web",
+      "inject": ["@deepseek-ai/dsh-client-ui-theme", "@deepseek-ai/dsh-client-ui-sidebar"]
+    }
+  }
+}
