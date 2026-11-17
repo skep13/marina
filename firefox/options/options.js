@@ -2,13 +2,14 @@ import { DEFAULTS, Lab3, loadSettings, saveSettings } from "../lib/lab3.js";
 
 const $ = (id) => document.getElementById(id);
 const result = $("result");
-const FIELDS = ["baseURL", "key", "model"];
+const FIELDS = ["baseURL", "key", "model", "profile", "blocked"];
 
 const s = await loadSettings();
 for (const f of FIELDS) $(f).value = s[f];
 
 function read() {
   const v = Object.fromEntries(FIELDS.map((f) => [f, $(f).value.trim()]));
+  v.profile = $("profile").value.replace(/\s+$/, "");
   v.baseURL = v.baseURL.replace(/\/+$/, "") || DEFAULTS.baseURL;
   v.model = v.model || DEFAULTS.model;
   return v;

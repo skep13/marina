@@ -20,10 +20,16 @@
     <button id="settings" class="icon" type="button" title="Settings" aria-label="Settings">cfg</button>
   </header>
 
+  <div id="access" class="access" hidden>
+    <span>No access to pages yet, so it can't read or act on tabs.</span>
+    <button id="allow" type="button" class="send">allow page access</button>
+  </div>
+
   <main id="log" aria-live="polite">
     <div id="empty" class="empty">
       <p class="prompt">&gt; ready_</p>
-      <p>Ask about anything. Page reading, clicking and tabs come next.</p>
+      <p>Ask about this page, or give it a task: fill this form, compare these tabs, find X.</p>
+      <p class="sub">It stops and asks before anything is submitted, sent or bought. Banking and payment sites are off limits.</p>
     </div>
   </main>
 

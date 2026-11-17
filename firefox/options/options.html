@@ -8,7 +8,8 @@
     body { padding: 16px; display: block; max-width: 520px; }
     h1 { font-size: 12px; letter-spacing: .12em; text-transform: uppercase; margin: 0 0 14px; color: var(--c1); }
     label { display: block; font-size: 10.5px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-dim); margin: 14px 0 4px; }
-    input[type=text], input[type=password] {
+    textarea { resize: vertical; line-height: 1.5; }
+    input[type=text], input[type=password], textarea {
       width: 100%; padding: 7px 9px; border-radius: 3px;
       border: 1px solid var(--bezel); background: var(--panel); color: var(--ink); font: inherit;
     }
@@ -40,6 +41,14 @@
     <label for="model">Model</label>
     <input id="model" type="text" spellcheck="false" placeholder="browser">
     <p class="hint">The llama-swap model id. <code>browser</code> is Qwen3.6 35B-A3B with no persona.</p>
+
+    <label for="profile">Profile: details it may use in forms</label>
+    <textarea id="profile" rows="8" spellcheck="false" placeholder="Name: Jacob …&#10;Email: …&#10;Phone: …&#10;Town: …"></textarea>
+    <p class="hint">One <code>Field: value</code> per line. This is the only place it gets personal details from; anything missing, it asks. Never put passwords or card numbers here: it won't type them anyway.</p>
+
+    <label for="blocked">Also block these sites</label>
+    <textarea id="blocked" rows="3" spellcheck="false" placeholder="example.com"></textarea>
+    <p class="hint">One domain per line, on top of the built-in banking and payment list. It won't read, open or act on them.</p>
 
     <div class="row">
       <button type="submit">Save</button>

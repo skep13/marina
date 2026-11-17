@@ -78,8 +78,7 @@ main {
 .agent .body {
   color: var(--c3); padding-left: 10px; border-left: 2px solid var(--c1-dim);
 }
-.agent.working .body:empty::after,
-.agent.working .body::after {
+.agent.working .body.live::after {
   content: "▌"; color: var(--c1); animation: blink 1s steps(1) infinite;
 }
 @keyframes blink { 50% { opacity: 0; } }
@@ -120,3 +119,44 @@ textarea::placeholder { color: var(--ink-dim); }
 .send:disabled { opacity: .35; cursor: default; }
 .send.stop { background: transparent; color: var(--c1); }
 .send:focus-visible { outline: 1px solid var(--ink); outline-offset: 2px; }
+
+/* --- agent steps ------------------------------------------------------- */
+.empty .sub { margin-top: 8px; font-size: 11px; }
+.step {
+  margin-left: 12px; font-size: 11px; color: var(--ink-dim);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.step::before { content: "▸ "; color: var(--c1-dim); }
+.step.running::before { content: "▸ "; color: var(--c1); animation: blink 1s steps(1) infinite; }
+.step.failed { color: var(--warn); white-space: normal; }
+.step.failed::before { content: "✕ "; color: var(--warn); }
+.foot { margin-left: 12px; font-size: 10px; color: var(--ink-dim); letter-spacing: .06em; opacity: .7; }
+.agent .body + .step, .step + .body { margin-top: 2px; }
+
+/* --- confirm card ------------------------------------------------------ */
+.confirm {
+  border: 1px solid var(--c1); border-radius: 3px; background: var(--panel);
+  padding: 8px 10px; box-shadow: 0 0 14px -6px var(--c1-glow);
+}
+.confirm .c-title { color: var(--c1); font-weight: 700; letter-spacing: .06em; text-transform: uppercase; font-size: 11px; }
+.confirm .c-why { color: var(--ink-dim); font-size: 11px; margin: 2px 0 6px; }
+.confirm dl { display: grid; grid-template-columns: minmax(0, 40%) 1fr; gap: 2px 8px; margin: 0 0 8px; font-size: 11.5px; }
+.confirm dt { color: var(--ink-dim); overflow-wrap: anywhere; }
+.confirm dd { margin: 0; color: var(--c3); overflow-wrap: anywhere; }
+.confirm .c-row { display: flex; gap: 8px; }
+.confirm .c-result { font-size: 10.5px; letter-spacing: .1em; text-transform: uppercase; }
+.confirm.allowed { border-color: var(--bezel); box-shadow: none; }
+.confirm.allowed .c-result { color: var(--ok); }
+.confirm.refused { border-color: var(--bezel); box-shadow: none; }
+.confirm.refused .c-result { color: var(--c1); }
+
+/* --- page access banner ------------------------------------------------ */
+.access {
+  display: flex; align-items: center; gap: 8px; padding: 8px 12px;
+  border-bottom: 1px solid var(--c1-dim); background: var(--panel); font-size: 11px; color: var(--ink-dim);
+}
+.access span { flex: 1; }
+
+.agent .body strong { color: var(--ink); }
+.agent .body code { color: var(--c2); background: var(--panel); padding: 0 3px; border-radius: 2px; }
+.agent.working > .who::after { content: " ▌"; color: var(--c1); animation: blink 1s steps(1) infinite; }

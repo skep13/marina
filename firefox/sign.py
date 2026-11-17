@@ -19,7 +19,7 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 DIST = HERE / "dist"
-SHIP = ["manifest.json", "background.js", "lib", "sidebar", "options", "icons"]   # what goes into the .xpi
+SHIP = ["manifest.json", "background.js", "content", "lib", "sidebar", "options", "icons"]   # what goes into the .xpi
 API = "https://addons.mozilla.org/api/v5"
 CREDS = Path.home() / ".config/amo/credentials"
 
