@@ -1,0 +1,8 @@
+# Core dependencies for the RAG pipeline (ingest + query).
+# Works with the llamacpp embedder (lab3) and the hash embedder (offline test).
+sqlite-vec>=0.1.6
+requests>=2.31
+PyYAML>=6.0
+# Optional but recommended: cleaner HTML extraction for portswigger/owasp.
+# Falls back to a regex stripper if absent.
+beautifulsoup4>=4.12

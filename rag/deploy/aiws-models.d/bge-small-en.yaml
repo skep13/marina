@@ -1,0 +1,21 @@
+# aiws model-library entry for the RAG embedder.
+# Install on lab3 at:  ~/.config/aiws/models.d/bge-small-en.yaml
+#                 (or) /etc/aiws/models.d/bge-small-en.yaml
+# Then `aiwsd` rewrites llama-swap's config. `resident: true` keeps the small
+# embedder loaded in the non-swapping group alongside whichever big chat model
+# is active, so retrieval never evicts marina/songbird (see aiws/models.py:
+# the `embed` role adds --embeddings; `resident` -> the persistent group).
+
+name: bge-small-en-v1.5
+label: BGE-small EN v1.5 (embeddings)
+runtime: llama.cpp
+file: bge-small-en-v1.5-q8_0.gguf
+url: https://huggingface.co/CompendiumLabs/bge-small-en-v1.5-gguf/resolve/main/bge-small-en-v1.5-q8_0.gguf
+roles: [embed]
+resident: true          # stay loaded beside the swapping chat models
+ttl: 0                  # never unload
+gpu_gb: 0.3
+profiles:
+  default:
+    ctx: 512            # bge-small max sequence length
+    slots: 1

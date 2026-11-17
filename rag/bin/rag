@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+# Entry point for the local RAG CLI. Runs `python -m rag` with the package on
+# PYTHONPATH, picking a Python that can load sqlite extensions.
+#
+#   rag query "how does SSRF work?" --k 6 --domain web
+#   rag ingest notes --prune
+#   rag ingest --all
+#   rag sources | rag stats | rag embed-check
+#
+# Python selection order: $RAG_PYTHON, rag/.venv, the repo .venv, then python3.
+set -euo pipefail
+
+here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+rag_root="$(cd "$here/.." && pwd)"
+repo_root="$(cd "$rag_root/.." && pwd)"
+
+pick_python() {
+  if [[ -n "${RAG_PYTHON:-}" ]]; then echo "$RAG_PYTHON"; return; fi
+  for cand in "$rag_root/.venv/bin/python" "$repo_root/.venv/bin/python"; do
+    [[ -x "$cand" ]] && { echo "$cand"; return; }
+  done
+  command -v python3
+}
+
+PY="$(pick_python)"
+export PYTHONPATH="$rag_root/src${PYTHONPATH:+:$PYTHONPATH}"
+exec "$PY" -m rag "$@"
