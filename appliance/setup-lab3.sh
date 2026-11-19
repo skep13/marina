@@ -90,6 +90,7 @@ TS_NAME="lab3"                  # Tailscale device name: reach the box from anyw
 PHONE_PORT=8443
 PHONE_NET="10.42.0.0/24"        # who may open it: devices on "Local AI Box"
 PHONE_TOKEN_FILE="/etc/appliance/phone.token"   # the proxy's key to her bridge; NOT in the repo
+TS_PHONE_PORT=8766              # localhost-only copy of the phone app, published by `tailscale serve`
 MARINA_CONFIG="/var/lib/marina/character_config.yaml"   # inside the model container
 CADDY_CA="/var/lib/caddy/.local/share/caddy/pki/authorities/local/root.crt"
 LOG() { echo "[appliance] $*"; }
@@ -164,6 +165,17 @@ https://${APPLIANCE_IP}:${PHONE_PORT}, https://${APPLIANCE_NAME}:${PHONE_PORT} {
 	tls internal
 	@outside not remote_ip ${PHONE_NET}
 	respond @outside "Join the ${AP_SSID} Wi-Fi to talk to Marina." 403
+	reverse_proxy ${model}:8765 {
+		header_up Authorization "Bearer ${phone}"
+		flush_interval -1
+	}
+}
+
+# The same app for your Tailscale devices, from anywhere. Only reachable from
+# the box itself: \`tailscale serve\` puts it at https://${TS_NAME}.<tailnet>.ts.net
+# with a real certificate, so phones get the mic with nothing to install.
+http://:${TS_PHONE_PORT} {
+	bind 127.0.0.1
 	reverse_proxy ${model}:8765 {
 		header_up Authorization "Bearer ${phone}"
 		flush_interval -1
@@ -446,8 +458,14 @@ tailscale_setup() {  # reach the box from any network over Tailscale (needs inte
   if [ -f "$CONFIRMED" ]; then write_caddyfile "$WEBUI_IP_APPLIANCE" "$MODEL_IP_APPLIANCE"; else write_caddyfile "$WEBUI_IP_NOW" "$MODEL_IP_NOW"; fi
   systemctl reload caddy 2>/dev/null || systemctl restart caddy
   # prints a login link the first time: open it and sign in to add the box to your tailnet
-  tailscale up --hostname="${TS_NAME}"
+  tailscale up --reset --hostname="${TS_NAME}" --accept-dns=false
   LOG "Tailscale up as '${TS_NAME}' ($(tailscale ip -4 2>/dev/null | head -1)). From a device on your tailnet: http://${TS_NAME}/marina/health"
+  # Her app with calls, over HTTPS with Tailscale's certificate (needs `phone` set up,
+  # and MagicDNS + HTTPS certificates on in the Tailscale admin console).
+  if [ -s "$PHONE_TOKEN_FILE" ]; then
+    tailscale serve --bg --https=443 "http://127.0.0.1:${TS_PHONE_PORT}"
+    LOG "calls from anywhere: https://$(tailscale status --json | sed -n 's/.*"DNSName": *"\([^"]*\)\.".*/\1/p' | head -1)"
+  fi
 }
 
 # ---- the uplink watcher (wifi-both and roam) ---------------------------------

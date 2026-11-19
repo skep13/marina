@@ -189,6 +189,12 @@ Then sign in to the same Tailscale account on your laptop. The box answers at
 (Marina's bridge; the café game finds it automatically). This needs MagicDNS,
 which Tailscale turns on by default; otherwise use the box's `100.x` address.
 
+If `phone` is set up, the same step publishes her app with calls at
+`https://lab3.<tailnet>.ts.net` using Tailscale's own certificate, so a phone
+on your tailnet gets the mic with no certificate to install. Turn on HTTPS
+Certificates in the Tailscale admin console (DNS page) first. Only tailnet
+devices can open it; `tailscale serve --https=443 off` takes it down.
+
 ## Stage B — cutover (only if you want the WIRED port to be the appliance net)
 
 This repurposes the wired NIC into the appliance network. **It cuts lab3 off
