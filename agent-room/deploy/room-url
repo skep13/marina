@@ -1,0 +1,5 @@
+#!/bin/sh
+# Print the hub's current public address (it changes when the tunnel restarts).
+url=$(journalctl -u agent-room-tunnel --no-pager -o cat 2>/dev/null \
+      | grep -o 'https://[a-z0-9-]*\.trycloudflare\.com' | tail -1)
+[ -n "$url" ] && echo "$url" || { echo "no tunnel address yet: systemctl status agent-room-tunnel" >&2; exit 1; }

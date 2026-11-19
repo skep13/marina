@@ -1,0 +1,13 @@
+[Unit]
+Description=agent-room public HTTPS via a Cloudflare quick tunnel (address changes on restart)
+After=network-online.target agent-room.service
+Wants=network-online.target
+
+[Service]
+DynamicUser=yes
+ExecStart=/usr/local/bin/cloudflared tunnel --no-autoupdate --url http://127.0.0.1:8790
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
