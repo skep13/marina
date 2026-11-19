@@ -2,6 +2,8 @@ import { THREE, GLTFLoader, VRMLoaderPlugin, VRMUtils } from './vendor/vrm-bundl
 
 // In a browser the page comes from the bridge itself (see web-shim.js).
 const WEB = !!window.marina?.web;
+// Drawn inside the iPhone app, which does the talking to the bridge itself.
+const EMBEDDED = !!window.marina?.embedded;
 const BRIDGE = WEB ? '' : 'http://127.0.0.1:8765';
 
 const el = (id) => document.getElementById(id);
@@ -2711,5 +2713,43 @@ function bridgeLost() {
 
 el('btn-see').hidden = true;
 
-pollForBridge();
+if (EMBEDDED) {
+  // Inside the iPhone app (ios/): the app talks to the bridge and hands each
+  // reply chunk here, so this page only draws her, plays her voice and lip
+  // syncs. No polling, no barge-in, none of the desktop chrome.
+  bargeEnabled = false;
+  let current = null;
+  window.marinaAvatar = {
+    begin() {
+      stopSpeaking();
+      if (current) current.cancelled = true;
+      current = newRequest();
+    },
+    async chunk(ev) {
+      if (!current) current = newRequest();
+      await playChunk(ev, current);
+      return current.chunks;
+    },
+    async end() {
+      if (!current) return 0;
+      const req = current;
+      await untilSpoken();
+      endUtterance();
+      if (current === req) current = null;
+      return req.chunks;
+    },
+    stop() {
+      stopSpeaking();
+      if (current) current.cancelled = true;
+      current = null;
+    },
+    unlock() {
+      ensureAudio();
+      return audioCtx ? audioCtx.resume().then(() => audioCtx.state) : 'none';
+    },
+    speaking: () => playing > 0,
+  };
+} else {
+  pollForBridge();
+}
 loadFromDisk();

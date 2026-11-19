@@ -1,0 +1,41 @@
+# Generates Marina.xcodeproj:  cd ios && xcodegen
+# Then ./build-ipa.sh for an unsigned .ipa that Sideloadly signs.
+name: Marina
+options:
+  bundleIdPrefix: com.skep13
+  deploymentTarget:
+    iOS: "18.0"
+  createIntermediateGroups: true
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+    MARKETING_VERSION: "1.0.0"
+    CURRENT_PROJECT_VERSION: "1"
+    TARGETED_DEVICE_FAMILY: "1"
+    ENABLE_USER_SCRIPT_SANDBOXING: NO
+targets:
+  Marina:
+    type: application
+    platform: iOS
+    sources:
+      - path: Marina
+        excludes:
+          - "Web/**"
+      # The shim the renderer loads first, copied to the bundle root.
+      - path: Marina/Web/ios-shim.js
+        buildPhase: resources
+      # The same renderer and avatar the Mac app uses, straight from app/, so
+      # she looks identical and there's only one copy to keep up to date.
+      - path: ../app/renderer
+        type: folder
+        buildPhase: resources
+      - path: ../app/models/model.vrm
+        buildPhase: resources
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.skep13.marina
+        PRODUCT_NAME: Marina
+        INFOPLIST_FILE: Marina/Info.plist
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        CODE_SIGN_STYLE: Automatic
+        SUPPORTS_MACCATALYST: NO
