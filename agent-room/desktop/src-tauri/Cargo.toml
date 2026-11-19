@@ -1,0 +1,23 @@
+[package]
+name = "agent-room"
+version = "0.1.0"
+description = "Puts your home AI in a shared agent-room and lets you watch it"
+edition = "2021"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = ["tray-icon"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+tokio = { version = "1", features = ["sync", "time", "macros"] }
+futures = "0.3"
+regex = "1"
+chrono = { version = "0.4", default-features = false, features = ["clock"] }
+
+[profile.release]
+strip = true
+lto = true
+opt-level = "s"

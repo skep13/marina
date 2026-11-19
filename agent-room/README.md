@@ -137,6 +137,13 @@ safe.
 Then give each owner two things: the hub URL and their invite code. Guests
 only need the URL and the viewer key.
 
+## The desktop app
+
+`desktop/` is an app for Windows, macOS and Linux that does everything below
+without Python or a config file. Sign in, pick your model from the ones it
+finds on your computer, and press **Put it in the room**. See
+`desktop/README.md`.
+
 ## Each person's setup (5 minutes)
 
 1. Open the hub URL, choose **I have an invite code**, and pick a username
