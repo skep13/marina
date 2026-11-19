@@ -2,7 +2,7 @@ name: Agent Room desktop app
 
 # Builds the agent-room desktop app for Windows, macOS and Linux.
 # Run it by hand (Actions → Agent Room desktop app → Run workflow), or push a
-# tag like agent-room-v0.1.0 to also attach the installers to a draft release.
+# tag like agent-room-v0.2.0 to publish the installers as a release (never marked latest).
 on:
   workflow_dispatch:
   push:
@@ -65,11 +65,19 @@ jobs:
       - name: Collect installers
         shell: bash
         run: |
-          mkdir -p ../../dist-out
-          find src-tauri/target -path '*/release/bundle/*' -type f \
-            \( -name '*.msi' -o -name '*-setup.exe' -o -name '*.deb' -o -name '*.rpm' -o -name '*.AppImage' -o -name '*.dmg' \) \
-            -exec cp {} ../../dist-out/ \;
-          ls -l ../../dist-out
+          # Plain, predictable names so download links are easy to write.
+          v=$(node -p "require('./package.json').version")
+          out=../../dist-out; mkdir -p $out
+          b=src-tauri/target
+          put() { f=$(find $b -path '*/release/bundle/*' -type f -name "$1" | head -1); [ -n "$f" ] && cp "$f" "$out/$2"; true; }
+          put '*-setup.exe'  "AgentRoom-$v-windows-setup.exe"
+          put '*.msi'        "AgentRoom-$v-windows.msi"
+          put '*.deb'        "AgentRoom-$v-linux-amd64.deb"
+          put '*.rpm'        "AgentRoom-$v-linux-x86_64.rpm"
+          put '*.AppImage'   "AgentRoom-$v-linux-x86_64.AppImage"
+          put '*.dmg'        "AgentRoom-$v-macos.dmg"
+          ls -l $out
+          [ -n "$(ls $out)" ]
 
       - uses: actions/upload-artifact@v4
         with:
@@ -77,12 +85,15 @@ jobs:
           path: dist-out/*
           if-no-files-found: error
 
-      - name: Attach to draft release
+      - name: Attach to the release
         if: startsWith(github.ref, 'refs/tags/agent-room-v')
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          tag="${GITHUB_REF_NAME}"
-          gh release view "$tag" >/dev/null 2>&1 || gh release create "$tag" --draft --title "Agent Room ${tag#agent-room-v}" --notes "Desktop app for the agent room."
+          # Never "latest": Marina's Mac app checks releases/latest for its own updates.
+          tag="${GITHUB_REF_NAME}"; v="${tag#agent-room-v}"
+          sed "s/{v}/$v/g" release-notes.md > ../../notes.md
+          gh release view "$tag" >/dev/null 2>&1 || \
+            gh release create "$tag" --latest=false --title "Agent Room $v" --notes-file ../../notes.md || true
           gh release upload "$tag" ../../dist-out/* --clobber

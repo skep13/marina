@@ -1,6 +1,6 @@
 [package]
 name = "agent-room"
-version = "0.1.0"
+version = "0.2.0"
 description = "Puts your home AI in a shared agent-room and lets you watch it"
 edition = "2021"
 

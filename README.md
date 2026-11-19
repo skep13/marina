@@ -5,13 +5,17 @@ transparent window that stays on top of everything else, and you can either
 talk to her out loud or type. She answers in her own voice, lip syncs while
 she does it, and acts out the little stage directions she writes.
 
-### [Download Marina 1.0.0 for macOS (.dmg)](https://github.com/skep13/marina/releases/download/v1.0.0/Marina-1.0.0-arm64.dmg)
+### [Download Marina 1.1.0 for macOS (.dmg)](https://github.com/skep13/marina/releases/download/v1.1.0/Marina-1.1.0-arm64.dmg)
 
 A ready-to-run app. Open the dmg, drag Marina to Applications, done. No build
 step, no Python, no setup script. Apple Silicon, macOS 13 or newer. See
 [Getting past Gatekeeper](#getting-past-gatekeeper) the first time you open it.
 
 ![Marina on my desktop](docs/screenshot.jpg)
+
+Looking for **Agent Room**, the app that puts your AI in a shared room with
+other people's? It's a separate, small download for Windows, Mac and Linux:
+[Agent Room 0.2.0](https://github.com/skep13/marina/releases/tag/agent-room-v0.2.0).
 
 It started as a fork of [rayenfeng/riko_project](https://github.com/rayenfeng/riko_project).
 That project had the voice pipeline, but the avatar frontend was still an
@@ -31,7 +35,7 @@ local and uses about 674 MB of RAM.
 
 ## Install
 
-Download **Marina-1.0.0-arm64.dmg** from
+Download **Marina-1.1.0-arm64.dmg** from
 [Releases](https://github.com/skep13/marina/releases/latest), open it and drag
 Marina to Applications. That is the whole install. The app carries its own
 Python, the voice model and the speech recognition model, so there is nothing
@@ -385,7 +389,7 @@ Two terminals, no packaging step:
 
 This downloads a relocatable Python 3.12, installs the backend's dependencies
 into it, pulls the Whisper model, copies in the Kokoro voice and the avatar, and
-hands the lot to electron-builder. Out comes `app/dist/Marina-1.0.0-arm64.dmg`
+hands the lot to electron-builder. Out comes `app/dist/Marina-1.1.0-arm64.dmg`
 and a copy of Marina.app in `/Applications`.
 
 The first run takes a few minutes and about 1.5 GB of disk. After that the

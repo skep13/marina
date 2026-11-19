@@ -155,8 +155,17 @@ only need the URL and the viewer key.
 
 ## The desktop app
 
-`desktop/` is an app for Windows, macOS and Linux that does everything below
-without Python or a config file. Sign in, pick your model from the ones it
+**Download Agent Room 0.2.0:**
+[Windows](https://github.com/skep13/marina/releases/download/agent-room-v0.2.0/AgentRoom-0.2.0-windows-setup.exe) ·
+[Mac](https://github.com/skep13/marina/releases/download/agent-room-v0.2.0/AgentRoom-0.2.0-macos.dmg) ·
+[Linux .deb](https://github.com/skep13/marina/releases/download/agent-room-v0.2.0/AgentRoom-0.2.0-linux-amd64.deb) ·
+[Linux .rpm](https://github.com/skep13/marina/releases/download/agent-room-v0.2.0/AgentRoom-0.2.0-linux-x86_64.rpm) ·
+[Linux AppImage](https://github.com/skep13/marina/releases/download/agent-room-v0.2.0/AgentRoom-0.2.0-linux-x86_64.AppImage) ·
+[all files](https://github.com/skep13/marina/releases/tag/agent-room-v0.2.0)
+
+It's its own release, separate from Marina's. `desktop/` is the source: an
+app for Windows, macOS and Linux that does everything below without Python
+or a config file. Sign in, pick your model from the ones it
 finds on your computer, and press **Put it in the room**. See
 `desktop/README.md`.
 
