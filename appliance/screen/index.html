@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'">
+<title>Marina</title>
+<!-- The laptop orb's renderer (style.css, app.js, orb.js are copied in from
+     aiws/orb/renderer) on lab3's own monitor. shim.js stands in for Electron. -->
+<link rel="stylesheet" href="./style.css">
+<link rel="stylesheet" href="./kiosk.css">
+<script src="./shim.js"></script>
+</head>
+<body>
+<main id="panel" hidden>
+  <header>
+    <b>MARINA</b>
+    <span id="seeing">on lab3</span>
+    <button id="watch" class="icon" hidden>◉</button>
+    <button id="gear" class="icon" title="Colours">⚙</button>
+    <button id="close" class="icon" hidden>⌄</button>
+  </header>
+
+  <section id="chat">
+    <div id="msgs"></div>
+    <div id="composer">
+      <textarea id="input" rows="2" placeholder="Talk to Marina… (Enter to send)"></textarea>
+      <div class="row">
+        <button id="look" class="toggle" hidden>👁 look</button>
+        <span class="grow"></span>
+        <button id="stop" class="danger" hidden>■ stop</button>
+        <button id="doit" hidden>▶ do it</button>
+        <button id="send" class="primary">send</button>
+      </div>
+    </div>
+  </section>
+
+  <section id="settings" hidden>
+    <h3>Sphere</h3>
+    <div class="grid" id="base"></div>
+    <h3>States</h3>
+    <div class="grid" id="states"></div>
+    <div class="row"><button id="reset">reset to defaults</button><span class="grow"></span><button id="done" class="primary">done</button></div>
+  </section>
+</main>
+<canvas id="orb" title="Marina"></canvas>
+<script type="module" src="./app.js"></script>
+</body>
+</html>

@@ -41,6 +41,9 @@
 #                                    #   "Local AI Box", at https://10.42.0.1:8443. Copy the
 #                                    #   app into ct110 first (see README). Phones trust the
 #                                    #   box's certificate once: http://10.42.0.1/marina-ca.crt
+#   setup-lab3.sh screen             # show Marina (the laptop orb app) on a monitor
+#                                    #   plugged into lab3: cage + cog kiosk, memory-capped
+#                                    #   so it can't crowd out the models. Takes over tty1.
 #   setup-lab3.sh confirm            # keep the cutover; cancel the auto-rollback.
 #   setup-lab3.sh status             # show what's configured / running
 #
@@ -84,7 +87,7 @@ CT_NET="${MODEL_IP_NOW%.*}.0/24" # the containers' network on ${BRIDGE}
 # Who may use Marina and the keyless model API through the proxy: the box's Wi-Fi,
 # a laptop on the cable (link-local, or a Mac's Internet Sharing, 192.168.2-3.x),
 # the home LAN and Tailscale. Anywhere else the box is plugged in gets a 403.
-TRUSTED_NETS="${APPLIANCE_IP%.*}.0/24 169.254.0.0/16 192.168.2.0/23 ${CT_NET} 100.64.0.0/10 127.0.0.1/8"
+TRUSTED_NETS="${APPLIANCE_IP%.*}.0/24 169.254.0.0/16 192.168.2.0/23 ${CT_NET} 100.64.0.0/10 127.0.0.1/8 ::1"
 TS_NAME="lab3"                  # Tailscale device name: reach the box from anywhere at http://lab3
 # phone: Marina's app over HTTPS (browsers only allow the mic on HTTPS), Wi-Fi clients only.
 PHONE_PORT=8443
@@ -141,6 +144,12 @@ http://${APPLIANCE_NAME}, http://${APPLIANCE_IP}, http://${WIRED_LL}, http://loc
 	handle /marina-ca.crt {
 		root * /var/lib/appliance/www
 		header Content-Type application/x-x509-ca-cert
+		file_server
+	}
+	# Marina on lab3's own monitor (see 'screen'): the laptop orb as a web page.
+	redir /screen /screen/
+	handle_path /screen/* {
+		root * /var/lib/appliance/www/screen
 		file_server
 	}
 	# One-line agent installer: curl http://${APPLIANCE_NAME}/install | sh
@@ -242,6 +251,113 @@ phone_setup() {
   install -d /var/lib/appliance/www
   install -m 644 "$CADDY_CA" /var/lib/appliance/www/marina-ca.crt
   LOG "phone: join \"${AP_SSID}\", trust http://${APPLIANCE_IP}/marina-ca.crt once, then open https://${APPLIANCE_IP}:${PHONE_PORT}"
+}
+
+# ---- screen: Marina on a monitor plugged into lab3 ----------------------------
+# Her VRM app (the same page phones get from 'phone', on the localhost-only
+# :${TS_PHONE_PORT}) shown full screen by cage (a one-window Wayland compositor) +
+# cog (WPE WebKit, much lighter than Chromium/Electron), in kiosk mode (30 fps,
+# 0.75x resolution: app/renderer/web-shim.js). The laptop orb is at /screen/ as a
+# lighter alternative: SCREEN_URL=http://localhost/screen/ in the config. It shares the iGPU and RAM with the models, so the
+# service is capped and is the first thing the kernel kills if memory runs out.
+SCREEN_DIR="/var/lib/appliance/www/screen"
+SCREEN_MEM_MAX="900M"
+SCREEN_CONF="/etc/appliance/screen.conf"   # SCREEN_URL, SCREEN_ROTATE (normal|90|180|270)
+screen_setup() {
+  need_root
+  local here orb; here="$(cd "$(dirname "$0")" && pwd)"
+  orb="${ORB_RENDERER:-$here/../aiws/orb/renderer}"
+  [ -f "$orb/app.js" ] && [ -f "$here/screen/shim.js" ] || {
+    echo "Needs appliance/screen/ and aiws/orb/renderer/ from the repo next to this script"
+    echo "(or ORB_RENDERER=/path/to/renderer)."; exit 1; }
+  DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+    cage cog wlr-randr seatd libgl1-mesa-dri libegl-mesa0 libgles2 fonts-dejavu-core
+  id kiosk >/dev/null 2>&1 || useradd -r -m -d /var/lib/kiosk -s /usr/sbin/nologin kiosk
+  usermod -aG video,render,input kiosk
+  systemctl enable --now seatd
+  install -d "$SCREEN_DIR"
+  install -m 644 "$orb/app.js" "$orb/orb.js" "$orb/style.css" "$SCREEN_DIR/"
+  install -m 644 "$here/screen/index.html" "$here/screen/shim.js" "$here/screen/kiosk.css" "$SCREEN_DIR/"
+  if [ -f "$CONFIRMED" ]; then write_caddyfile "$WEBUI_IP_APPLIANCE" "$MODEL_IP_APPLIANCE"; else write_caddyfile "$WEBUI_IP_NOW" "$MODEL_IP_NOW"; fi
+  systemctl restart caddy
+  # The kiosk mode lives in the app's web shim: keep ct${MODEL_CTID}'s copy current.
+  [ -f "$here/../app/renderer/web-shim.js" ] && pct push "$MODEL_CTID" "$here/../app/renderer/web-shim.js" \
+    /opt/marina/app/renderer/web-shim.js --perms 644 || true
+  [ -f "$SCREEN_CONF" ] || cat > "$SCREEN_CONF" <<EOF
+# Marina on lab3's monitor (setup-lab3.sh screen). Restart marina-screen after editing.
+SCREEN_URL="http://127.0.0.1:${TS_PHONE_PORT}/?kiosk"
+SCREEN_ROTATE="90"   # normal | 90 | 180 | 270 (portrait monitor: 90 or 270)
+EOF
+  cat > /usr/local/sbin/marina-screen-session <<'SESSION'
+#!/bin/sh
+# Runs inside cage: rotate the output, then the page.
+. /etc/appliance/screen.conf
+out=$(wlr-randr | awk '/^[^ ]/{print $1; exit}')
+[ -n "$out" ] && [ -n "$SCREEN_ROTATE" ] && wlr-randr --output "$out" --transform "$SCREEN_ROTATE"
+exec cog --platform=wl "$SCREEN_URL"
+SESSION
+  chmod 755 /usr/local/sbin/marina-screen-session
+  cat > /etc/systemd/system/marina-screen.service <<EOF
+[Unit]
+Description=Marina on lab3's monitor (setup-lab3.sh screen)
+After=seatd.service caddy.service
+Requires=seatd.service
+Conflicts=getty@tty1.service
+
+[Service]
+# Display access through seatd, not a login session: logind would move the
+# processes into a session scope, outside this unit's memory cap.
+User=kiosk
+Environment=LIBSEAT_BACKEND=seatd XDG_SESSION_TYPE=wayland XDG_RUNTIME_DIR=/run/marina-screen
+RuntimeDirectory=marina-screen
+RuntimeDirectoryMode=0700
+# cage exits with no display attached, so wait for a monitor rather than loop
+ExecStartPre=/bin/sh -c 'until grep -qx connected /sys/class/drm/card*-*/status; do sleep 5; done'
+TimeoutStartSec=infinity
+# -s: Ctrl+Alt+F2 still reaches a text console
+ExecStart=/usr/bin/cage -s -- /usr/local/sbin/marina-screen-session
+Restart=always
+RestartSec=10
+# The models come first: a hard memory cap, killed before llama-server if RAM
+# runs out, and the lowest CPU/IO priority. marina-screen-watch starts/stops it.
+MemoryHigh=700M
+MemoryMax=${SCREEN_MEM_MAX}
+MemorySwapMax=0
+OOMScoreAdjust=1000
+Nice=10
+CPUWeight=20
+IOWeight=20
+
+[Install]
+WantedBy=multi-user.target
+EOF
+  # Monitor off or unplugged: stop the kiosk so its RAM and GPU go back to the
+  # models. On again: start it. Polls the connector state every 5 s.
+  cat > /usr/local/sbin/marina-screen-watch <<'WATCH'
+#!/bin/sh
+on() { grep -qx connected /sys/class/drm/card*-*/status 2>/dev/null; }
+while :; do
+  if on; then systemctl is-active -q marina-screen || systemctl start --no-block marina-screen
+  else systemctl is-active -q marina-screen && systemctl stop marina-screen; fi
+  sleep 5
+done
+WATCH
+  chmod 755 /usr/local/sbin/marina-screen-watch
+  cat > /etc/systemd/system/marina-screen-watch.service <<EOF
+[Unit]
+Description=Start/stop Marina's screen with the monitor (setup-lab3.sh screen)
+
+[Service]
+ExecStart=/usr/local/sbin/marina-screen-watch
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
+EOF
+  systemctl daemon-reload
+  systemctl disable -q marina-screen.service 2>/dev/null || true   # the watcher starts it
+  systemctl enable --now marina-screen-watch.service
+  LOG "screen: Marina shows whenever a monitor is on (off for good: systemctl disable --now marina-screen-watch; systemctl stop marina-screen)"
 }
 
 # ---- stages -----------------------------------------------------------------
@@ -861,6 +977,7 @@ case "${1:-}" in
   roam)      roam ;;
   tailscale) tailscale_setup ;;
   phone)     phone_setup ;;
+  screen)    screen_setup ;;
   cutover)   cutover "$@" ;;
   confirm)   confirm ;;
   _rollback) _rollback ;;

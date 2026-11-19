@@ -1,0 +1,15 @@
+/* lab3's monitor: the sphere large on the left, the chat docked on the right.
+   Opaque background, no blur: nothing behind it to see, and blur costs GPU. */
+:root { font-size: 16px; }
+html, body { background: #05070d; }
+#orb { position: fixed; left: 0; right: 560px; top: 0; bottom: 0; margin: auto; cursor: default;
+  width: min(62vh, calc(100vw - 620px)); height: min(62vh, calc(100vw - 620px)); }
+#panel { left: auto; right: 24px; top: 24px; bottom: 24px; width: 520px;
+  backdrop-filter: none; background: rgba(14, 16, 24, .96); }
+header { -webkit-app-region: no-drag; }
+.msg { font-size: 15px; }
+[hidden] { display: none !important; }
+@media (max-width: 900px) {   /* small screens: sphere on top, chat below */
+  #orb { right: 0; bottom: auto; top: 16px; width: 34vh; height: 34vh; }
+  #panel { left: 16px; right: 16px; width: auto; top: calc(34vh + 32px); bottom: 16px; }
+}

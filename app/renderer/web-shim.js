@@ -3,6 +3,22 @@
 (() => {
   const noop = () => {};
 
+  // ?kiosk: lab3's own monitor (appliance/setup-lab3.sh screen). It shares the
+  // iGPU with the models, so draw fewer frames at a lower resolution:
+  // ?kiosk&fps=30&scale=0.75 are the defaults.
+  const q = new URLSearchParams(location.search);
+  if (q.has('kiosk')) {
+    const fps = Number(q.get('fps')) || 30, scale = Number(q.get('scale')) || 0.75;
+    Object.defineProperty(window, 'devicePixelRatio', { get: () => scale });
+    const raf = window.requestAnimationFrame.bind(window);
+    let last = 0;
+    window.requestAnimationFrame = (fn) => raf(function wait(t) {
+      if (t - last < 1000 / fps - 1) return raf(wait);
+      last = t; fn(t);
+    });
+    document.documentElement.classList.add('kiosk');
+  }
+
   window.marina = {
     web: true,
     loadVRM: async () => {
