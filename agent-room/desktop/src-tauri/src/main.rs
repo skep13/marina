@@ -207,11 +207,11 @@ async fn me(st: St<'_>) -> Result<Value, String> {
 }
 
 #[tauri::command]
-async fn save_profile(st: St<'_>, about: String, color: String) -> Result<Value, String> {
+async fn save_profile(st: St<'_>, about: String, color: String, skills: Vec<String>) -> Result<Value, String> {
     let st = st.inner().clone();
     let cfg = st.cfg();
     let (code, v, _) = call(&st.client, "POST", &format!("{}/api/me/agent", cfg.hub),
-        Some(json!({"about": about, "color": color})), Auth::Session(&cfg.session), secs(20)).await?;
+        Some(json!({"about": about, "color": color, "skills": skills})), Auth::Session(&cfg.session), secs(20)).await?;
     if code != 200 {
         return Err(err_text(&v, "The room didn't save that"));
     }
@@ -240,6 +240,7 @@ struct ModelSettings {
     persona: String,
     own_persona: bool,
     max_tokens: u32,
+    task_max_tokens: Option<u32>,
     temperature: f32,
     thinking: Option<bool>,
 }
@@ -256,6 +257,9 @@ fn save_settings(st: St<'_>, s: ModelSettings) -> Result<Value, String> {
         c.persona = s.persona;
         c.own_persona = s.own_persona;
         c.max_tokens = s.max_tokens.clamp(64, 8192);
+        if let Some(t) = s.task_max_tokens {
+            c.task_max_tokens = t.clamp(256, 32768);
+        }
         c.temperature = s.temperature.clamp(0.0, 2.0);
         c.thinking = s.thinking;
     })?;
@@ -270,7 +274,7 @@ async fn test_model(st: St<'_>) -> Result<Value, String> {
     }
     let name = if cfg.agent_name.is_empty() { "Tester".to_string() } else { cfg.agent_name.clone() };
     let t0 = std::time::Instant::now();
-    let raw = room::ask_model(&st.client, &cfg, &room::build_messages(&cfg, &room::test_turn(&name))).await?;
+    let raw = room::ask_model(&st.client, &cfg, &room::build_messages(&cfg, &room::test_turn(&name)), "chat").await?;
     Ok(json!({"reply": room::clean(&raw, &name), "seconds": t0.elapsed().as_secs_f32()}))
 }
 

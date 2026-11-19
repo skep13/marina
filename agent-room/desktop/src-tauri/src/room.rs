@@ -149,16 +149,23 @@ pub async fn detect(client: &reqwest::Client) -> Vec<Value> {
     futures::future::join_all(probes).await.into_iter().flatten().collect()
 }
 
-pub async fn ask_model(client: &reqwest::Client, cfg: &Config, msgs: &[Value]) -> Result<String, String> {
+pub fn is_task(kind: &str) -> bool {
+    matches!(kind, "plan" | "work" | "review")
+}
+
+pub async fn ask_model(client: &reqwest::Client, cfg: &Config, msgs: &[Value], kind: &str) -> Result<String, String> {
+    let task = is_task(kind);
+    let tokens = if task { cfg.task_max_tokens } else { cfg.max_tokens };
     let mut body = json!({
-        "model": cfg.model, "messages": msgs, "max_tokens": cfg.max_tokens,
+        "model": cfg.model, "messages": msgs, "max_tokens": tokens,
         "temperature": cfg.temperature, "stream": false,
     });
     if let Some(t) = cfg.thinking {
         body["chat_template_kwargs"] = json!({"enable_thinking": t});
     }
     let url = format!("{}/chat/completions", cfg.model_url.trim_end_matches('/'));
-    let (code, v, _) = call(client, "POST", &url, Some(body), Auth::Bearer(&cfg.model_key), secs(280)).await?;
+    let wait = if task { secs(880) } else { secs(280) };
+    let (code, v, _) = call(client, "POST", &url, Some(body), Auth::Bearer(&cfg.model_key), wait).await?;
     if code != 200 {
         let why = v["error"]["message"].as_str().or(v["error"].as_str()).unwrap_or("");
         return Err(format!("the model server answered {code} {why}").trim().to_string());
@@ -221,7 +228,12 @@ pub fn build_messages(cfg: &Config, turn: &Value) -> Vec<Value> {
     if own && msgs.first().map(|m| m.0 == "assistant").unwrap_or(false) {
         msgs.insert(0, ("user".into(), "(room) The conversation so far:".into()));
     }
-    let mut nudge = format!("(It's your turn, {me}. Write your next message only, or PASS.)");
+    let mut nudge = match turn["kind"].as_str().unwrap_or("chat") {
+        "plan" => format!("(Your job now, {me}: write the plan as [task] lines.)"),
+        "work" => format!("(Your task now, {me}: hand in the work as described.)"),
+        "review" => format!("(Your review now, {me}: start with [approve] or [changes].)"),
+        _ => format!("(It's your turn, {me}. Write your next message only, or PASS.)"),
+    };
     if own {
         nudge = format!("(room) {context}\n\n{nudge}");
     }
@@ -314,11 +326,18 @@ pub async fn run(app: AppHandle, mut rx: watch::Receiver<u64>, my_gen: u64) {
                 }
                 let turn = v["turn"].clone();
                 let me = turn["you"].as_str().unwrap_or("").to_string();
-                st.set_state(&app, "thinking", "Your AI is writing a reply…");
+                let kind = turn["kind"].as_str().unwrap_or("chat").to_string();
+                let task_no = turn["task"]["seq"].as_u64().map(|n| format!(" {n}")).unwrap_or_default();
+                st.set_state(&app, "thinking", &match kind.as_str() {
+                    "plan" => "Your AI is planning the project…".to_string(),
+                    "work" => format!("Your AI is working on task{task_no}…"),
+                    "review" => format!("Your AI is reviewing task{task_no}…"),
+                    _ => "Your AI is writing a reply…".to_string(),
+                });
                 let t0 = Instant::now();
                 let msgs = build_messages(&cfg, &turn);
                 let answer = tokio::select! {
-                    r = ask_model(&st.client, &cfg, &msgs) => r,
+                    r = ask_model(&st.client, &cfg, &msgs, &kind) => r,
                     _ = rx.changed() => break,
                 };
                 let text = match answer {
@@ -336,7 +355,10 @@ pub async fn run(app: AppHandle, mut rx: watch::Receiver<u64>, my_gen: u64) {
                 let took = t0.elapsed().as_secs();
                 st.log(&app, match sent {
                     Ok((200, ..)) if passed => format!("passed ({took}s)"),
-                    Ok((200, ..)) => format!("said: {} ({took}s)", short(&text, 110)),
+                    Ok((200, ..)) => {
+                        let verb = match kind.as_str() { "plan" => "planned", "work" => "handed in", "review" => "reviewed", _ => "said" };
+                        format!("{verb}: {} ({took}s)", short(&text, 110))
+                    }
                     Ok((409, ..)) => format!("answered too late, the room moved on ({took}s)"),
                     Ok((c, ..)) => format!("the room refused the reply ({c})"),
                     Err(e) => format!("couldn't send the reply: {e}"),

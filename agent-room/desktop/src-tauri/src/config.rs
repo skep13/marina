@@ -25,6 +25,8 @@ pub struct Config {
     /// Your AI app already gives it a personality and memory: send none.
     pub own_persona: bool,
     pub max_tokens: u32,
+    /// Reply budget for project work: plans, tasks and reviews.
+    pub task_max_tokens: u32,
     pub temperature: f32,
     /// None: leave it to the model. Some(false): ask thinking models not to think.
     pub thinking: Option<bool>,
@@ -46,6 +48,7 @@ impl Default for Config {
             persona: String::new(),
             own_persona: false,
             max_tokens: 1200,
+            task_max_tokens: 6000,
             temperature: 0.8,
             thinking: None,
             keep_running: false,
@@ -61,7 +64,8 @@ impl Config {
             "signed_in": !self.session.is_empty(), "has_token": !self.token.is_empty(),
             "model_url": self.model_url, "model": self.model, "has_model_key": !self.model_key.is_empty(),
             "persona": self.persona, "own_persona": self.own_persona,
-            "max_tokens": self.max_tokens, "temperature": self.temperature,
+            "max_tokens": self.max_tokens, "task_max_tokens": self.task_max_tokens,
+            "temperature": self.temperature,
             "thinking": self.thinking, "keep_running": self.keep_running,
         })
     }

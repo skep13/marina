@@ -27,8 +27,8 @@ Standard library only (Python 3.9+).
   hub.py set KEY VALUE                 change a setting (see DEFAULTS)
   hub.py serve [--host H] [--port P]   run the hub
 """
-import argparse, hashlib, hmac, json, os, queue, random, re, secrets, sqlite3, sys
-import threading, time
+import argparse, hashlib, hmac, io, json, os, posixpath, queue, random, re, secrets, sqlite3, sys
+import threading, time, zipfile
 from http.cookies import SimpleCookie
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
@@ -49,7 +49,15 @@ DEFAULTS = {
     "project_max_turns": "120",  # a project ends after this many AI messages
     "doc_max_chars": "40000",    # largest shared project document
     "doc_context_chars": "6000", # how much of the document each AI sees
+    "task_timeout": "900",       # how long an AI gets for a project task or review
+    "max_tasks": "8",            # most tasks a plan may have
+    "task_rounds": "3",          # review rounds before a task is accepted anyway
+    "file_max_chars": "100000",  # largest single project file
+    "files_max_total": "1000000",# all files in one project
+    "task_context_chars": "24000",  # how much of the project's files a worker sees
 }
+SKILLS = ["planning", "coding", "writing", "research", "review", "design", "chat"]
+MAX_AGENTS_PER_OWNER = 4
 PROJECT_GUIDE = (
     "\n\nRight now the group is working on a PROJECT together.\n"
     "Project: {title}\nBrief from the people who set it:\n{brief}\n\n"
@@ -85,7 +93,42 @@ COLOR_RE = re.compile(r"^#[0-9a-fA-F]{6}$")
 COLORS = ["#e07a5f", "#3d9a8b", "#7b6cd9", "#d4a017", "#4a90d9", "#c2577a", "#6a994e"]
 DOC_RE = re.compile(r"\[doc\](.*?)(?:\[/doc\]|\Z)", re.S | re.I)   # unclosed block runs to the end
 DONE_RE = re.compile(r"\[done\]", re.I)
+TASK_RE = re.compile(r"\[task\b([^\]]*)\](.*?)(?:\[/task\]|(?=\[task\b)|\Z)", re.S | re.I)
+FILE_RE = re.compile(r"\[file\s+path\s*=\s*[\"']?([^\]\"'\n]+?)[\"']?\s*\]\n?(.*?)(?:\[/file\]|(?=\[file\s)|\Z)",
+                     re.S | re.I)
+APPROVE_RE = re.compile(r"\[approve\]", re.I)
+CHANGES_RE = re.compile(r"\[changes\]", re.I)
+FENCE_RE = re.compile(r"^\s*```[^\n]*\n(.*?)\n?```\s*$", re.S)
+PATH_RE = re.compile(r"^[A-Za-z0-9_.\-/ ]{1,200}$")
 
+PLAN_GUIDE = (
+    "You are {name}, the planner for a project that several AIs will build together. "
+    "Each AI is run by a different person on their own computer and has its own strengths. "
+    "Break the brief into 2-{max_tasks} concrete tasks. Each task must be something one AI can "
+    "finish in a single reply: a section of writing, one file or a few small files of code, a "
+    "piece of research. Write each task on its own line in exactly this form:\n"
+    "[task skill=SKILL] Short title :: exactly what to produce and how it fits with the rest [/task]\n"
+    "If a task needs another one finished first, add after=N (N is that task's number, counting "
+    "from 1), like [task skill=coding after=1]. SKILL is the one that matters most, from: {skills}. "
+    "Give coding tasks file names so the pieces fit together. Plan only: don't do the tasks yourself."
+)
+WORK_GUIDE = (
+    "You are {name}, doing one task in a group project. Other AIs, each run by a different person, "
+    "are doing the other tasks, and another AI will review your work.\n\n"
+    "How to hand in your work:\n"
+    "- Put every file in its own block: [file path=folder/name.ext] the whole file [/file]. "
+    "No ``` fences inside the block. To change a file, hand in the whole new version.\n"
+    "- Put writing for the shared project document between [doc] and [/doc].\n"
+    "- Anything outside those blocks is a short note to the others (a sentence or two).\n"
+    "Nobody runs the code here, so don't claim you ran or tested it. If you really can't do "
+    "this task, reply with exactly PASS and someone else will take it."
+)
+REVIEW_GUIDE = (
+    "You are {name}, reviewing another AI's work on a group project. Check that it does what the "
+    "task asked, is correct, and fits with the rest of the project. Start your reply with [approve] "
+    "if it is good enough (you may add small suggestions after it), or with [changes] followed by "
+    "a short, specific list of what must be fixed. Don't rewrite the work yourself."
+)
 
 def h(token):
     return hashlib.sha256(token.encode()).hexdigest()
@@ -129,10 +172,33 @@ class Store:
                 created_by TEXT, created REAL, started REAL, finished REAL,
                 doc TEXT NOT NULL DEFAULT '', turns INTEGER NOT NULL DEFAULT 0,
                 done_votes TEXT NOT NULL DEFAULT '[]', outcome TEXT DEFAULT '');
+            CREATE TABLE IF NOT EXISTS tasks (
+                id INTEGER PRIMARY KEY, project_id INTEGER NOT NULL, seq INTEGER NOT NULL,
+                title TEXT NOT NULL, detail TEXT NOT NULL DEFAULT '', skill TEXT NOT NULL DEFAULT '',
+                after INTEGER NOT NULL DEFAULT 0,
+                status TEXT NOT NULL DEFAULT 'todo',  -- todo | working | review | reviewing | done | skipped
+                assignee INTEGER, reviewer INTEGER, note TEXT NOT NULL DEFAULT '',
+                doc_part TEXT NOT NULL DEFAULT '', review TEXT NOT NULL DEFAULT '',
+                rounds INTEGER NOT NULL DEFAULT 0, declined TEXT NOT NULL DEFAULT '[]',
+                added_by TEXT DEFAULT '', updated REAL);
+            CREATE TABLE IF NOT EXISTS files (
+                project_id INTEGER NOT NULL, path TEXT NOT NULL, content TEXT NOT NULL,
+                author TEXT, task_seq INTEGER, updated REAL, PRIMARY KEY (project_id, path));
         """)
         cols = {r["name"] for r in self.db.execute("PRAGMA table_info(agents)")}
         if "ready" not in cols:                       # owner has filled in the profile
             self.db.execute("ALTER TABLE agents ADD COLUMN ready INTEGER DEFAULT 0")
+        if "owner_id" not in cols:                    # an owner may run several AIs
+            self.db.execute("ALTER TABLE agents ADD COLUMN owner_id INTEGER")
+        if "skills" not in cols:                      # what each AI is good at
+            self.db.execute("ALTER TABLE agents ADD COLUMN skills TEXT NOT NULL DEFAULT ''")
+        if "projects_only" not in cols:               # skips the free chat (e.g. a GPU-heavy coder)
+            self.db.execute("ALTER TABLE agents ADD COLUMN projects_only INTEGER NOT NULL DEFAULT 0")
+        self.db.execute("""UPDATE agents SET owner_id=(SELECT id FROM accounts WHERE accounts.agent_id=agents.id)
+                           WHERE owner_id IS NULL""")
+        pcols = {r["name"] for r in self.db.execute("PRAGMA table_info(projects)")}
+        if "mode" not in pcols:                       # older projects were chat-only
+            self.db.execute("ALTER TABLE projects ADD COLUMN mode TEXT NOT NULL DEFAULT 'chat'")
         if "persona" in cols:
             # The hub never keeps an AI's persona or memory: those live at home
             # with the AI. Wipe anything an older version stored.
@@ -155,15 +221,27 @@ class Store:
     def set(self, k, v):
         self.q("INSERT INTO settings(k,v) VALUES(?,?) ON CONFLICT(k) DO UPDATE SET v=excluded.v", (k, str(v)))
 
+    AGENT_COLS = """a.id, a.name, a.about, a.color, a.ready, a.skills, a.owner_id, a.projects_only,
+                    acc.username AS owner
+                    FROM agents a LEFT JOIN accounts acc ON acc.id=a.owner_id"""
+
+    @staticmethod
+    def _agent(r):
+        return dict(r, ready=bool(r["ready"]), projects_only=bool(r["projects_only"]),
+                    skills=[x for x in (r["skills"] or "").split(",") if x])
+
     def agents(self):
         """Public profiles only. An AI is 'ready' (gets turns) once its owner
         has signed in and filled in its profile."""
-        return [dict(r, ready=bool(r["ready"])) for r in
-                self.q("SELECT id,name,about,color,ready FROM agents ORDER BY id")]
+        return [self._agent(r) for r in self.q(f"SELECT {self.AGENT_COLS} ORDER BY a.id")]
 
     def agent(self, agent_id):
-        r = self.q("SELECT id,name,about,color,ready FROM agents WHERE id=?", (agent_id,)).fetchone()
-        return dict(r, ready=bool(r["ready"])) if r else None
+        r = self.q(f"SELECT {self.AGENT_COLS} WHERE a.id=?", (agent_id,)).fetchone()
+        return self._agent(r) if r else None
+
+    def owned_agents(self, account_id):
+        return [self._agent(r) for r in self.q(f"SELECT {self.AGENT_COLS} WHERE a.owner_id=? ORDER BY a.id",
+                                                (account_id,))]
 
     def agent_by_name(self, name):
         r = self.q("SELECT id,name FROM agents WHERE name=?", (name,)).fetchone()
@@ -199,13 +277,68 @@ class Store:
     # ---- projects
     def project(self, pid, with_doc=True):
         cols = "*" if with_doc else ("id,title,brief,status,created_by,created,started,finished,"
-                                     "turns,done_votes,outcome,length(doc) AS doc_chars")
+                                     "turns,done_votes,outcome,mode,length(doc) AS doc_chars")
         r = self.q(f"SELECT {cols} FROM projects WHERE id=?", (pid,)).fetchone()
         if not r:
             return None
         p = dict(r)
         p["done_votes"] = json.loads(p["done_votes"])
+        if p["mode"] == "tasks":
+            p["tasks"] = [{k: t[k] for k in ("id", "seq", "title", "detail", "skill", "after", "status",
+                                               "assignee_name", "reviewer_name", "note", "review", "rounds")}
+                          for t in self.tasks(pid)]
+            p["files"] = self.files(pid)
         return p
+
+    # ---- project tasks and files
+    def tasks(self, pid):
+        rows = self.q("""SELECT t.*, a.name AS assignee_name, r.name AS reviewer_name FROM tasks t
+                         LEFT JOIN agents a ON a.id=t.assignee LEFT JOIN agents r ON r.id=t.reviewer
+                         WHERE t.project_id=? ORDER BY t.seq""", (pid,)).fetchall()
+        return [dict(r, declined=json.loads(r["declined"])) for r in rows]
+
+    def task(self, tid):
+        r = self.q("SELECT * FROM tasks WHERE id=?", (tid,)).fetchone()
+        return dict(r, declined=json.loads(r["declined"])) if r else None
+
+    def add_task(self, pid, title, detail, skill, after=0, added_by=""):
+        seq = self.q("SELECT COALESCE(MAX(seq),0)+1 n FROM tasks WHERE project_id=?", (pid,)).fetchone()["n"]
+        self.q("""INSERT INTO tasks(project_id,seq,title,detail,skill,after,added_by,updated)
+                  VALUES(?,?,?,?,?,?,?,?)""", (pid, seq, title[:160], detail[:2000],
+                                               skill if skill in SKILLS else "", int(after or 0), added_by, time.time()))
+        return seq
+
+    def set_task(self, tid, **kw):
+        if "declined" in kw:
+            kw["declined"] = json.dumps(kw["declined"])
+        kw["updated"] = time.time()
+        self.q(f"UPDATE tasks SET {', '.join(k + '=?' for k in kw)} WHERE id=?", (*kw.values(), tid))
+
+    def files(self, pid):
+        return [dict(r) for r in self.q("""SELECT path, length(content) AS size, author, task_seq, updated
+                                            FROM files WHERE project_id=? ORDER BY path""", (pid,))]
+
+    def file(self, pid, path):
+        r = self.q("SELECT content FROM files WHERE project_id=? AND path=?", (pid, path)).fetchone()
+        return r["content"] if r else None
+
+    def file_contents(self, pid):
+        return [dict(r) for r in self.q("""SELECT path, content, author, task_seq, updated FROM files
+                                            WHERE project_id=? ORDER BY updated DESC""", (pid,))]
+
+    def save_file(self, pid, path, content, author, seq):
+        self.q("""INSERT INTO files VALUES(?,?,?,?,?,?) ON CONFLICT(project_id,path) DO UPDATE SET
+                  content=excluded.content, author=excluded.author, task_seq=excluded.task_seq,
+                  updated=excluded.updated""", (pid, path, content, author, seq, time.time()))
+
+    def rebuild_doc(self, pid):
+        parts = []
+        for t in self.tasks(pid):
+            part = t["doc_part"].strip()
+            if part:
+                parts.append(part if part.startswith("#") else f"## {t['title']}\n\n{part}")
+        doc = "\n\n".join(parts)[: int(self.num("doc_max_chars"))]
+        self.q("UPDATE projects SET doc=? WHERE id=?", (doc, pid))
 
     def active_project(self):
         r = self.q("SELECT id FROM projects WHERE status='active' ORDER BY started LIMIT 1").fetchone()
@@ -220,7 +353,7 @@ class Store:
         return [self.project(r["id"], with_doc=False) for r in rows]
 
     def add_project(self, title, brief, who):
-        return self.q("INSERT INTO projects(title,brief,created_by,created) VALUES(?,?,?,?)",
+        return self.q("INSERT INTO projects(title,brief,created_by,created,mode) VALUES(?,?,?,?,'tasks')",
                       (title, brief, who, time.time())).lastrowid
 
     def start_next_project(self):
@@ -263,6 +396,11 @@ class Room:
         self.next_turn_at = time.time() + 5
         self.passes = set()          # agents who passed since the last real message
         self.last_spoke = {}         # agent id -> time of their last message
+        self.jobs = {}               # agent id -> task-project turn that agent is working on
+        self.job_lock = threading.Lock()
+        self.last_worked = {}        # agent id -> when it last got a task
+        self.plan_tries = {}         # project id -> failed plans
+        self.review_declined = {}    # task id -> agents who passed on reviewing it
 
     # ---- live updates
     def broadcast(self, event, data):
@@ -281,9 +419,13 @@ class Room:
         on = self.online_ids()
         speaking = self.turn["agent_name"] if self.turn and not self.reply.is_set() else None
         agents = self.s.agents()
+        with self.job_lock:
+            working = {self.s.agent(aid)["name"]: {"kind": j["kind"], "task": (j["turn"]["task"] or {}).get("seq")}
+                       for aid, j in self.jobs.items() if self.s.agent(aid)}
         return {"topic": self.s.get("topic"), "paused": self.s.get("paused") == "1",
-                "agents": agents, "online": [a["name"] for a in agents if a["id"] in on],
-                "speaking": speaking, "today": self.s.agent_messages_today(),
+                "agents": [{k: v for k, v in a.items() if k != "owner_id"} for a in agents],
+                "online": [a["name"] for a in agents if a["id"] in on],
+                "speaking": speaking, "working": working, "today": self.s.agent_messages_today(),
                 "daily_limit": int(self.s.num("daily_limit"))}
 
     def post(self, kind, author, text):
@@ -309,6 +451,16 @@ class Room:
         return turn
 
     def answer(self, agent, turn_id, text, passed):
+        with self.job_lock:
+            job = self.jobs.get(agent["id"])
+            if job and job["turn"]["id"] == turn_id:
+                del self.jobs[agent["id"]]
+            else:
+                job = None
+        if job:
+            self.finish_job(job, agent, text, passed)
+            self.broadcast("state", self.state())
+            return True
         t = self.turn
         if not t or t["id"] != turn_id or t["agent_id"] != agent["id"] or self.reply.is_set():
             return False
@@ -316,6 +468,7 @@ class Room:
             self.passes.add(agent["id"])
         else:
             p = self.s.active_project()
+            p = p if p and p.get("mode") == "chat" else None
             self.post("agent", agent["name"], self.project_reply(p, agent, text) if p else text)
             self.last_spoke[agent["id"]] = time.time()
             if p:
@@ -344,6 +497,7 @@ class Room:
         if not p or p["status"] not in ("active", "queued"):
             return
         self.s.finish_project(pid, status, outcome)
+        self.drop_jobs(pid)
         if p["status"] == "active":
             word = "finished" if status == "done" else "stopped"
             self.post("system", "room", f"Project {word}: {p['title']} ({outcome})")
@@ -393,6 +547,305 @@ class Room:
                                     trimmed=", showing the end" if len(doc) > keep else "",
                                     doc=shown or "(empty so far)")
 
+    # ---- task projects: plan, hand out tasks, review
+    def job_of(self, agent_id):
+        with self.job_lock:
+            return self.jobs.get(agent_id)
+
+    def drain(self, agent_id):
+        q = self.inbox.get(agent_id)
+        try:
+            while q:
+                q.get_nowait()
+        except queue.Empty:
+            pass
+
+    def drop_jobs(self, pid):
+        with self.job_lock:
+            for aid, job in list(self.jobs.items()):
+                if job["project_id"] == pid:
+                    del self.jobs[aid]
+                    self.drain(aid)
+
+    def pick(self, cands, skill, also=None, avoid_owner=None):
+        """The best AI for a skill: has it, then (for reviews) from another home, then least recently busy."""
+        def score(a):
+            sk = a["skills"]
+            pts = (10 if skill and skill in sk else 0) + (4 if also and also in sk else 0) + (0 if sk else 1)
+            if avoid_owner is not None and a["owner_id"] != avoid_owner:
+                pts += 6
+            return (pts, -self.last_worked.get(a["id"], 0))
+        return max(cands, key=score) if cands else None
+
+    def roster(self, agents):
+        return "\n".join(f"- {a['name']}" + (f" ({a['about']})" if a["about"] else "") +
+                         f": {', '.join(a['skills']) or 'no particular skills listed'}" for a in agents)
+
+    def overview(self, tasks):
+        lines = []
+        for t in tasks:
+            who = t["assignee_name"] or "nobody yet"
+            lines.append(f"{t['seq']}. [{t['status']}] {t['title']} ({t['skill'] or 'any'}; {who})")
+        return "\n".join(lines)
+
+    def files_context(self, pid, budget, first_seq=None):
+        """File contents for an AI to read: this task's files first, then the newest."""
+        fs = self.s.file_contents(pid)
+        fs.sort(key=lambda f: (f["task_seq"] != first_seq, -f["updated"]))
+        out, used, listed = [], 0, []
+        for f in fs:
+            block = f"[file path={f['path']}]\n{f['content']}\n[/file]"
+            if used + len(block) <= budget:
+                out.append(block)
+                used += len(block)
+            else:
+                listed.append(f"{f['path']} ({len(f['content']):,} characters, not shown)")
+        if listed:
+            out.append("Other files: " + ", ".join(listed))
+        return "\n\n".join(out) or "(no files yet)"
+
+    def doc_tail(self, p):
+        doc, keep = p["doc"], int(self.s.num("doc_context_chars"))
+        return (doc if len(doc) <= keep else "…" + doc[-keep:]) or "(empty so far)"
+
+    def dispatch(self, a, kind, p, t, everyone):
+        name = a["name"]
+        tasks = self.s.tasks(p["id"])
+        head = f"Project: {p['title']}\nBrief from the people who set it:\n{p['brief']}"
+        if kind == "plan":
+            guide = PLAN_GUIDE.format(name=name, max_tasks=int(self.s.num("max_tasks")), skills=", ".join(SKILLS))
+            body = f"{head}\n\nThe AIs who can take tasks:\n{self.roster([x for x in everyone if x['ready']])}"
+            note = f"{name} is planning the project"
+        elif kind == "work":
+            guide = WORK_GUIDE.format(name=name)
+            redo = (f"\n\nThe reviewer asked for changes to your last version:\n{t['review']}" if t["review"] else "")
+            body = (f"{head}\n\nAll tasks:\n{self.overview(tasks)}\n\n"
+                    f"YOUR TASK (#{t['seq']}, {t['skill'] or 'any skill'}): {t['title']}\n{t['detail']}{redo}\n\n"
+                    f"Project files so far:\n{self.files_context(p['id'], int(self.s.num('task_context_chars')), t['seq'])}\n\n"
+                    f"Shared document so far:\n{self.doc_tail(p)}")
+            note = f"{name} is working on task {t['seq']}: {t['title']}"
+        else:
+            guide = REVIEW_GUIDE.format(name=name)
+            mine = [f for f in self.s.file_contents(p["id"]) if f["task_seq"] == t["seq"]]
+            budget, shown = int(self.s.num("task_context_chars")), []
+            for f in mine:
+                block = f"[file path={f['path']}]\n{f['content']}\n[/file]"
+                if sum(map(len, shown)) + len(block) <= budget:
+                    shown.append(block)
+                else:
+                    shown.append(f"({f['path']}: {len(f['content']):,} characters, too long to show)")
+            body = (f"{head}\n\nAll tasks:\n{self.overview(tasks)}\n\n"
+                    f"TASK TO REVIEW (#{t['seq']}, {t['skill'] or 'any skill'}): {t['title']}\n{t['detail']}\n\n"
+                    f"Done by {t['assignee_name'] or 'another AI'}. Their note: {t['note'] or '(none)'}\n\n"
+                    f"Files they handed in:\n{chr(10).join(shown) or '(none)'}\n\n"
+                    f"Their writing for the document:\n{t['doc_part'] or '(none)'}")
+            note = f"{name} is reviewing task {t['seq']}: {t['title']}"
+        turn = {
+            "id": secrets.token_hex(8), "kind": kind, "agent_id": a["id"], "agent_name": name, "you": name,
+            "topic": p["title"], "project": {"id": p["id"], "title": p["title"]},
+            "task": {"seq": t["seq"], "title": t["title"], "skill": t["skill"]} if t else None,
+            "guidelines": guide,
+            "participants": [{"name": x["name"], "about": x["about"], "online": True} for x in everyone],
+            "messages": [{"kind": "system", "author": "room", "text": body}],
+            "max_tokens": 6000 if kind == "work" else 2000,
+        }
+        with self.job_lock:
+            self.jobs[a["id"]] = {"turn": turn, "kind": kind, "task_id": t["id"] if t else None,
+                                  "project_id": p["id"], "deadline": time.time() + self.s.num("task_timeout")}
+        if t:
+            self.s.set_task(t["id"], **({"status": "working", "assignee": a["id"]} if kind == "work"
+                                        else {"status": "reviewing", "reviewer": a["id"]}))
+        self.s.q("UPDATE projects SET turns=turns+1 WHERE id=?", (p["id"],))
+        self.last_worked[a["id"]] = time.time()
+        self.inbox.setdefault(a["id"], queue.Queue()).put(turn)
+        self.post("system", "room", note)
+        self.project_event()
+
+    def work_tick(self, p):
+        now = time.time()
+        with self.job_lock:
+            late = [(aid, j) for aid, j in self.jobs.items() if now > j["deadline"]]
+            for aid, _ in late:
+                del self.jobs[aid]
+        for aid, job in late:
+            self.drain(aid)
+            ag = self.s.agent(aid) or {"name": "an AI"}
+            self.job_failed(job, ag, f"{ag['name']} ran out of time")
+        if self.s.get("paused") == "1" or self.s.agent_messages_today() >= self.s.num("daily_limit"):
+            return
+        if p["turns"] >= self.s.num("project_max_turns"):
+            return self.end_project(p["id"], "done", f"stopped at the {p['turns']}-step limit")
+        on = self.online_ids()
+        everyone = self.s.agents()
+        ready = [a for a in everyone if a["id"] in on and a["ready"]]
+        with self.job_lock:
+            busy = set(self.jobs)
+            planning = any(j["kind"] == "plan" and j["project_id"] == p["id"] for j in self.jobs.values())
+        if self.turn and not self.reply.is_set():
+            busy.add(self.turn["agent_id"])
+        # One job per home at a time: an owner's AIs usually share one GPU.
+        busy_owners = {a["owner_id"] for a in everyone if a["id"] in busy and a["owner_id"] is not None}
+        idle = [a for a in ready if a["id"] not in busy and a["owner_id"] not in busy_owners]
+        take = idle.remove
+        def claim(a):                                # also blocks that owner's other AIs this tick
+            take(a)
+            if a["owner_id"] is not None:
+                idle[:] = [x for x in idle if x["owner_id"] != a["owner_id"]]
+        tasks = self.s.tasks(p["id"])
+
+        if not tasks:                                # 1. someone plans it
+            if planning:
+                return
+            if self.plan_tries.get(p["id"], 0) >= 2:
+                self.s.add_task(p["id"], p["title"], "Do the whole brief in one go.", "writing")
+                self.post("system", "room", "No usable plan came back, so the whole brief is one task.")
+                return self.project_event()
+            a = self.pick(idle, "planning")
+            if a and len(ready) >= min(2, self.s.num("min_agents")):
+                self.dispatch(a, "plan", p, None, everyone)
+            return
+        if all(t["status"] in ("done", "skipped") for t in tasks):
+            n = sum(t["status"] == "done" for t in tasks)
+            return self.end_project(p["id"], "done", f"{n} task{'s' * (n != 1)} done, "
+                                                     f"{len(self.s.files(p['id']))} files")
+        finished = {t["seq"] for t in tasks if t["status"] in ("done", "skipped")}
+        for t in tasks:                              # 2. hand out tasks that are ready
+            if t["status"] != "todo" or (t["after"] and t["after"] not in finished):
+                continue
+            cands = [a for a in idle if a["id"] not in t["declined"]]
+            if t["review"] and any(a["id"] == t["assignee"] for a in cands):
+                a = next(a for a in cands if a["id"] == t["assignee"])   # fixes go back to whoever wrote it
+            else:
+                skilled_somewhere = any(t["skill"] in a["skills"] for a in ready if a["id"] not in t["declined"])
+                if t["skill"] and skilled_somewhere and not any(t["skill"] in a["skills"] for a in cands):
+                    continue                         # wait for the AI that's good at this
+                a = self.pick(cands, t["skill"])
+            if a:
+                self.dispatch(a, "work", p, t, everyone)
+                claim(a)
+        for t in tasks:                              # 3. reviews, ideally by an AI from another home
+            if t["status"] != "review":
+                continue
+            others = [a for a in ready if a["id"] != t["assignee"]]
+            if not others:
+                self.s.set_task(t["id"], status="done", review="(accepted: no other AI online to review it)")
+                self.project_event()
+                continue
+            cands = [a for a in idle if a["id"] != t["assignee"]
+                     and a["id"] not in self.review_declined.get(t["id"], set())] or \
+                    [a for a in idle if a["id"] != t["assignee"]]
+            owner = (self.s.agent(t["assignee"]) or {}).get("owner_id") if t["assignee"] else None
+            a = self.pick(cands, "review", also=t["skill"], avoid_owner=owner)
+            if a:
+                self.dispatch(a, "review", p, t, everyone)
+                claim(a)
+
+    def job_failed(self, job, agent, why):
+        t = self.s.task(job["task_id"]) if job["task_id"] else None
+        if job["kind"] == "plan":
+            self.plan_tries[job["project_id"]] = self.plan_tries.get(job["project_id"], 0) + 1
+        elif job["kind"] == "work" and t:
+            self.s.set_task(t["id"], status="todo", declined=t["declined"] + [agent.get("id")])
+        elif t:
+            self.review_declined.setdefault(t["id"], set()).add(agent.get("id"))
+            self.s.set_task(t["id"], status="review", reviewer=None)
+        what = {"plan": "the plan", "work": f"task {t['seq'] if t else '?'}",
+                "review": f"the review of task {t['seq'] if t else '?'}"}[job["kind"]]
+        self.post("system", "room", f"{why} on {what}; someone else will pick it up.")
+        self.project_event()
+
+    def clean_path(self, path):
+        path = posixpath.normpath(path.strip().strip("/").replace("\\", "/"))
+        if not PATH_RE.match(path) or path.startswith("..") or "/../" in f"/{path}/" or path in (".", ""):
+            return None
+        return path
+
+    def finish_job(self, job, agent, text, passed):
+        p = self.s.project(job["project_id"])
+        if not p or p["status"] != "active":
+            return
+        text = (text or "").strip()
+        if passed or not text or text.upper().rstrip(".") == "PASS":
+            return self.job_failed(job, agent, f"{agent['name']} passed")
+        t = self.s.task(job["task_id"]) if job["task_id"] else None
+        self.last_spoke[agent["id"]] = time.time()
+
+        if job["kind"] == "plan":
+            found = []
+            for attrs, body in TASK_RE.findall(text):
+                body = body.strip()
+                if not body:
+                    continue
+                title, _, detail = body.partition("::")
+                if not detail:
+                    title, _, detail = body.partition("\n")
+                skill = (re.search(r"skill\s*=\s*[\"']?(\w+)", attrs, re.I) or [None, ""])[1].lower()
+                after = (re.search(r"after\s*=\s*[\"']?(\d+)", attrs, re.I) or [None, "0"])[1]
+                found.append((title.strip(" -*#:"), detail.strip(), skill, int(after)))
+            found = found[: int(self.s.num("max_tasks"))]
+            if not found:
+                self.plan_tries[p["id"]] = self.plan_tries.get(p["id"], 0) + 1
+                self.post("agent", agent["name"], text[:600] + "\n[no tasks found in the plan; asking again]")
+                return self.project_event()
+            for i, (title, detail, skill, after) in enumerate(found, 1):
+                self.s.add_task(p["id"], title or f"Task {i}", detail, skill,
+                                after if 0 < after < i else 0, added_by=agent["name"])
+            chat = TASK_RE.sub("", text).strip()
+            self.post("agent", agent["name"], (chat[:500] + "\n" if chat else "") +
+                      f"[planned {len(found)} tasks: " + "; ".join(f[0] for f in found)[:600] + "]")
+            return self.project_event()
+
+        if job["kind"] == "work":
+            fmax, total_max = int(self.s.num("file_max_chars")), int(self.s.num("files_max_total"))
+            used = sum(f["size"] for f in self.s.files(p["id"]))
+            wrote, skipped = [], []
+            for path, content in FILE_RE.findall(text):
+                path = self.clean_path(path)
+                m = FENCE_RE.match(content)
+                content = (m.group(1) if m else content).rstrip() + "\n"
+                if not path:
+                    skipped.append("a file with a bad name")
+                elif len(content) > fmax or used + len(content) > total_max:
+                    skipped.append(f"{path} (too big)")
+                else:
+                    self.s.save_file(p["id"], path, content, agent["name"], t["seq"])
+                    used += len(content)
+                    wrote.append(path)
+            rest = FILE_RE.sub("", text)
+            doc = "\n\n".join(b.strip() for b in DOC_RE.findall(rest) if b.strip())
+            chat = DOC_RE.sub("", rest).strip()
+            if not wrote and not doc:                # plain answer: it goes into the document
+                doc, chat = chat, ""
+            self.s.set_task(t["id"], status="review", note=chat[:600], doc_part=doc or t["doc_part"],
+                            reviewer=None)
+            self.s.rebuild_doc(p["id"])
+            bits = [f"[task {t['seq']}] " + (chat[:500] if chat else "handed in")]
+            if wrote:
+                bits.append("[wrote " + ", ".join(wrote) + "]")
+            if doc:
+                bits.append(f"[{len(doc):,} characters for the document]")
+            if skipped:
+                bits.append("[not saved: " + ", ".join(skipped) + "]")
+            self.post("agent", agent["name"], "\n".join(bits))
+            return self.project_event()
+
+        # review
+        approve, changes = APPROVE_RE.search(text), CHANGES_RE.search(text)
+        notes = CHANGES_RE.sub("", APPROVE_RE.sub("", text)).strip()
+        if changes and not (approve and approve.start() < changes.start()):
+            rounds = t["rounds"] + 1
+            if rounds >= self.s.num("task_rounds"):
+                self.s.set_task(t["id"], status="done", rounds=rounds, review=notes[:2000])
+                verdict = f"asked for changes again; accepted after {rounds} rounds"
+            else:
+                self.s.set_task(t["id"], status="todo", rounds=rounds, review=notes[:2000])
+                verdict = "asked for changes"
+        else:
+            self.s.set_task(t["id"], status="done", review=notes[:2000])
+            verdict = "approved"
+        self.post("agent", agent["name"], f"[review of task {t['seq']}: {verdict}] {notes[:600]}".strip())
+        self.project_event()
+
     # ---- scheduler
     def choose(self, online, recent):
         last = next((m for m in reversed(recent) if m["kind"] == "agent"), None)
@@ -416,6 +869,9 @@ class Room:
 
     def tick(self):
         self.ensure_project()
+        project = self.s.active_project()
+        if project and project.get("mode") == "tasks":   # the chat waits while they work
+            return self.work_tick(project)
         now = time.time()
         if self.s.get("paused") == "1" or now < self.next_turn_at:
             return
@@ -424,7 +880,7 @@ class Room:
             return
         on = self.online_ids()
         everyone = self.s.agents()
-        online = [a for a in everyone if a["id"] in on and a["ready"]]   # set up + connected
+        online = [a for a in everyone if a["id"] in on and a["ready"] and not a["projects_only"]]
         if len(online) < self.s.num("min_agents"):
             return
         project = self.s.active_project()
@@ -437,7 +893,7 @@ class Room:
         a = self.choose(online, recent)
         guide = GUIDELINES.format(name=a["name"]) + (self.project_guidelines(project) if project else "")
         turn = {
-            "id": secrets.token_hex(8), "agent_id": a["id"], "agent_name": a["name"],
+            "id": secrets.token_hex(8), "kind": "chat", "agent_id": a["id"], "agent_name": a["name"],
             "you": a["name"], "topic": project["title"] if project else self.s.get("topic"),
             "project": {"title": project["title"]} if project else None,
             "guidelines": guide,
@@ -551,7 +1007,8 @@ class Handler(BaseHTTPRequestHandler):
 
     def body(self):
         n = int(self.headers.get("Content-Length") or 0)
-        if n > MAX_BODY:
+        limit = 1024 * 1024 if urlparse(self.path).path == "/api/agent/reply" else MAX_BODY
+        if n > limit:
             raise ValueError("too big")
         return json.loads(self.rfile.read(n) or b"{}")
 
@@ -626,7 +1083,8 @@ class Handler(BaseHTTPRequestHandler):
             me = None
             if role == "owner":
                 ag = self.room.s.agent(x["agent_id"])
-                me = {"username": x["username"], "agent": ag}
+                me = {"username": x["username"], "agent": ag, "agents": self.room.s.owned_agents(x["id"]),
+                      "skills": SKILLS, "max_agents": MAX_AGENTS_PER_OWNER}
             return self.send(200, dict(self.room.state(), admin=role in ("owner", "admin"), me=me))
         if p == "/api/messages":
             return self.send(200, self.room.s.recent(200))
@@ -634,6 +1092,9 @@ class Handler(BaseHTTPRequestHandler):
             return self.stream()
         if p == "/api/projects":
             return self.send(200, self.room.s.projects_summary())
+        m = re.fullmatch(r"/api/projects/(\d+)/(files/(.+)|zip)", p)
+        if m:
+            return self.project_files(int(m.group(1)), m.group(3))
         m = re.fullmatch(r"/api/projects/(\d+)(/doc)?", p)
         if m:
             pr = self.room.s.project(int(m.group(1)))
@@ -706,6 +1167,37 @@ class Handler(BaseHTTPRequestHandler):
             return self.projects_post(p, b, x["username"] if role == "owner" else "host")
         self.send(404, {"error": "not found"})
 
+    def send_download(self, body, ctype, filename, inline=False):
+        self.send_response(200)
+        self.send_header("Content-Type", ctype)
+        self.send_header("Content-Disposition", f'{"inline" if inline else "attachment"}; filename="{filename}"')
+        self.send_header("Content-Length", str(len(body)))
+        self.send_header("X-Content-Type-Options", "nosniff")
+        self.send_header("Content-Security-Policy", "default-src 'none'; sandbox")
+        self.send_header("Cache-Control", "no-store")
+        self.end_headers()
+        self.wfile.write(body)
+
+    def project_files(self, pid, path):
+        s = self.room.s
+        pr = s.project(pid)
+        if not pr:
+            return self.send(404, {"error": "no such project"})
+        slug = re.sub(r"[^a-z0-9]+", "-", pr["title"].lower()).strip("-")[:60] or "project"
+        if path is not None:                        # one file, as plain text
+            from urllib.parse import unquote
+            content = s.file(pid, unquote(path))
+            if content is None:
+                return self.send(404, {"error": "no such file"})
+            name = re.sub(r"[^A-Za-z0-9_.-]+", "_", posixpath.basename(unquote(path))) or "file.txt"
+            return self.send_download(content.encode(), "text/plain; charset=utf-8", name, inline=True)
+        buf = io.BytesIO()
+        with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
+            z.writestr(f"{slug}/PROJECT.md", f"# {pr['title']}\n\n> {pr['brief']}\n\n{pr['doc']}\n")
+            for f in s.file_contents(pid):
+                z.writestr(f"{slug}/{f['path']}", f["content"])
+        return self.send_download(buf.getvalue(), "application/zip", f"{slug}.zip")
+
     def projects_post(self, p, b, who):
         room, s = self.room, self.room.s
         if p == "/api/projects":
@@ -720,6 +1212,31 @@ class Handler(BaseHTTPRequestHandler):
             room.project_event()
             room.ensure_project()
             return self.send(200, {"ok": True, "id": pid, "ahead": ahead})
+        m = re.fullmatch(r"/api/projects/(\d+)/tasks(?:/(\d+)/(skip))?", p)
+        if m:
+            pr = s.project(int(m.group(1)), with_doc=False)
+            if not pr or pr["status"] not in ("active", "queued") or pr["mode"] != "tasks":
+                return self.send(409, {"error": "that project isn't running or queued"})
+            if m.group(2):
+                t = s.task(int(m.group(2)))
+                if not t or t["project_id"] != pr["id"] or t["status"] in ("done", "skipped"):
+                    return self.send(409, {"error": "that task is already finished"})
+                with room.job_lock:
+                    for aid, job in list(room.jobs.items()):
+                        if job["task_id"] == t["id"]:
+                            del room.jobs[aid]
+                            room.drain(aid)
+                s.set_task(t["id"], status="skipped")
+                room.post("system", "room", f"{who} skipped task {t['seq']}: {t['title']}")
+            else:
+                title = str(b.get("title", "")).strip()
+                if not title:
+                    return self.send(400, {"error": "give the task a title"})
+                skill = str(b.get("skill", "")).strip().lower()
+                seq = s.add_task(pr["id"], title, str(b.get("detail", "")).strip(), skill, added_by=who)
+                room.post("system", "room", f"{who} added task {seq}: {title[:120]}")
+            room.project_event()
+            return self.send(200, {"ok": True})
         m = re.fullmatch(r"/api/projects/(\d+)/(cancel|done)", p)
         if not m:
             return self.send(404, {"error": "not found"})
@@ -758,6 +1275,7 @@ class Handler(BaseHTTPRequestHandler):
         else:
             acct = s.q("INSERT INTO accounts(username,pw_hash,agent_id,created) VALUES(?,?,?,?)",
                        (user, hash_pw(pw), aid, time.time())).lastrowid
+        s.q("UPDATE agents SET owner_id=? WHERE id=?", (acct, aid))
         return self.send(200, {"ok": True}, cookie=self.session_cookie(s.new_session(acct), SESSION_DAYS * 86400))
 
     def admin(self, b):
@@ -780,8 +1298,42 @@ class Handler(BaseHTTPRequestHandler):
         self.room.broadcast("state", self.room.state())
         return self.send(200, {"ok": True})
 
+    def skills_from(self, b):
+        raw = b.get("skills")
+        if raw is None:
+            return None
+        items = raw if isinstance(raw, list) else str(raw).split(",")
+        return ",".join(x for x in SKILLS if x in {str(i).strip().lower() for i in items})
+
     def me(self, p, b, acct):
         s, aid = self.room.s, acct["agent_id"]
+        if b.get("agent_id") is not None and p in ("/api/me/agent", "/api/me/token"):
+            want = int(b.get("agent_id") or 0)
+            if want not in {a["id"] for a in s.owned_agents(acct["id"])}:
+                return self.send(403, {"error": "that isn't one of your AIs"})
+            aid = want
+        if p == "/api/me/agents":                   # add another AI of yours
+            name = str(b.get("name", "")).strip()
+            about = str(b.get("about", "")).strip()[:200]
+            color = str(b.get("color", "")).strip() or COLORS[len(s.agents()) % len(COLORS)]
+            if not NAME_RE.match(name):
+                return self.send(400, {"error": "name: 1-32 letters, numbers, space, _ . -"})
+            if not about:
+                return self.send(400, {"error": "fill in a one-line bio"})
+            if not COLOR_RE.match(color):
+                return self.send(400, {"error": "colour must look like #3d9a8b"})
+            if len(s.owned_agents(acct["id"])) >= MAX_AGENTS_PER_OWNER:
+                return self.send(400, {"error": f"you can have up to {MAX_AGENTS_PER_OWNER} AIs"})
+            if name.lower() in {a["name"].lower() for a in s.agents()} or \
+                    s.q("SELECT 1 FROM accounts WHERE username=?", (name,)).fetchone():
+                return self.send(400, {"error": "that name is taken"})
+            new = s.q("""INSERT INTO agents(name,token_hash,about,color,created,ready,owner_id,skills,projects_only)
+                         VALUES(?,?,?,?,?,1,?,?,?)""", (name, h(secrets.token_hex(16)), about, color, time.time(),
+                                                        acct["id"], self.skills_from(b) or "",
+                                                        int(bool(b.get("projects_only"))))).lastrowid
+            self.room.post("system", "room", f"{acct['username']} added a new AI: {name}")
+            self.room.broadcast("state", self.room.state())
+            return self.send(200, {"ok": True, "agent": s.agent(new)})
         if p == "/api/me/handoff":       # the desktop app opens the room page already signed in
             code = secrets.token_urlsafe(24)
             with self.handoff_lock:
@@ -794,8 +1346,10 @@ class Handler(BaseHTTPRequestHandler):
                 return self.send(400, {"error": "fill in a one-line bio"})
             if color and not COLOR_RE.match(color):
                 return self.send(400, {"error": "colour must look like #3d9a8b"})
-            s.q("UPDATE agents SET about=?, ready=1, color=COALESCE(NULLIF(?,''),color) WHERE id=?",
-                (about, color, aid))
+            sk = self.skills_from(b)
+            po = None if b.get("projects_only") is None else int(bool(b.get("projects_only")))
+            s.q("UPDATE agents SET about=?, ready=1, color=COALESCE(NULLIF(?,''),color), skills=COALESCE(?,skills), "
+                "projects_only=COALESCE(?,projects_only) WHERE id=?", (about, color, sk, po, aid))
             self.room.broadcast("state", self.room.state())
             return self.send(200, {"ok": True, "agent": s.agent(aid)})
         if p == "/api/me/token":
@@ -806,7 +1360,7 @@ class Handler(BaseHTTPRequestHandler):
                    "model": "CHANGE-ME", "model_key": "",
                    "persona": f"You are {ag['name']}. CHANGE-ME: personality, interests, how you talk. "
                               "(This stays on your computer; or set own_persona to true if your AI app supplies it.)",
-                   "own_persona": False, "max_tokens": 1200, "temperature": 0.8}
+                   "own_persona": False, "max_tokens": 1200, "task_max_tokens": 6000, "temperature": 0.8}
             return self.send(200, {"token": tok, "config": cfg, "filename": re.sub(r"[^a-z0-9]+", "-", ag["name"].lower()).strip("-") + "-agent.json"})
         if p == "/api/me/password":
             r = s.q("SELECT pw_hash FROM accounts WHERE id=?", (acct["id"],)).fetchone()
@@ -864,6 +1418,13 @@ def main():
     sub = ap.add_subparsers(dest="cmd", required=True)
     sub.add_parser("init")
     a = sub.add_parser("add-agent"); a.add_argument("name"); a.add_argument("--about", default="")
+    a.add_argument("--owner", help="username of the person who runs it (makes it ready)")
+    a.add_argument("--skills", default="", help="comma list: " + ",".join(SKILLS))
+    a = sub.add_parser("projects-only", help="keep an AI out of the free chat")
+    a.add_argument("name"); a.add_argument("value", choices=["on", "off"])
+    a = sub.add_parser("owner", help="give an AI to an owner's account")
+    a.add_argument("name"); a.add_argument("username")
+    a = sub.add_parser("skills"); a.add_argument("name"); a.add_argument("skills", help="comma list: " + ",".join(SKILLS))
     a = sub.add_parser("invite"); a.add_argument("name"); a.add_argument("--days", type=int, default=7)
     sub.add_parser("list")
     sub.add_parser("accounts")
@@ -893,12 +1454,40 @@ def main():
             sys.exit("name: 1-32 letters, numbers, space, _ . -")
         tok = "ar_" + secrets.token_urlsafe(32)
         n = s.q("SELECT COUNT(*) c FROM agents").fetchone()["c"]
+        owner = None
+        if args.owner:
+            o = s.q("SELECT id FROM accounts WHERE username=?", (args.owner,)).fetchone()
+            if not o:
+                sys.exit("no account with that username")
+            owner = o["id"]
+        skills = ",".join(x for x in SKILLS if x in {i.strip().lower() for i in args.skills.split(",")})
         try:
-            s.q("INSERT INTO agents(name,token_hash,about,color,created) VALUES(?,?,?,?,?)",
-                (args.name, h(tok), args.about[:200], COLORS[n % len(COLORS)], time.time()))
+            s.q("INSERT INTO agents(name,token_hash,about,color,created,owner_id,skills,ready) VALUES(?,?,?,?,?,?,?,?)",
+                (args.name, h(tok), args.about[:200], COLORS[n % len(COLORS)], time.time(), owner, skills,
+                 1 if args.about else 0))
         except sqlite3.IntegrityError:
             sys.exit("an agent with that name already exists")
         print(f"agent '{args.name}' added. Its token (give it ONLY to its owner):\n{tok}")
+    elif args.cmd == "projects-only":
+        ag = s.agent_by_name(args.name)
+        if not ag:
+            sys.exit("no such agent")
+        s.q("UPDATE agents SET projects_only=? WHERE id=?", (1 if args.value == "on" else 0, ag["id"]))
+        print(f"{args.name}: projects only {args.value}")
+    elif args.cmd == "owner":
+        ag = s.agent_by_name(args.name)
+        o = s.q("SELECT id FROM accounts WHERE username=?", (args.username,)).fetchone()
+        if not ag or not o:
+            sys.exit("no such agent or username")
+        s.q("UPDATE agents SET owner_id=? WHERE id=?", (o["id"], ag["id"]))
+        print(f"{args.name} now belongs to {args.username}")
+    elif args.cmd == "skills":
+        ag = s.agent_by_name(args.name)
+        if not ag:
+            sys.exit("no such agent")
+        skills = ",".join(x for x in SKILLS if x in {i.strip().lower() for i in args.skills.split(",")})
+        s.q("UPDATE agents SET skills=? WHERE id=?", (skills, ag["id"]))
+        print(f"{args.name}: {skills or '(none)'}")
     elif args.cmd == "invite":
         ag = s.agent_by_name(args.name)
         if not ag:

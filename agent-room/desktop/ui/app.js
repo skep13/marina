@@ -83,7 +83,19 @@ $("f-join").onsubmit = async e => {
 // ---------------------------------------------------------------- profile
 
 let pickedColor = COLORS[0];
+const SKILLS = ["planning", "coding", "writing", "research", "review", "design", "chat"];
+let pickedSkills = new Set();
 function openProfile(first) {
+  pickedSkills = new Set((me && me.agent.skills) || []);
+  const ch = $("p-skills"); ch.textContent = "";
+  for (const k of (me && me.skills) || SKILLS) {
+    const b = document.createElement("button");
+    b.type = "button"; b.textContent = k; b.className = pickedSkills.has(k) ? "on" : "";
+    b.setAttribute("aria-pressed", pickedSkills.has(k));
+    b.onclick = () => { pickedSkills.has(k) ? pickedSkills.delete(k) : pickedSkills.add(k);
+      b.classList.toggle("on", pickedSkills.has(k)); b.setAttribute("aria-pressed", pickedSkills.has(k)); };
+    ch.appendChild(b);
+  }
   paintName();
   $("p-about").value = (me && me.agent.about) || "";
   pickedColor = (me && me.agent.color) || COLORS[0];
@@ -104,7 +116,7 @@ $("p-cancel").onclick = () => openMain();
 $("f-profile").onsubmit = async e => {
   e.preventDefault(); err($("p-err"));
   try {
-    const ag = await call("save_profile", { about: $("p-about").value, color: pickedColor });
+    const ag = await call("save_profile", { about: $("p-about").value, color: pickedColor, skills: [...pickedSkills] });
     me.agent = ag; openMain();
   } catch (x) { err($("p-err"), String(x)); }
 };
@@ -127,6 +139,7 @@ function fillSettings() {
   for (const r of document.querySelectorAll("input[name=pmode]")) r.checked = r.value === (cfg.own_persona ? "own" : "here");
   $("m-persona").hidden = !!cfg.own_persona;
   $("m-max").value = cfg.max_tokens || 1200;
+  $("m-tmax").value = cfg.task_max_tokens || 6000;
   $("m-temp").value = cfg.temperature ?? 0.8; $("m-temp-v").textContent = Number($("m-temp").value).toFixed(2);
   $("m-think").value = cfg.thinking === true ? "on" : cfg.thinking === false ? "off" : "";
   $("m-key").placeholder = cfg.has_model_key ? "saved (leave blank to keep)" : "none";
@@ -219,6 +232,7 @@ for (const r of document.querySelectorAll("input[name=pmode]")) r.onchange = () 
 let typing;
 $("m-persona").oninput = () => { clearTimeout(typing); typing = setTimeout(persist, 600); };
 $("m-max").onchange = () => persist();
+$("m-tmax").onchange = () => persist();
 $("m-temp").oninput = () => { $("m-temp-v").textContent = Number($("m-temp").value).toFixed(2); };
 $("m-temp").onchange = () => persist();
 $("m-think").onchange = () => persist();
@@ -234,6 +248,7 @@ async function persist(opts = {}) {
     persona: $("m-persona").value,
     own_persona: document.querySelector("input[name=pmode][value=own]").checked,
     max_tokens: parseInt($("m-max").value, 10) || 1200,
+    task_max_tokens: parseInt($("m-tmax").value, 10) || 6000,
     temperature: parseFloat($("m-temp").value),
     thinking: think === "on" ? true : think === "off" ? false : null,
   };
@@ -289,7 +304,7 @@ function renderStatus(s) {
   for (const line of [...s.log].reverse()) {
     const li = document.createElement("li");
     li.textContent = line;
-    if (/  said: /.test(line)) li.className = "said";
+    if (/  (said|handed in|planned|reviewed): /.test(line)) li.className = "said";
     else if (/error|refused|couldn't|too late/i.test(line)) li.className = "bad";
     log.appendChild(li);
   }

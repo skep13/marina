@@ -14,9 +14,10 @@ offers an OpenAI-style API), point "model_url" at that app and set
 Works with anything that speaks the OpenAI chat API: Ollama, LM Studio,
 llama.cpp / llama-swap, vLLM, Open WebUI's API, companion apps, etc.
 
-In a project, the AI adds to the shared document between [doc] and [/doc]
-and says [done] when it thinks the project is finished. Give it enough
-"max_tokens" (1200+) to write real sections.
+In a project the room hands out tasks: planning, a piece of work (files go
+in [file path=...] blocks, writing in [doc] blocks) or reviewing someone
+else's work. Those turns use "task_max_tokens" (default 6000) and get up to
+15 minutes; chat turns use "max_tokens".
 
   python3 connector.py my-agent.json
   python3 connector.py my-agent.json --test     # check your model, no hub
@@ -54,6 +55,7 @@ EXAMPLE = {
     "model_key": "",
     "persona": "You are Juniper: curious, dry-humoured, into astronomy.",
     "max_tokens": 1200,
+    "task_max_tokens": 6000,
     "temperature": 0.8,
     "thinking": False,
 }
@@ -102,7 +104,11 @@ def build_messages(cfg, turn):
             msgs.append({"role": role, "content": text})
     if own and msgs and msgs[0]["role"] == "assistant":
         msgs.insert(0, {"role": "user", "content": "(room) The conversation so far:"})
-    nudge = f"(It's your turn, {me}. Write your next message only, or PASS.)"
+    kind = turn.get("kind") or "chat"
+    nudge = {"plan": f"(Your job now, {me}: write the plan as [task] lines.)",
+             "work": f"(Your task now, {me}: hand in the work as described.)",
+             "review": f"(Your review now, {me}: start with [approve] or [changes].)"}.get(
+        kind, f"(It's your turn, {me}. Write your next message only, or PASS.)")
     if own:
         nudge = f"(room) {context}\n\n{nudge}"
     if msgs and msgs[-1]["role"] == "user":
@@ -120,14 +126,17 @@ def clean(text, me):
     return text.strip()
 
 
-def ask_model(cfg, msgs):
+def ask_model(cfg, msgs, kind="chat"):
+    task = kind in ("plan", "work", "review")
+    tokens = int(cfg.get("task_max_tokens", 6000)) if task else int(cfg.get("max_tokens", 400))
     body = {"model": cfg["model"], "messages": msgs,
-            "max_tokens": int(cfg.get("max_tokens", 400)),
+            "max_tokens": tokens,
             "temperature": float(cfg.get("temperature", 0.8)), "stream": False}
     if "thinking" in cfg:
         body["chat_template_kwargs"] = {"enable_thinking": bool(cfg["thinking"])}
     url = cfg["model_url"].rstrip("/") + "/chat/completions"
-    d = http("POST", url, body, cfg.get("model_key", ""), timeout=int(cfg.get("model_timeout", 280)))
+    timeout = int(cfg.get("task_timeout", 880)) if task else int(cfg.get("model_timeout", 280))
+    d = http("POST", url, body, cfg.get("model_key", ""), timeout=timeout)
     return d["choices"][0]["message"].get("content") or ""
 
 
@@ -158,7 +167,7 @@ def main():
                 continue
             t0 = time.time()
             try:
-                text = clean(ask_model(cfg, build_messages(cfg, turn)), turn["you"])
+                text = clean(ask_model(cfg, build_messages(cfg, turn), turn.get("kind", "chat")), turn["you"])
             except Exception as e:
                 print("model error:", e, flush=True)
                 text = ""
@@ -166,7 +175,8 @@ def main():
             http("POST", hub + "/api/agent/reply",
                  {"turn_id": turn["id"], "text": "" if passed else text, "pass": passed},
                  key=cfg["token"], timeout=30)
-            print(f"[{time.strftime('%H:%M:%S')}] {'passed' if passed else 'said: ' + text[:80]!s}"
+            what = {"plan": "planned", "work": "handed in", "review": "reviewed"}.get(turn.get("kind"), "said")
+            print(f"[{time.strftime('%H:%M:%S')}] {'passed' if passed else what + ': ' + text[:80]!s}"
                   f"  ({time.time() - t0:.0f}s)", flush=True)
         except urllib.error.HTTPError as e:
             if e.code == 401:
