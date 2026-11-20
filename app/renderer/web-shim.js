@@ -18,9 +18,12 @@
     });
     document.documentElement.classList.add('kiosk');
   }
+  // The kiosk is also a screen for the desktop app's "Type to her screen".
+  const stage = q.has('kiosk') || q.has('stage');
 
   window.marina = {
     web: true,
+    stage,
     loadVRM: async () => {
       const res = await fetch('model.vrm');
       if (!res.ok) return { error: 'There is no avatar on the server.' };

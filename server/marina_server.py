@@ -335,6 +335,85 @@ def interrupt(body: InterruptIn):
     return {"ok": True, "id": stream_id, "heard": max(0, body.chunks)}
 
 
+# ---- stage: type on one device, she answers on another ------------------------
+# The desktop app's "Type to her screen" window posts to /stage/say; every
+# screen holding /stage/listen open (lab3's monitor kiosk) plays the reply.
+# Events carry a sequence number so a screen that reconnects between polls
+# picks up where it left off instead of missing the start of a reply.
+_stage = {"seq": 0, "log": [], "screens": 0}
+_stage_cv = threading.Condition()
+
+
+def _stage_publish(event):
+    with _stage_cv:
+        _stage["seq"] += 1
+        _stage["log"].append({**event, "seq": _stage["seq"]})
+        del _stage["log"][:-300]
+        _stage_cv.notify_all()
+
+
+class StageIn(BaseModel):
+    text: str
+    speak: bool = False   # her voice on the screen (costs TTS time on this machine)
+
+
+@app.post("/stage/say")
+def stage_say(body: StageIn):
+    text = body.text.strip()
+    if not text:
+        return StreamingResponse(
+            iter([_ndjson({"type": "error", "message": "Empty message."})]),
+            media_type="application/x-ndjson")
+    print(f"[you, to the screen] {text}", flush=True)
+
+    def relay():
+        with _stage_cv:
+            screens = _stage["screens"]
+        yield _ndjson({"type": "screens", "count": screens})
+        for line in _stream_reply(text, body.speak):
+            event = json.loads(line)
+            if event.get("type") == "start":
+                event["transcript"] = text
+            _stage_publish(event)
+            # The sender only needs the words; the audio is for the screen.
+            event.pop("audio", None)
+            event.pop("visemes", None)
+            yield _ndjson(event)
+
+    return StreamingResponse(relay(), media_type="application/x-ndjson")
+
+
+@app.get("/stage/listen")
+def stage_listen(after: int = -1, timeout: float = 60.0):
+    """Long poll for a screen: streams each relayed reply as it happens."""
+    def stream():
+        with _stage_cv:
+            _stage["screens"] += 1
+            last = _stage["seq"] if after < 0 else after
+        try:
+            yield _ndjson({"type": "ready", "seq": last})
+            end = time.monotonic() + min(max(timeout, 5.0), 300.0)
+            while True:
+                left = end - time.monotonic()
+                with _stage_cv:
+                    _stage_cv.wait_for(lambda: _stage["seq"] > last, timeout=max(0.0, min(15.0, left)))
+                    new = [e for e in _stage["log"] if e["seq"] > last]
+                if new:
+                    for event in new:
+                        last = event["seq"]
+                        yield _ndjson(event)
+                    end = max(end, time.monotonic() + 30)   # stay open while she talks
+                elif time.monotonic() >= end:
+                    return
+                else:
+                    yield _ndjson({"type": "waiting"})       # notices a closed connection
+        finally:
+            with _stage_cv:
+                _stage["screens"] -= 1
+
+    return StreamingResponse(stream(), media_type="application/x-ndjson")
+
+
 class ConfirmIn(BaseModel):
     id: str
     ok: bool

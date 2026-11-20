@@ -216,6 +216,134 @@ ipcMain.on('click-through', (_e, ignore) => {
 // to show her to people. The renderer paints the backdrop.
 let stage = false;
 
+// ---- Type to her screen: write here, she answers on another screen ---------
+// (lab3's monitor kiosk). Talks to that machine's bridge, not this one's, so
+// it's her there, with that bridge's memory. The requests go from here rather
+// than the page so nothing depends on CORS or the page's CSP.
+const SCREEN_CHAT_FILE = () => path.join(app.getPath('userData'), 'screen-chat.json');
+const SCREEN_URL_DEFAULT = 'http://lab3/marina';
+
+function screenUrl() {
+  let url = process.env.MARINA_SCREEN_URL || '';
+  if (!url) {
+    try { url = JSON.parse(fs.readFileSync(SCREEN_CHAT_FILE(), 'utf8')).url || ''; } catch {}
+  }
+  return (url || SCREEN_URL_DEFAULT).trim().replace(/\/+$/, '');
+}
+
+let screenChat = null;
+
+function openScreenChat() {
+  if (screenChat && !screenChat.isDestroyed()) { screenChat.show(); screenChat.focus(); return; }
+  screenChat = new BrowserWindow({
+    width: 380,
+    height: 560,
+    minWidth: 300,
+    minHeight: 360,
+    title: 'Type to her screen',
+    backgroundColor: '#14161c',
+    webPreferences: {
+      preload: path.join(__dirname, 'renderer', 'screen-chat', 'preload.js'),
+      contextIsolation: true,
+      nodeIntegration: false,
+    },
+  });
+  screenChat.loadFile(path.join(__dirname, 'renderer', 'screen-chat', 'index.html'));
+  screenChat.on('closed', () => { screenChat = null; });
+}
+
+ipcMain.handle('screen-chat:url', () => screenUrl());
+ipcMain.handle('screen-chat:set-url', (_e, url) => {
+  try { fs.writeFileSync(SCREEN_CHAT_FILE(), JSON.stringify({ url: String(url || '').trim() })); } catch {}
+  return screenUrl();
+});
+ipcMain.handle('screen-chat:health', async () => {
+  try {
+    const r = await fetch(`${screenUrl()}/health`, { signal: AbortSignal.timeout(4000) });
+    return r.ok ? { ok: true, ...(await r.json()) } : { ok: false, error: `the bridge answered ${r.status}` };
+  } catch (e) {
+    return { ok: false, error: String(e.cause?.code || e.message || e) };
+  }
+});
+ipcMain.handle('screen-chat:say', async (e, { id, text }) => {
+  const page = e.sender;
+  const send = (ev) => { if (!page.isDestroyed()) page.send('screen-chat:event', { id, ...ev }); };
+  try {
+    const r = await fetch(`${screenUrl()}/stage/say`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text }),
+    });
+    if (!r.ok) throw new Error(`the bridge answered ${r.status}: ${(await r.text()).slice(0, 160)}`);
+    const decoder = new TextDecoder();
+    let buf = '';
+    for await (const piece of r.body) {
+      buf += decoder.decode(piece, { stream: true });
+      let nl;
+      while ((nl = buf.indexOf('\n')) >= 0) {
+        const line = buf.slice(0, nl).trim();
+        buf = buf.slice(nl + 1);
+        if (line) { try { send(JSON.parse(line)); } catch {} }
+      }
+    }
+    send({ type: 'closed' });
+  } catch (err) {
+    send({ type: 'failed', message: String(err.cause?.code || err.message || err) });
+  }
+  return true;
+});
+// When the screen runs (lab3: 17:00-22:00 by default, appliance/screen/screen-ctl.py).
+// It lives on the screen machine's proxy, next to the bridge.
+let screenPower = null;
+function screenPowerUrl() {
+  try { return `${new URL(screenUrl()).origin}/screen-power`; } catch { return null; }
+}
+async function fetchScreenPower(action, body) {
+  const url = screenPowerUrl();
+  if (!url) return (screenPower = null);
+  try {
+    const r = await fetch(action ? `${url}/${action}` : url, {
+      method: action ? 'POST' : 'GET',
+      headers: { 'Content-Type': 'application/json' },
+      body: action ? JSON.stringify(body || {}) : undefined,
+      signal: AbortSignal.timeout(4000),
+    });
+    screenPower = r.ok ? await r.json() : null;
+  } catch {
+    screenPower = null;
+  }
+  return screenPower;
+}
+function screenPowerLabel(p) {
+  if (!p) return 'Her screen: can’t reach it';
+  if (p.on) return `Her screen: on until ${p.until_text}`;
+  return `Her screen: off (${p.reason})`;
+}
+ipcMain.handle('screen-chat:power', () => fetchScreenPower());
+ipcMain.handle('screen-chat:extend', async (_e, minutes) => {
+  const p = await fetchScreenPower('extend', { minutes });
+  refreshTray();
+  return p;
+});
+ipcMain.handle('screen-chat:off', async () => {
+  const p = await fetchScreenPower('off');
+  refreshTray();
+  return p;
+});
+
+// Stopping goes through the bridge, so the screen stops too.
+ipcMain.handle('screen-chat:stop', async (_e, chunks) => {
+  try {
+    await fetch(`${screenUrl()}/interrupt`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ chunks: chunks || 0 }),
+      signal: AbortSignal.timeout(4000),
+    });
+  } catch {}
+  return true;
+});
+
 function setStage(on) {
   if (!win) return;
   stage = !!on;
@@ -418,6 +546,16 @@ function buildTray() {
         accelerator: 'Command+Shift+F',
         click: (item) => setStage(item.checked),
       },
+      {
+        label: screenPowerLabel(screenPower),
+        submenu: [
+          { label: 'Type to her screen…', click: () => openScreenChat() },
+          { type: 'separator' },
+          { label: 'Keep on 1 more hour', click: () => fetchScreenPower('extend', { minutes: 60 }).then(refreshTray) },
+          { label: 'Keep on 3 more hours', click: () => fetchScreenPower('extend', { minutes: 180 }).then(refreshTray) },
+          { label: 'Turn off now', enabled: !!screenPower?.on, click: () => fetchScreenPower('off').then(refreshTray) },
+        ],
+      },
       { type: 'separator' },
       { label: 'Change model…', click: () => { win?.show(); win?.webContents.send('pick-model'); } },
       { label: 'Reset position', click: () => { if (win) { win.setBounds({ x: 60, y: 60, width: 420, height: 680 }); win.show(); } } },
@@ -440,7 +578,7 @@ function buildTray() {
   refresh();
   tray.on('mouse-move', () => {
     refresh();
-    Promise.all([fetchPresets(), fetchMac()]).then(refresh);
+    Promise.all([fetchPresets(), fetchMac(), fetchScreenPower()]).then(refresh);
   });
   fetchPresets().then(refresh);
   // The bridge takes a while to start, so keep asking until it answers.

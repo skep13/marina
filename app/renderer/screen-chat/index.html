@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'">
+<title>Type to her screen</title>
+<link rel="stylesheet" href="./style.css">
+</head>
+<body>
+<header>
+  <span id="dot" class="dot"></span>
+  <span id="status">connecting…</span>
+  <span class="grow"></span>
+  <span id="power" title="Her screen runs 17:00–22:00 unless you extend it"></span>
+  <button type="button" id="extend" title="Keep her screen on for another hour">+1 h</button>
+</header>
+<main id="msgs">
+  <p class="note">Type here and Marina answers on her screen.</p>
+</main>
+<form id="composer">
+  <textarea id="input" rows="2" placeholder="Say something to her… (Enter to send)" autofocus></textarea>
+  <div class="row">
+    <button type="button" id="where" class="link" title="Which bridge to talk to"></button>
+    <span class="grow"></span>
+    <button type="button" id="stop" class="danger" hidden>stop</button>
+    <button type="submit" id="send" class="primary">send</button>
+  </div>
+</form>
+<form id="url-form" hidden>
+  <label>Her screen's bridge
+    <input id="url" spellcheck="false" placeholder="http://lab3/marina">
+  </label>
+  <div class="row"><span class="grow"></span>
+    <button type="button" id="url-cancel">cancel</button>
+    <button type="submit" class="primary">save</button>
+  </div>
+</form>
+<script src="./chat.js"></script>
+</body>
+</html>

@@ -2751,5 +2751,53 @@ if (EMBEDDED) {
   };
 } else {
   pollForBridge();
+  if (window.marina?.stage) startStagePoll();
 }
 loadFromDisk();
+
+// A screen for someone typing elsewhere (lab3's monitor, ?kiosk): they write
+// in the desktop app's "Type to her screen" window and she answers here.
+async function startStagePoll() {
+  let after = -1, req = null;
+  const finish = async () => {
+    if (!req) return;
+    await untilSpoken();
+    endUtterance();
+    disarmBargeIn(req);
+    if (inflight === req) inflight = null;
+    req = null;
+    setBusy(false);
+  };
+  for (;;) {
+    try {
+      const res = await fetch(`${BRIDGE}/stage/listen?after=${after}&timeout=60`);
+      if (!res.ok) throw new Error(`stage ${res.status}`);
+      for await (const ev of readEvents(res)) {
+        if (typeof ev.seq === 'number') after = ev.seq;
+        if (ev.type === 'start') {
+          if (inflight) inflight.cancelled = true;
+          stopSpeaking();
+          req = newRequest();
+          setBusy(true, 'thinking');
+          if (ev.transcript) showHeard(ev.transcript);
+          say('…');
+        } else if (!req) {
+          continue;
+        } else if (sideEvent(ev)) {
+          continue;
+        } else if (ev.type === 'chunk') {
+          await playChunk(ev, req);
+        } else if (ev.type === 'error') {
+          showNotice(ev.message, 'bridge');
+          await finish();
+        } else if (ev.type === 'done' || ev.type === 'interrupted') {
+          hideNotice('bridge');
+          await finish();
+        }
+      }
+    } catch {
+      await finish();
+      await new Promise((r) => setTimeout(r, 3000));
+    }
+  }
+}

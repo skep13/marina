@@ -44,6 +44,8 @@
 #   setup-lab3.sh screen             # show Marina (the laptop orb app) on a monitor
 #                                    #   plugged into lab3: cage + cog kiosk, memory-capped
 #                                    #   so it can't crowd out the models. Takes over tty1.
+#                                    #   Shows during SCREEN_HOURS (default 17:00-22:00) in
+#                                    #   /etc/appliance/screen.conf; the desktop app extends it.
 #   setup-lab3.sh confirm            # keep the cutover; cancel the auto-rollback.
 #   setup-lab3.sh status             # show what's configured / running
 #
@@ -151,6 +153,11 @@ http://${APPLIANCE_NAME}, http://${APPLIANCE_IP}, http://${WIRED_LL}, http://loc
 	handle_path /screen/* {
 		root * /var/lib/appliance/www/screen
 		file_server
+	}
+	# When her screen runs: the desktop app extends it or turns it off.
+	handle /screen-power* {
+		respond @untrusted "Not from this network." 403
+		reverse_proxy 127.0.0.1:7392
 	}
 	# One-line agent installer: curl http://${APPLIANCE_NAME}/install | sh
 	handle /install {
@@ -287,11 +294,15 @@ screen_setup() {
 # Marina on lab3's monitor (setup-lab3.sh screen). Restart marina-screen after editing.
 SCREEN_URL="http://127.0.0.1:${TS_PHONE_PORT}/?kiosk"
 SCREEN_ROTATE="90"   # normal | 90 | 180 | 270 (portrait monitor: 90 or 270)
+SCREEN_HOURS="17:00-22:00"   # when she shows; extend from the desktop app
 EOF
   cat > /usr/local/sbin/marina-screen-session <<'SESSION'
 #!/bin/sh
 # Runs inside cage: rotate the output, then the page.
 . /etc/appliance/screen.conf
+# A fresh web cache each start, so an updated app is what shows (the shader
+# cache stays: it only speeds up drawing her).
+rm -rf "$HOME/.cache/wpe" "$HOME/.local/share/wpe"
 out=$(wlr-randr | awk '/^[^ ]/{print $1; exit}')
 [ -n "$out" ] && [ -n "$SCREEN_ROTATE" ] && wlr-randr --output "$out" --transform "$SCREEN_ROTATE"
 exec cog --platform=wl "$SCREEN_URL"
@@ -331,33 +342,30 @@ IOWeight=20
 [Install]
 WantedBy=multi-user.target
 EOF
-  # Monitor off or unplugged: stop the kiosk so its RAM and GPU go back to the
-  # models. On again: start it. Polls the connector state every 5 s.
-  cat > /usr/local/sbin/marina-screen-watch <<'WATCH'
-#!/bin/sh
-on() { grep -qx connected /sys/class/drm/card*-*/status 2>/dev/null; }
-while :; do
-  if on; then systemctl is-active -q marina-screen || systemctl start --no-block marina-screen
-  else systemctl is-active -q marina-screen && systemctl stop marina-screen; fi
-  sleep 5
-done
-WATCH
-  chmod 755 /usr/local/sbin/marina-screen-watch
+  # When she shows: a monitor connected AND within SCREEN_HOURS, or extended from
+  # the desktop app (tray: Her screen). screen-ctl decides every 5 s and takes
+  # extend/off requests on 127.0.0.1:7392 (Caddy: /screen-power). It keeps the
+  # old marina-screen-watch unit name so re-running replaces the shell watcher.
+  grep -q '^SCREEN_HOURS=' "$SCREEN_CONF" || \
+    echo 'SCREEN_HOURS="17:00-22:00"   # when she shows; extend from the desktop app' >> "$SCREEN_CONF"
+  install -m 755 "$here/screen/screen-ctl.py" /usr/local/sbin/marina-screen-ctl
+  rm -f /usr/local/sbin/marina-screen-watch
   cat > /etc/systemd/system/marina-screen-watch.service <<EOF
 [Unit]
-Description=Start/stop Marina's screen with the monitor (setup-lab3.sh screen)
+Description=When Marina's screen runs: hours, extend/off (setup-lab3.sh screen)
 
 [Service]
-ExecStart=/usr/local/sbin/marina-screen-watch
+ExecStart=/usr/bin/python3 /usr/local/sbin/marina-screen-ctl
 Restart=always
 
 [Install]
 WantedBy=multi-user.target
 EOF
   systemctl daemon-reload
-  systemctl disable -q marina-screen.service 2>/dev/null || true   # the watcher starts it
-  systemctl enable --now marina-screen-watch.service
-  LOG "screen: Marina shows whenever a monitor is on (off for good: systemctl disable --now marina-screen-watch; systemctl stop marina-screen)"
+  systemctl disable -q marina-screen.service 2>/dev/null || true   # screen-ctl starts it
+  systemctl enable marina-screen-watch.service
+  systemctl restart marina-screen-watch.service
+  LOG "screen: Marina shows $(sed -n 's/^SCREEN_HOURS="\{0,1\}\([0-9:-]*\).*/\1/p' "$SCREEN_CONF") with a monitor on; extend from the desktop app (off for good: systemctl disable --now marina-screen-watch; systemctl stop marina-screen)"
 }
 
 # ---- stages -----------------------------------------------------------------
