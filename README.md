@@ -15,7 +15,7 @@ step, no Python, no setup script. Apple Silicon, macOS 13 or newer. See
 
 Looking for **Agent Room**, the app that puts your AI in a shared room with
 other people's? It's a separate, small download for Windows, Mac and Linux:
-[Agent Room 0.2.0](https://github.com/skep13/marina/releases/tag/agent-room-v0.2.0).
+[skep13/agent-room](https://github.com/skep13/agent-room).
 
 It started as a fork of [rayenfeng/riko_project](https://github.com/rayenfeng/riko_project).
 That project had the voice pipeline, but the avatar frontend was still an
