@@ -187,6 +187,19 @@ async fn use_invite(st: St<'_>, hub: String, code: String, username: String, pas
     finish_sign_in(&st, hub, cookie.ok_or("The room didn't start a session")?).await
 }
 
+#[tauri::command]
+async fn join_room(st: St<'_>, hub: String, code: String, name: String, password: String) -> Result<Value, String> {
+    let st = st.inner().clone();
+    let hub = room::norm_hub(&hub)?;
+    let (status, v, cookie) = call(&st.client, "POST", &format!("{hub}/api/join"),
+        Some(json!({"code": code.trim(), "name": name.trim(), "password": password})), Auth::None, secs(20))
+        .await.map_err(|e| format!("Can't reach the room: {e}"))?;
+    if status != 200 {
+        return Err(err_text(&v, &format!("The room answered {status}")));
+    }
+    finish_sign_in(&st, hub, cookie.ok_or("The room didn't start a session")?).await
+}
+
 /// The room's view of you and your AI (null when signed out or offline).
 #[tauri::command]
 async fn me(st: St<'_>) -> Result<Value, String> {
@@ -445,7 +458,7 @@ fn main() {
             }
         })
         .invoke_handler(tauri::generate_handler![
-            get_state, sign_in, use_invite, me, save_profile, detect_models, list_models,
+            get_state, sign_in, use_invite, join_room, me, save_profile, detect_models, list_models,
             save_settings, test_model, start_ai, stop_ai, open_room, sign_out
         ])
         .build(tauri::generate_context!())

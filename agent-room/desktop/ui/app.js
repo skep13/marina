@@ -53,6 +53,7 @@ let joinMode = "signin";
 function openJoin(msg) {
   $("j-hub").value = cfg.hub || "";
   if (cfg.username) $("j-user").value = cfg.username;
+  else document.querySelector('.seg button[data-mode="new"]').click();
   err($("j-err"), msg);
   show("s-join");
   ($("j-hub").value ? $("j-user").value ? $("j-pass") : $("j-user") : $("j-hub")).focus();
@@ -60,11 +61,14 @@ function openJoin(msg) {
 for (const b of document.querySelectorAll(".seg button")) b.onclick = () => {
   joinMode = b.dataset.mode;
   for (const x of document.querySelectorAll(".seg button")) x.classList.toggle("on", x === b);
-  const inv = joinMode === "invite";
+  const inv = joinMode === "invite", nu = joinMode === "new";
   $("j-code-row").hidden = $("j-invite-hint").hidden = !inv;
-  $("j-code").required = inv;
-  $("j-pass").autocomplete = inv ? "new-password" : "current-password";
-  $("j-go").textContent = inv ? "Create my sign-in" : "Sign in";
+  $("j-join-row").hidden = $("j-new-hint").hidden = !nu;
+  $("j-code").required = inv; $("j-join").required = nu;
+  $("j-user-label").textContent = nu ? "Your AI's name" : "Username";
+  $("j-pass").autocomplete = inv || nu ? "new-password" : "current-password";
+  $("j-pass").minLength = inv || nu ? 10 : 0;
+  $("j-go").textContent = nu ? "Register my AI" : inv ? "Create my sign-in" : "Sign in";
 };
 $("f-join").onsubmit = async e => {
   e.preventDefault();
@@ -72,8 +76,9 @@ $("f-join").onsubmit = async e => {
   try {
     const args = { hub: $("j-hub").value, username: $("j-user").value, password: $("j-pass").value };
     me = joinMode === "invite" ? await call("use_invite", { ...args, code: $("j-code").value })
-                               : await call("sign_in", args);
-    $("j-pass").value = ""; $("j-code").value = "";
+       : joinMode === "new" ? await call("join_room", { hub: args.hub, code: $("j-join").value, name: args.username, password: args.password })
+       : await call("sign_in", args);
+    $("j-pass").value = ""; $("j-code").value = ""; $("j-join").value = "";
     cfg = (await call("get_state")).config;
     if (!me.agent.ready) openProfile(true); else openMain();
   } catch (x) { err($("j-err"), String(x)); }
@@ -86,16 +91,10 @@ let pickedColor = COLORS[0];
 const SKILLS = ["planning", "coding", "writing", "research", "review", "design", "chat"];
 let pickedSkills = new Set();
 function openProfile(first) {
-  pickedSkills = new Set((me && me.agent.skills) || []);
-  const ch = $("p-skills"); ch.textContent = "";
-  for (const k of (me && me.skills) || SKILLS) {
-    const b = document.createElement("button");
-    b.type = "button"; b.textContent = k; b.className = pickedSkills.has(k) ? "on" : "";
-    b.setAttribute("aria-pressed", pickedSkills.has(k));
-    b.onclick = () => { pickedSkills.has(k) ? pickedSkills.delete(k) : pickedSkills.add(k);
-      b.classList.toggle("on", pickedSkills.has(k)); b.setAttribute("aria-pressed", pickedSkills.has(k)); };
-    ch.appendChild(b);
-  }
+  const ag = (me && me.agent) || {}, sk = (ag.skills || []).join(", ") || "not worked out yet";
+  $("p-skills").textContent = ag.tryout === "done" ? sk
+    : sk + (ag.tryout === "asked" || ag.tryout === "answered" || ag.tryout === "grading"
+            ? " (tryout in progress)" : " (a first guess until its tryout)");
   paintName();
   $("p-about").value = (me && me.agent.about) || "";
   pickedColor = (me && me.agent.color) || COLORS[0];
@@ -116,7 +115,7 @@ $("p-cancel").onclick = () => openMain();
 $("f-profile").onsubmit = async e => {
   e.preventDefault(); err($("p-err"));
   try {
-    const ag = await call("save_profile", { about: $("p-about").value, color: pickedColor, skills: [...pickedSkills] });
+    const ag = await call("save_profile", { about: $("p-about").value, color: pickedColor, skills: [] });
     me.agent = ag; openMain();
   } catch (x) { err($("p-err"), String(x)); }
 };

@@ -308,7 +308,8 @@ pub async fn run(app: AppHandle, mut rx: watch::Receiver<u64>, my_gen: u64) {
             break;
         }
         let cfg = st.cfg();
-        let poll_url = format!("{}/api/agent/poll", cfg.hub);
+        let poll_url = reqwest::Url::parse_with_params(&format!("{}/api/agent/poll", cfg.hub), &[("model", cfg.model.as_str())])
+            .map(|u| u.to_string()).unwrap_or_else(|_| format!("{}/api/agent/poll", cfg.hub));
         let r = tokio::select! {
             r = call(&st.client, "GET", &poll_url, None, Auth::Bearer(&cfg.token), secs(45)) => r,
             _ = rx.changed() => break,

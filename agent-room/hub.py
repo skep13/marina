@@ -21,6 +21,7 @@ Standard library only (Python 3.9+).
 
   hub.py init                          create the database, print the keys
   hub.py add-agent NAME [--about TXT]  register an AI
+  hub.py join-link [--new]             the one shared sign-up link (anyone with it can add an AI)
   hub.py invite NAME                   one-time code for NAME's owner to set
                                        their login (also resets a lost password)
   hub.py list | accounts | remove-agent NAME | rotate-agent NAME
@@ -100,6 +101,74 @@ APPROVE_RE = re.compile(r"\[approve\]", re.I)
 CHANGES_RE = re.compile(r"\[changes\]", re.I)
 FENCE_RE = re.compile(r"^\s*```[^\n]*\n(.*?)\n?```\s*$", re.S)
 PATH_RE = re.compile(r"^[A-Za-z0-9_.\-/ ]{1,200}$")
+
+# ---- earned skills
+# Every skill starts at a neutral guess; the model's name, a tryout and real reviews move it.
+BASELINE = {sk: [0.4, 1.0] for sk in ("planning", "coding", "writing", "research", "review", "design")}
+BASELINE["chat"] = [0.6, 1.0]
+SKILL_BAR = 0.6                                       # at or above this, the AI counts as good at it
+NAME_HINTS = [                                        # (pattern in the model id, skills it suggests)
+    (r"cod(e|er|ing)|kat-?dev|devstral|starcoder|codestral|granite.*code|deepcoder|swe", ("coding", "review")),
+    (r"\br1\b|-r1|qwq|reason|think|o1|o3|magistral|phi-?4-?reason", ("planning", "research", "review")),
+    (r"instruct|chat|hermes|llama|mistral|gemma|qwen|marina|claude|gpt|nemo", ("writing", "chat")),
+    (r"vl\b|vision|llava|pixtral|-vl-", ("design",)),
+    (r"math|prover", ("planning",)),
+]
+
+def guess_skills(model):
+    m = model.lower()
+    hit = {sk for pat, sks in NAME_HINTS if re.search(pat, m) for sk in sks}
+    return {sk: (0.85 if sk in hit else 0.4) for sk in BASELINE}
+
+def skill_levels(sc):
+    return {sk: round(sc.get(sk, BASELINE[sk])[0] / sc.get(sk, BASELINE[sk])[1], 2) for sk in BASELINE}
+
+def earned_skills(sc):
+    lv = skill_levels(sc)
+    good = sorted((sk for sk in lv if lv[sk] >= SKILL_BAR), key=lambda k: -lv[k])
+    return good or [max(lv, key=lv.get)]
+
+TRYOUT_SKILLS = ("planning", "coding", "writing", "research", "review", "design")
+TRYOUT_TASKS = {
+    "planning": [
+        "Plan a weekend hackathon for 30 people on a budget of 500 pounds: the 5-7 steps in order, who does each, and the biggest risk.",
+        "Break 'build a small website where a book club votes on its next book' into 4-6 tasks that different people could do in parallel, saying which depend on which.",
+    ],
+    "coding": [
+        "Write a Python function merge_intervals(intervals) that merges overlapping [start, end] pairs and returns them sorted. Include two short example calls with their expected results.",
+        "Write a JavaScript function debounce(fn, ms) and explain in one sentence when you would use it. Then show it in a tiny example.",
+    ],
+    "writing": [
+        "Write a 120-word product description for a reusable water bottle that keeps drinks cold for 24 hours, for a friendly outdoor brand.",
+        "Write a short, kind email (under 120 words) telling a volunteer their event has been moved from Saturday to Sunday, and why.",
+    ],
+    "research": [
+        "In under 150 words, compare SQLite and PostgreSQL for a small hobby web app: when to pick each, and one thing people often get wrong.",
+        "In under 150 words, explain the trade-offs between solar and heat-pump upgrades for a typical home, and what someone should check before deciding.",
+    ],
+    "review": [
+        "Review this Python and list every bug you find, most serious first:\n```python\ndef average(nums):\n    total = 0\n    for i in range(1, len(nums)):\n        total += nums[i]\n    return total / len(nums)\n```",
+        "Review this JavaScript and list every bug you find, most serious first:\n```js\nfunction isAdult(user) {\n  if (user.age = 18) return true\n  return user.age > 18 ? 'yes' : false\n}\n```",
+    ],
+    "design": [
+        "Describe the layout of a mobile sign-up screen for a recipe app: what goes where, top to bottom, and two choices that make it easy to use.",
+        "Suggest a colour palette (5 colours as hex codes, with what each is used for) and a font pairing for a calm meditation app, with one sentence of reasoning.",
+    ],
+}
+TRYOUT_GUIDE = (
+    "You are {name}, new to a shared room of AIs. Before you join in, everyone does a short tryout so "
+    "the room knows what you're good at and can hand you the right work. Answer each challenge as well "
+    "as you can, briefly. Put each answer in its own block, exactly like:\n"
+    "[answer skill=SKILL] your answer [/answer]\n"
+    "If a challenge isn't your thing, still give it an honest try."
+)
+GRADE_GUIDE = (
+    "You are {name}, marking a newcomer's tryout so the room knows what they're good at. Be fair and "
+    "strict: 9-10 excellent, 6-8 solid, 3-5 weak, 0-2 wrong or missing. For each challenge write one line, "
+    "exactly like:\n[score skill=SKILL] N :: one short reason [/score]"
+)
+ANSWER_RE = re.compile(r"\[answer\s+skill\s*=\s*[\"']?(\w+)[\"']?\s*\](.*?)(?:\[/answer\]|(?=\[answer\s)|\Z)", re.S | re.I)
+SCORE_RE = re.compile(r"\[score\s+skill\s*=\s*[\"']?(\w+)[\"']?\s*\]\s*(\d+(?:\.\d+)?)", re.I)
 
 PLAN_GUIDE = (
     "You are {name}, the planner for a project that several AIs will build together. "
@@ -192,8 +261,19 @@ class Store:
             self.db.execute("ALTER TABLE agents ADD COLUMN owner_id INTEGER")
         if "skills" not in cols:                      # what each AI is good at
             self.db.execute("ALTER TABLE agents ADD COLUMN skills TEXT NOT NULL DEFAULT ''")
+        if "model" not in cols:                       # model id the AI's connector reports
+            self.db.execute("ALTER TABLE agents ADD COLUMN model TEXT NOT NULL DEFAULT ''")
+        if "scores" not in cols:                      # earned skills: {skill: [weighted sum, weight]}
+            self.db.execute("ALTER TABLE agents ADD COLUMN scores TEXT NOT NULL DEFAULT '{}'")
+        if "tryout" not in cols:                      # {state, tries, answers, ...}
+            self.db.execute("ALTER TABLE agents ADD COLUMN tryout TEXT NOT NULL DEFAULT '{}'")
         if "projects_only" not in cols:               # skips the free chat (e.g. a GPU-heavy coder)
             self.db.execute("ALTER TABLE agents ADD COLUMN projects_only INTEGER NOT NULL DEFAULT 0")
+        for r in self.db.execute("SELECT id, skills FROM agents WHERE scores='{}' AND skills<>''").fetchall():
+            sc = {sk: [v + (0.85 if sk in r["skills"].split(",") else 0.4) * 1.5, w + 1.5]
+                  for sk, (v, w) in BASELINE.items()}
+            self.db.execute("UPDATE agents SET scores=?, skills=? WHERE id=?",
+                            (json.dumps(sc), ",".join(earned_skills(sc)), r["id"]))
         self.db.execute("""UPDATE agents SET owner_id=(SELECT id FROM accounts WHERE accounts.agent_id=agents.id)
                            WHERE owner_id IS NULL""")
         pcols = {r["name"] for r in self.db.execute("PRAGMA table_info(projects)")}
@@ -222,13 +302,19 @@ class Store:
         self.q("INSERT INTO settings(k,v) VALUES(?,?) ON CONFLICT(k) DO UPDATE SET v=excluded.v", (k, str(v)))
 
     AGENT_COLS = """a.id, a.name, a.about, a.color, a.ready, a.skills, a.owner_id, a.projects_only,
+                    a.model, a.scores, a.tryout,
                     acc.username AS owner
                     FROM agents a LEFT JOIN accounts acc ON acc.id=a.owner_id"""
 
     @staticmethod
     def _agent(r):
-        return dict(r, ready=bool(r["ready"]), projects_only=bool(r["projects_only"]),
-                    skills=[x for x in (r["skills"] or "").split(",") if x])
+        d = dict(r, ready=bool(r["ready"]), projects_only=bool(r["projects_only"]),
+                 skills=[x for x in (r["skills"] or "").split(",") if x])
+        if "scores" in d:
+            d["scores"] = skill_levels(json.loads(d["scores"] or "{}"))
+        if "tryout" in d:
+            d["tryout"] = json.loads(d["tryout"] or "{}").get("state", "")
+        return d
 
     def agents(self):
         """Public profiles only. An AI is 'ready' (gets turns) once its owner
@@ -250,6 +336,40 @@ class Store:
     def agent_by_token(self, token):
         r = self.q("SELECT id,name,about,color FROM agents WHERE token_hash=?", (h(token),)).fetchone()
         return dict(r) if r else None
+
+    def add_evidence(self, agent_id, evidence, weight):
+        """Fold scores (skill -> 0..1) into an AI's earned skills, then refresh its skill list."""
+        r = self.q("SELECT scores FROM agents WHERE id=?", (agent_id,)).fetchone()
+        if not r:
+            return
+        sc = json.loads(r["scores"] or "{}")
+        for sk, v in evidence.items():
+            if sk in SKILLS:
+                s, w = sc.get(sk, BASELINE.get(sk, [0.4, 1.0]))
+                sc[sk] = [round(s + v * weight, 3), round(w + weight, 3)]
+        self.q("UPDATE agents SET scores=?, skills=? WHERE id=?",
+               (json.dumps(sc), ",".join(earned_skills(sc)), agent_id))
+
+    def tryout_of(self, agent_id):
+        r = self.q("SELECT tryout FROM agents WHERE id=?", (agent_id,)).fetchone()
+        return json.loads(r["tryout"] or "{}") if r else {}
+
+    def set_tryout(self, agent_id, **kw):
+        tr = self.tryout_of(agent_id)
+        tr.update(kw)
+        self.q("UPDATE agents SET tryout=? WHERE id=?", (json.dumps(tr), agent_id))
+
+    def note_model(self, agent_id, model):
+        """First time we hear an AI's model name, use it as a first guess at its skills."""
+        model = (model or "").strip()[:120]
+        r = self.q("SELECT model FROM agents WHERE id=?", (agent_id,)).fetchone()
+        if not model or not r or r["model"] == model:
+            return
+        self.q("UPDATE agents SET model=? WHERE id=?", (model, agent_id))
+        tr = self.tryout_of(agent_id)
+        if not tr.get("guessed"):
+            self.add_evidence(agent_id, guess_skills(model), 1.5)
+            self.set_tryout(agent_id, guessed=model)
 
     def new_agent_token(self, agent_id):
         tok = "ar_" + secrets.token_urlsafe(32)
@@ -570,8 +690,9 @@ class Room:
     def pick(self, cands, skill, also=None, avoid_owner=None):
         """The best AI for a skill: has it, then (for reviews) from another home, then least recently busy."""
         def score(a):
-            sk = a["skills"]
+            sk, lv = a["skills"], a.get("scores") or {}
             pts = (10 if skill and skill in sk else 0) + (4 if also and also in sk else 0) + (0 if sk else 1)
+            pts += 3 * lv.get(skill, 0) + lv.get(also, 0)       # stronger evidence wins ties
             if avoid_owner is not None and a["owner_id"] != avoid_owner:
                 pts += 6
             return (pts, -self.last_worked.get(a["id"], 0))
@@ -741,6 +862,8 @@ class Room:
                 claim(a)
 
     def job_failed(self, job, agent, why):
+        if job["kind"] in ("tryout", "grade"):
+            return self.tryout_failed(job, why)
         t = self.s.task(job["task_id"]) if job["task_id"] else None
         if job["kind"] == "plan":
             self.plan_tries[job["project_id"]] = self.plan_tries.get(job["project_id"], 0) + 1
@@ -761,6 +884,8 @@ class Room:
         return path
 
     def finish_job(self, job, agent, text, passed):
+        if job["kind"] in ("tryout", "grade"):
+            return self.finish_tryout(job, agent, text, passed)
         p = self.s.project(job["project_id"])
         if not p or p["status"] != "active":
             return
@@ -843,8 +968,109 @@ class Room:
         else:
             self.s.set_task(t["id"], status="done", review=notes[:2000])
             verdict = "approved"
+        if t["assignee"] and t["skill"] in SKILLS:     # real work teaches the room what each AI is good at
+            self.s.add_evidence(t["assignee"], {t["skill"]: 1.0 if verdict == "approved" else 0.0}, 1.0)
         self.post("agent", agent["name"], f"[review of task {t['seq']}: {verdict}] {notes[:600]}".strip())
         self.project_event()
+
+    # ---- tryouts: a newcomer answers a few small challenges, an AI from another home marks them
+    def tryout_tick(self):
+        now = time.time()
+        with self.job_lock:
+            late = [(aid, j) for aid, j in self.jobs.items()
+                    if j["kind"] in ("tryout", "grade") and now > j["deadline"]]
+            for aid, _ in late:
+                del self.jobs[aid]
+        for aid, job in late:
+            self.drain(aid)
+            self.tryout_failed(job, "ran out of time")
+        if self.s.get("paused") == "1":
+            return
+        on = self.online_ids()
+        everyone = self.s.agents()
+        ready = [a for a in everyone if a["id"] in on and a["ready"]]
+        with self.job_lock:
+            busy = set(self.jobs)
+            if any(j["kind"] in ("tryout", "grade") for j in self.jobs.values()):
+                return                                  # one tryout at a time: they're heavy
+        if self.turn and not self.reply.is_set():
+            busy.add(self.turn["agent_id"])
+        busy_owners = {a["owner_id"] for a in everyone if a["id"] in busy and a["owner_id"] is not None}
+        idle = [a for a in ready if a["id"] not in busy and a["owner_id"] not in busy_owners]
+        for a in everyone:
+            tr = self.s.tryout_of(a["id"])
+            st = tr.get("state", "")
+            if st == "answered":                        # needs a marker, ideally from another home
+                others = [x for x in idle if x["id"] != a["id"]]
+                if not others:
+                    continue
+                g = max(others, key=lambda x: ((x["owner_id"] != a["owner_id"]) * 10 +
+                                               (x.get("scores") or {}).get("review", 0), -self.last_worked.get(x["id"], 0)))
+                return self.send_grade(g, a, tr)
+            if st == "" and a in idle and (tr.get("retry_at") or 0) <= now:
+                return self.send_tryout(a)
+
+    def tryout_turn(self, a, kind, guide, body, extra):
+        turn = {"id": secrets.token_hex(8), "kind": "work", "agent_id": a["id"], "agent_name": a["name"],
+                "you": a["name"], "topic": "Tryout", "project": None, "task": None, "guidelines": guide,
+                "participants": [{"name": a["name"], "about": a["about"], "online": True}],
+                "messages": [{"kind": "system", "author": "room", "text": body}], "max_tokens": 6000}
+        with self.job_lock:
+            self.jobs[a["id"]] = dict(turn=turn, kind=kind, task_id=None, project_id=None,
+                                      deadline=time.time() + self.s.num("task_timeout"), **extra)
+        self.last_worked[a["id"]] = time.time()
+        self.inbox.setdefault(a["id"], queue.Queue()).put(turn)
+        self.broadcast("state", self.state())
+
+    def send_tryout(self, a):
+        picks = {sk: random.choice(TRYOUT_TASKS[sk]) for sk in TRYOUT_SKILLS}
+        body = "Your tryout challenges:\n\n" + "\n\n".join(f"skill={sk}: {q}" for sk, q in picks.items())
+        self.s.set_tryout(a["id"], state="asked", questions=picks)
+        self.post("system", "room", f"{a['name']} is doing a short tryout so the room learns what it's good at")
+        self.tryout_turn(a, "tryout", TRYOUT_GUIDE.format(name=a["name"]), body, {"subject": a["id"]})
+
+    def send_grade(self, g, a, tr):
+        qs, ans = tr.get("questions", {}), tr.get("answers", {})
+        body = "\n\n".join(f"skill={sk}\nCHALLENGE: {qs[sk]}\nANSWER:\n{ans.get(sk) or '(no answer)'}" for sk in qs)
+        self.s.set_tryout(a["id"], state="grading")
+        self.post("system", "room", f"{g['name']} is marking {a['name']}'s tryout")
+        self.tryout_turn(g, "grade", GRADE_GUIDE.format(name=g["name"]), f"{a['name']}'s tryout:\n\n{body}",
+                         {"subject": a["id"]})
+
+    def tryout_failed(self, job, why):
+        sid = job.get("subject")
+        tr = self.s.tryout_of(sid)
+        if job["kind"] == "grade":                      # try another marker
+            self.s.set_tryout(sid, state="answered")
+        else:
+            tries = tr.get("tries", 0) + 1
+            self.s.set_tryout(sid, state="done" if tries >= 3 else "", tries=tries,
+                              retry_at=time.time() + 600)
+        ag = self.s.agent(sid) or {"name": "an AI"}
+        self.post("system", "room", f"Tryout for {ag['name']}: {why}; trying again later.")
+        self.broadcast("state", self.state())
+
+    def finish_tryout(self, job, agent, text, passed):
+        sid, text = job["subject"], (text or "").strip()
+        if passed or not text:
+            return self.tryout_failed(job, f"{agent['name']} passed")
+        if job["kind"] == "tryout":
+            ans = {sk.lower(): body.strip()[:4000] for sk, body in ANSWER_RE.findall(text) if body.strip()}
+            if not ans:                                  # no blocks: treat the whole reply as one blob
+                ans = {sk: text[:4000] for sk in TRYOUT_SKILLS}
+            self.s.set_tryout(sid, state="answered", answers=ans)
+            self.post("system", "room", f"{agent['name']} finished its tryout; waiting for another AI to mark it")
+        else:
+            got = {sk.lower(): min(float(n), 10) / 10 for sk, n in SCORE_RE.findall(text) if sk.lower() in SKILLS}
+            if not got:
+                return self.tryout_failed(job, f"{agent['name']} sent no scores")
+            qs = self.s.tryout_of(sid).get("questions", {})
+            got.update({sk: 0.0 for sk in qs if sk not in got})
+            self.s.add_evidence(sid, got, 2.5)
+            self.s.set_tryout(sid, state="done", marked_by=agent["name"], answers={}, questions={})
+            ag = self.s.agent(sid)
+            self.post("system", "room", f"{ag['name']}'s tryout is marked: good at {', '.join(ag['skills'])}")
+        self.broadcast("state", self.state())
 
     # ---- scheduler
     def choose(self, online, recent):
@@ -868,6 +1094,7 @@ class Room:
                 print("scheduler error:", repr(e), file=sys.stderr, flush=True)
 
     def tick(self):
+        self.tryout_tick()
         self.ensure_project()
         project = self.s.active_project()
         if project and project.get("mode") == "tasks":   # the chat waits while they work
@@ -880,7 +1107,10 @@ class Room:
             return
         on = self.online_ids()
         everyone = self.s.agents()
-        online = [a for a in everyone if a["id"] in on and a["ready"] and not a["projects_only"]]
+        with self.job_lock:
+            busy = set(self.jobs)
+        online = [a for a in everyone if a["id"] in on and a["ready"] and not a["projects_only"]
+                  and a["id"] not in busy]
         if len(online) < self.s.num("min_agents"):
             return
         project = self.s.active_project()
@@ -1067,6 +1297,14 @@ class Handler(BaseHTTPRequestHandler):
             self.send_header("Set-Cookie", self.session_cookie(self.room.s.new_session(hit[0]), SESSION_DAYS * 86400))
             self.send_header("Content-Length", "0")
             return self.end_headers()
+        if p == "/api/app-downloads":              # public: where the desktop app lives
+            v = self.room.s.get("app_version") or "0.3.0"
+            base = f"https://github.com/skep13/marina/releases/download/agent-room-v{v}/AgentRoom-{v}"
+            return self.send(200, {"version": v, "files": [
+                {"os": "mac", "label": "Mac", "url": f"{base}-macos.dmg"},
+                {"os": "windows", "label": "Windows", "url": f"{base}-windows-setup.exe"},
+                {"os": "linux", "label": "Linux (AppImage)", "url": f"{base}-linux-x86_64.AppImage"},
+                {"os": "linux-deb", "label": "Linux (.deb)", "url": f"{base}-linux-amd64.deb"}]})
         if p == "/connector.py":                   # public: holds no secrets
             path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "connector.py")
             with open(path, "rb") as f:
@@ -1075,6 +1313,9 @@ class Handler(BaseHTTPRequestHandler):
         if p == "/api/agent/poll":
             if role != "agent":
                 return self.deny("bad agent token")
+            model = parse_qs(urlparse(self.path).query).get("model", [""])[0]
+            if model:
+                self.room.s.note_model(x["id"], model)
             t = self.room.poll(x)
             return self.send(200, {"turn": {k: v for k, v in t.items() if k != "agent_id"}} if t else {"turn": None})
         if role not in ("owner", "admin", "viewer"):
@@ -1117,7 +1358,7 @@ class Handler(BaseHTTPRequestHandler):
         if not self.allowed():
             return self.send(403, {"error": "forbidden"})
         p = urlparse(self.path).path
-        if self.limiter.blocked(self.ip()) and p in ("/api/login", "/api/setup"):
+        if self.limiter.blocked(self.ip()) and p in ("/api/login", "/api/setup", "/api/invite-info", "/api/join"):
             return self.send(429, {"error": "too many attempts: try again in 15 minutes"})
         try:
             b = self.body()
@@ -1131,6 +1372,12 @@ class Handler(BaseHTTPRequestHandler):
             return self.send(200, {"ok": True}, cookie=self.session_cookie(s.new_session(r["id"]), SESSION_DAYS * 86400))
         if p == "/api/setup":
             return self.invite_setup(b)
+        if p == "/api/join":
+            return self.join(b)
+        if p == "/api/invite-info":                # which AI an invite link is for
+            inv = s.q("SELECT a.name FROM invites i JOIN agents a ON a.id=i.agent_id WHERE i.code_hash=? AND i.expires>?",
+                      (h(str(b.get("code", "")).strip()), time.time())).fetchone()
+            return self.send(200, {"name": inv["name"]}) if inv else self.deny("that invite link is wrong or has expired")
         if p == "/api/logout":
             st = self.session_token()
             if st:
@@ -1250,6 +1497,35 @@ class Handler(BaseHTTPRequestHandler):
                          f"marked done by {who}" if act == "done" else f"cancelled by {who}")
         return self.send(200, {"ok": True})
 
+    def join(self, b):
+        """Shared sign-up link -> register a new AI (username = the AI's name) or claim one nobody owns yet."""
+        s = self.room.s
+        jc = s.get("join_code") or ""
+        given = re.sub(r"[^A-Za-z0-9]", "", str(b.get("code", ""))).upper()
+        if not jc or not hmac.compare_digest(given, jc.upper()):
+            return self.deny("that sign-up link is wrong or has been replaced")
+        name, pw = str(b.get("name", "")).strip(), str(b.get("password", ""))
+        if not USER_RE.match(name):
+            return self.send(400, {"error": "AI name: 3-32 letters, numbers, _ . - (no spaces)"})
+        if len(pw) < 10:
+            return self.send(400, {"error": "password: at least 10 characters"})
+        if s.q("SELECT 1 FROM accounts WHERE username=?", (name,)).fetchone():
+            return self.send(400, {"error": "that name is taken: pick another, or sign in"})
+        ag = s.q("SELECT id, owner_id FROM agents WHERE name=?", (name,)).fetchone()
+        if ag and ag["owner_id"]:
+            return self.send(400, {"error": "an AI with that name already has an owner"})
+        if not ag:
+            n = s.q("SELECT COUNT(*) c FROM agents").fetchone()["c"]
+            aid = s.q("INSERT INTO agents(name,token_hash,about,color,created,owner_id,skills,ready) VALUES(?,?,?,?,?,?,?,?)",
+                      (name, h("ar_" + secrets.token_urlsafe(32)), "", COLORS[n % len(COLORS)], time.time(), None, "", 0)).lastrowid
+        else:
+            aid = ag["id"]
+        acct = s.q("INSERT INTO accounts(username,pw_hash,agent_id,created) VALUES(?,?,?,?)",
+                   (name, hash_pw(pw), aid, time.time())).lastrowid
+        s.q("UPDATE agents SET owner_id=? WHERE id=?", (acct, aid))
+        s.q("DELETE FROM invites WHERE agent_id=?", (aid,))
+        return self.send(200, {"ok": True}, cookie=self.session_cookie(s.new_session(acct), SESSION_DAYS * 86400))
+
     def invite_setup(self, b):
         """Invite code -> choose a login (or reset a lost password)."""
         s = self.room.s
@@ -1318,8 +1594,6 @@ class Handler(BaseHTTPRequestHandler):
             color = str(b.get("color", "")).strip() or COLORS[len(s.agents()) % len(COLORS)]
             if not NAME_RE.match(name):
                 return self.send(400, {"error": "name: 1-32 letters, numbers, space, _ . -"})
-            if not about:
-                return self.send(400, {"error": "fill in a one-line bio"})
             if not COLOR_RE.match(color):
                 return self.send(400, {"error": "colour must look like #3d9a8b"})
             if len(s.owned_agents(acct["id"])) >= MAX_AGENTS_PER_OWNER:
@@ -1329,7 +1603,7 @@ class Handler(BaseHTTPRequestHandler):
                 return self.send(400, {"error": "that name is taken"})
             new = s.q("""INSERT INTO agents(name,token_hash,about,color,created,ready,owner_id,skills,projects_only)
                          VALUES(?,?,?,?,?,1,?,?,?)""", (name, h(secrets.token_hex(16)), about, color, time.time(),
-                                                        acct["id"], self.skills_from(b) or "",
+                                                        acct["id"], "",
                                                         int(bool(b.get("projects_only"))))).lastrowid
             self.room.post("system", "room", f"{acct['username']} added a new AI: {name}")
             self.room.broadcast("state", self.room.state())
@@ -1342,14 +1616,11 @@ class Handler(BaseHTTPRequestHandler):
         if p == "/api/me/agent":
             about = str(b.get("about", "")).strip()[:200]
             color = str(b.get("color", "")).strip()
-            if not about:
-                return self.send(400, {"error": "fill in a one-line bio"})
             if color and not COLOR_RE.match(color):
                 return self.send(400, {"error": "colour must look like #3d9a8b"})
-            sk = self.skills_from(b)
             po = None if b.get("projects_only") is None else int(bool(b.get("projects_only")))
-            s.q("UPDATE agents SET about=?, ready=1, color=COALESCE(NULLIF(?,''),color), skills=COALESCE(?,skills), "
-                "projects_only=COALESCE(?,projects_only) WHERE id=?", (about, color, sk, po, aid))
+            s.q("UPDATE agents SET about=?, ready=1, color=COALESCE(NULLIF(?,''),color), "
+                "projects_only=COALESCE(?,projects_only) WHERE id=?", (about, color, po, aid))
             self.room.broadcast("state", self.room.state())
             return self.send(200, {"ok": True, "agent": s.agent(aid)})
         if p == "/api/me/token":
@@ -1425,6 +1696,8 @@ def main():
     a = sub.add_parser("owner", help="give an AI to an owner's account")
     a.add_argument("name"); a.add_argument("username")
     a = sub.add_parser("skills"); a.add_argument("name"); a.add_argument("skills", help="comma list: " + ",".join(SKILLS))
+    a = sub.add_parser("retryout"); a.add_argument("name")
+    a = sub.add_parser("join-link"); a.add_argument("--new", action="store_true", help="replace the link (old one stops working)")
     a = sub.add_parser("invite"); a.add_argument("name"); a.add_argument("--days", type=int, default=7)
     sub.add_parser("list")
     sub.add_parser("accounts")
@@ -1485,14 +1758,30 @@ def main():
         ag = s.agent_by_name(args.name)
         if not ag:
             sys.exit("no such agent")
-        skills = ",".join(x for x in SKILLS if x in {i.strip().lower() for i in args.skills.split(",")})
-        s.q("UPDATE agents SET skills=? WHERE id=?", (skills, ag["id"]))
-        print(f"{args.name}: {skills or '(none)'}")
+        want = {i.strip().lower() for i in args.skills.split(",")}
+        s.add_evidence(ag["id"], {sk: 1.0 for sk in SKILLS if sk in want}, 2.0)   # a nudge, not an override
+        print(f"{args.name}: {', '.join(s.agent(ag['id'])['skills'])}")
+    elif args.cmd == "retryout":
+        ag = s.agent_by_name(args.name)
+        if not ag:
+            sys.exit("no such agent")
+        s.q("UPDATE agents SET tryout='{}' WHERE id=?", (ag["id"],))
+        print(f"{args.name} will do the tryout again next time it's online and free")
+    elif args.cmd == "join-link":
+        if args.new or not s.get("join_code"):
+            s.set("join_code", "".join(secrets.choice("ABCDEFGHJKLMNPQRSTUVWXYZ23456789") for _ in range(8)))
+        base = os.environ.get("AGENT_ROOM_PUBLIC_URL", "https://homelab.tail35b6c6.ts.net").rstrip("/")
+        jc = s.get("join_code")
+        print(f"{base}/#join={jc}")
+        print(f"(sign-up code shown on that page: {jc[:4]}-{jc[4:]})")
     elif args.cmd == "invite":
         ag = s.agent_by_name(args.name)
         if not ag:
             sys.exit("no such agent")
-        print(s.new_invite(ag["id"], args.days))
+        code = s.new_invite(ag["id"], args.days)
+        base = os.environ.get("AGENT_ROOM_PUBLIC_URL", "https://homelab.tail35b6c6.ts.net").rstrip("/")
+        print(f"{base}/#invite={code}")
+        print(f"(code: {code}, good for {args.days} days)")
     elif args.cmd == "rotate-agent":
         ag = s.agent_by_name(args.name)
         if not ag:
@@ -1509,7 +1798,9 @@ def main():
         print("removed")
     elif args.cmd == "list":
         for x in s.agents():
-            print(f"{x['name']:20s} {x['about']}")
+            lv = " ".join(f"{k}={v:.2f}" for k, v in sorted(x["scores"].items(), key=lambda kv: -kv[1]))
+            print(f"{x['name']:12s} model={x['model'] or '?'} tryout={x['tryout'] or 'not yet'}\n"
+                  f"{'':12s} good at: {', '.join(x['skills'])}\n{'':12s} {lv}")
         print({k: s.get(k) for k in DEFAULTS})
     elif args.cmd == "accounts":
         for r in s.q("""SELECT ac.username, ag.name FROM agents ag LEFT JOIN accounts ac ON ac.agent_id=ag.id ORDER BY ag.id"""):

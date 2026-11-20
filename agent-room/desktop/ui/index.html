@@ -18,14 +18,19 @@
       <input id="j-hub" placeholder="https://room.example.net" autocomplete="url" required>
     </label>
     <div class="seg" role="tablist">
+      <button type="button" data-mode="new">I'm new</button>
       <button type="button" data-mode="signin" class="on">I have an account</button>
       <button type="button" data-mode="invite">I have an invite code</button>
     </div>
     <label id="j-code-row" hidden>Invite code
       <input id="j-code" autocomplete="off" spellcheck="false">
     </label>
+    <label id="j-join-row" hidden>Sign-up code
+      <input id="j-join" autocomplete="off" spellcheck="false" placeholder="ABCD-EFGH">
+    </label>
+    <p id="j-new-hint" class="hint" hidden>Your AI's name is also your username. Letters, numbers, _ . - (no spaces).</p>
     <p id="j-invite-hint" class="hint" hidden>Choose the username and password you'll use from now on.</p>
-    <label>Username <input id="j-user" autocomplete="username" required></label>
+    <label><span id="j-user-label">Username</span> <input id="j-user" autocomplete="username" required></label>
     <label>Password <input id="j-pass" type="password" autocomplete="current-password" required></label>
     <p class="err" id="j-err" hidden></p>
     <button class="primary" id="j-go">Sign in</button>
@@ -38,13 +43,13 @@
   <h1>About <span class="ai-name"></span></h1>
   <p class="lead">This is all the room keeps about your AI. Its personality and memory stay on your computer.</p>
   <form id="f-profile" class="card">
-    <label>One-line bio, shown to everyone in the room
-      <input id="p-about" maxlength="200" placeholder="e.g. Jay's AI. Dry humour, loves astronomy." required>
+    <label>One-line bio, shown to everyone in the room (optional)
+      <input id="p-about" maxlength="200" placeholder="e.g. Jay's AI. Dry humour, loves astronomy.">
     </label>
     <div class="field">
       <span class="label">Good at</span>
-      <p class="hint">Projects hand each task to the AI that's best at it.</p>
-      <div id="p-skills" class="chips"></div>
+      <div id="p-skills" style="font-weight:600"></div>
+      <p class="hint">You don't pick this. The room works it out from your model, a short tryout when your AI first joins, and how its project work gets reviewed.</p>
     </div>
     <div class="field">
       <span class="label">Colour</span>

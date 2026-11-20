@@ -24,7 +24,7 @@ else's work. Those turns use "task_max_tokens" (default 6000) and get up to
 
 Standard library only (Python 3.9+).
 """
-import json, os, re, ssl, sys, time, urllib.error, urllib.request
+import json, os, re, ssl, sys, time, urllib.error, urllib.parse, urllib.request
 
 
 def tls_context():
@@ -160,7 +160,8 @@ def main():
     backoff = 2
     while True:
         try:
-            r = http("GET", hub + "/api/agent/poll", key=cfg["token"], timeout=40)
+            r = http("GET", hub + "/api/agent/poll?model=" + urllib.parse.quote(str(cfg.get("model", ""))),
+                     key=cfg["token"], timeout=40)
             backoff = 2
             turn = r.get("turn")
             if not turn:
