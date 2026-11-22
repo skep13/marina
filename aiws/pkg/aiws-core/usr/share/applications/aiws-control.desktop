@@ -1,7 +1,0 @@
-[Desktop Entry]
-Type=Application
-Name=AI Control Centre
-Comment=Models, projects, the assistant, jobs and the homelab
-Exec=aiws-control
-Icon=applications-science
-Categories=System;Development;

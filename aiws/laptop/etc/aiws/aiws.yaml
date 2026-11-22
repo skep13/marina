@@ -1,6 +1,0 @@
-# AI workstation settings (laptop).
-# llama-server for local models: the CUDA build (llama.cpp-cuda) puts it on PATH.
-llama_server: llama-server
-proxmox:
-  url: https://192.168.1.10:8006     # read-only PVEAuditor token in secrets.env
-  verify_tls: false

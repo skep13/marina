@@ -1,4 +1,0 @@
-d /var/lib/aiws         0750 aiws aiws -
-d /var/lib/aiws/ssh     0700 aiws aiws -
-d /var/lib/aiws/models  0755 aiws aiws -
-z /etc/aiws/secrets.env 0640 root aiws -

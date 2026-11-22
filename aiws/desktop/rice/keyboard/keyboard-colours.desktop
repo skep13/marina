@@ -1,8 +1,0 @@
-[Desktop Entry]
-Type=Application
-Name=Keyboard Colours
-Comment=Colour wheel for the keyboard lighting
-Exec=/home/marina/.local/bin/keyboard-colours
-Icon=preferences-desktop-color
-Categories=Settings;HardwareSettings;
-Terminal=false

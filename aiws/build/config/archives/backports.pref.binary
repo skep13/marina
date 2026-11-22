@@ -1,9 +1,0 @@
-# Replacing Proxmox on lab3 (PVE kernel 7.0, Mesa 25.0) means matching or
-# beating its kernel and graphics stack: take these from trixie-backports.
-Package: linux-image-* linux-headers-* linux-kbuild-* linux-base firmware-* amd64-microcode
-Pin: release n=trixie-backports
-Pin-Priority: 990
-
-Package: mesa-* libgl1-mesa-* libglx-mesa0 libegl-mesa0 libgbm1 libdrm* libvulkan1 vulkan-tools
-Pin: release n=trixie-backports
-Pin-Priority: 990

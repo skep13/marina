@@ -1,4 +1,0 @@
-# AIWS system settings. Per-user choices (roles, projects) live in aiwsd's state.
-proxmox:
-  url: https://192.168.1.10:8006     # any node; read-only PVEAuditor token in secrets.env
-  verify_tls: false                  # self-signed homelab certs

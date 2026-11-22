@@ -29,8 +29,6 @@ app/renderer/vendor/
 character_config.yaml
 reminders.json
 reminders.tmp
-songbird/kali/agent/kali_agent.py
-songbird/kali/webui/kali_tool.py
 mood.json
 mood.json.tmp
 
@@ -40,8 +38,6 @@ cache/
 # generated output, personal notes and stray copies (kept locally, not published)
 output/
 docs/marina-handover-*.md
-aiws/handoff/
-aiws/tester@/
 docx-qa-oakfield*/
 result.json
 

@@ -1,4 +1,0 @@
-# Compressed swap in RAM: cheap insurance for an 8-23 GB desktop.
-ALGO=zstd
-PERCENT=25
-PRIORITY=100

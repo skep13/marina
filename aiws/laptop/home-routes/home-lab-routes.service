@@ -1,7 +1,0 @@
-[Unit]
-Description=Route the home lab over Tailscale on networks that clash with it
-After=tailscaled.service network-online.target
-
-[Service]
-Type=oneshot
-ExecStart=/usr/local/sbin/home-lab-routes

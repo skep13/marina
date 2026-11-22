@@ -1,4 +1,0 @@
-#%PAM-1.0
-# Used only by yubikey-unlock.py: the enrolled key, no touch, nothing else.
-auth       required   pam_u2f.so authfile=/etc/u2f_mappings origin=pam://cachyos-x8664 appid=pam://cachyos-x8664 userpresence=0
-account    required   pam_permit.so

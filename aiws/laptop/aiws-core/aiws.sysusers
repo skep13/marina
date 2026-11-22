@@ -1,4 +1,0 @@
-g aiws - -
-u aiws - "AI workstation services" /var/lib/aiws /usr/bin/nologin
-m aiws render
-m aiws video

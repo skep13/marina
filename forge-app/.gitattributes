@@ -1,4 +1,0 @@
-# Built by dsh-forge-theme/build.py from client.template.js; GitHub collapses
-# these in diffs and leaves them out of language stats.
-dsh-forge-theme/lib/client.js   linguist-generated=true
-dsh-forge-theme/lib/tokens.json linguist-generated=true

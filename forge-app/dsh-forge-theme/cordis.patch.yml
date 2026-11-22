@@ -1,7 +1,0 @@
-# Forge theme: our plugin fills the sidebar brand slots, so the official
-# DeepSeek brand plugin is switched off.
-- insert:
-    - id: forge-theme
-      name: 'dsh-forge-theme'
-- id: ui-brand-official
-  disabled: true

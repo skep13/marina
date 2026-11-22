@@ -1,2 +1,0 @@
-# Re-run power-auto whenever the charger is plugged in or removed
-SUBSYSTEM=="power_supply", KERNEL=="ADP1", ACTION=="change", TAG+="systemd", ENV{SYSTEMD_WANTS}="power-auto.service"

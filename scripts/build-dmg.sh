@@ -2,9 +2,12 @@
 # Builds one disk image with every Mac app in this repo:
 #
 #   Marina.app            the companion (app/, built by ./build-app.sh)
-#   Forge.app             the coding agent window (forge-app/)
-#   modelctl.app          lab3 model switcher TUI (modelctl/)
-#   Rainy Day Café.app    the café game (games/cozy-cafe/)
+#   Forge.app             the coding agent window (skep13/forge, in ~/forge)
+#   modelctl.app          lab3 model switcher TUI (skep13/homelab, ~/homelab/modelctl)
+#   Rainy Day Café.app    the café game (skep13/games, ~/games/cozy-cafe)
+#
+# The other apps live in their own repositories now, cloned next to this one.
+# FORGE_DIR, MODELCTL_DIR and CAFE_DIR point somewhere else if they aren't.
 #
 # Output: dist/Marina-Suite-<date>.dmg, with an Applications shortcut to drag
 # the apps onto.
@@ -31,10 +34,14 @@ for arg in "$@"; do
   esac
 done
 
+FORGE_DIR="${FORGE_DIR:-$HOME/forge}"
+MODELCTL_DIR="${MODELCTL_DIR:-$HOME/homelab/modelctl}"
+CAFE_DIR="${CAFE_DIR:-$HOME/games/cozy-cafe}"
+
 MARINA_APP="$ROOT/app/dist/mac-arm64/Marina.app"
 FORGE_APP="$HOME/Applications/Forge.app"
 MODELCTL_APP="$HOME/Applications/modelctl.app"
-CAFE_APP="$ROOT/games/cozy-cafe/dist/Rainy Day Café.app"
+CAFE_APP="$CAFE_DIR/dist/Rainy Day Café.app"
 
 if [ "$BUILD" = 1 ]; then
   stale_marina=0
@@ -50,11 +57,11 @@ if [ "$BUILD" = 1 ]; then
     echo "==> Marina: up to date, reusing $MARINA_APP"
   fi
   echo "==> Forge"
-  ./forge-app/macos/install.sh --build --no-dock
+  "$FORGE_DIR/macos/install.sh" --build --no-dock
   echo "==> modelctl"
-  ./modelctl/macos/install.sh --build --no-dock
+  "$MODELCTL_DIR/macos/install.sh" --build --no-dock
   echo "==> Rainy Day Café"
-  ./games/cozy-cafe/build-app.sh --no-install
+  "$CAFE_DIR/build-app.sh" --no-install
 fi
 
 for a in "$MARINA_APP" "$FORGE_APP" "$MODELCTL_APP" "$CAFE_APP"; do

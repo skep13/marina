@@ -1,9 +1,0 @@
-# A homelab machine that runs jobs for you. Rename to lab2.yaml and point
-# it at a box with a user `aiws` that has /var/lib/aiws/ssh/id_ed25519.pub
-# in its authorized_keys.
-name: lab2
-host: 192.168.1.11
-user: aiws
-tags: [cpu, build]
-max_mem: 1G
-cpu_weight: 50

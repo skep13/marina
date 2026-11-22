@@ -1,2 +1,0 @@
-# YubiKey plugged in -> try to unlock (the service proves it's the enrolled key)
-ACTION=="add", SUBSYSTEM=="hidraw", ATTRS{idVendor}=="1050", TAG+="systemd", ENV{SYSTEMD_WANTS}+="yubikey-unlock.service"
