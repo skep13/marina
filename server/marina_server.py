@@ -1358,6 +1358,29 @@ def idle_listen(timeout: float = 120.0, client: str = "desk"):
                              media_type="application/x-ndjson")
 
 
+class RoomNoteIn(BaseModel):
+    text: str
+    topic: str = ""
+    kind: str = "chat"
+    others: list[str] = []
+
+
+@app.get("/room/context")
+def room_context():
+    """For the Room of AIs connector: who she is and what she's done there
+    before, so the room gets the same Marina (see process.room)."""
+    from process import room
+    return {"context": room.context()}
+
+
+@app.post("/room/note")
+def room_note(body: RoomNoteIn):
+    """The connector, after she says or hands in something in the room."""
+    from process import room
+    entry = room.note(body.text, body.topic, body.kind, body.others)
+    return {"ok": entry is not None}
+
+
 class PresenceIn(BaseModel):
     front: bool
 

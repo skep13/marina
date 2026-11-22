@@ -24,6 +24,7 @@ from process.backend import note_used
 from process import config
 from process import confirm
 from process import shared
+from process import room as her_room
 from process.config import load_config, resolve_data
 from process.memory import episode
 from process.memory import extract as memory_extract
@@ -523,6 +524,7 @@ def turn_notes(history, user_input=None):
     if personal:
         offer(lambda: followup.note(their_message=text))
     offer(lambda: lore.note(history, text))
+    offer(lambda: her_room.home_note(text))
     if personal:
         offer(lambda: gap.note(history))
         offer(lambda: recall.note(text))
