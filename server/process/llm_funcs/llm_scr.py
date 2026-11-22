@@ -306,13 +306,16 @@ def chat_completion(messages, **kw):
     whenever a backend can't be reached."""
     from openai import APIConnectionError, APITimeoutError
 
+    routed = kw.pop("_model", None)
     kw = _request_extras(kw)
     order = _order()
     for i, which in enumerate(order):
         send, send_kw = _for_backup(messages, kw) if _is_backup(which) else (messages, kw)
         try:
+            # A route only ever moves work on lab3; the backup keeps its own model.
+            model = routed if (routed and which == "server") else model_for(which)
             out = _clients[which].chat.completions.create(
-                model=model_for(which), messages=send, **send_kw)
+                model=model, messages=send, **send_kw)
         except (APIConnectionError, APITimeoutError):
             if i == len(order) - 1:
                 raise
@@ -596,9 +599,37 @@ def _shorten_old_results(messages):
     return out
 
 
-def get_reply_stream(messages, working=False, **kw):
+# Like the Room of AIs: work on certain kinds of request goes to the model
+# best at it. Each route in `llm.routes` has a `match` regex, tried against
+# their message, and the `model` (and optionally `temperature`) to work
+# with. Only her working rounds move, the ones after she has started using
+# tools, so ordinary chat that happens to mention code stays on her own
+# model and never pays for a model swap. First match wins.
+ROUTES = []
+for _r in _llm.get("routes") or []:
+    try:
+        ROUTES.append({**_r, "_re": re.compile(_r["match"], re.I)})
+    except (KeyError, TypeError, re.error) as _e:
+        print(f"[llm] ignoring a route that doesn't work: {_e}", flush=True)
+
+
+def route_for(user_input):
+    if isinstance(user_input, list):
+        user_input = " ".join(p.get("text", "") for p in user_input if isinstance(p, dict))
+    text = str(user_input or "")
+    for r in ROUTES:
+        if r.get("model") and r["_re"].search(text):
+            return r
+    return None
+
+
+def get_reply_stream(messages, working=False, route=None, **kw):
     settings = _work_settings() if working else {
         "temperature": _temperature(), "max_tokens": MAX_TOKENS}
+    if working and route:
+        settings["_model"] = route["model"]
+        if route.get("temperature") is not None:
+            settings["temperature"] = float(route["temperature"])
     return chat_completion(messages, stream=True, **settings, **kw)
 
 
@@ -787,6 +818,9 @@ def _stream(user_input=None, extra_system=None, use_tools=True, history=None):
     offer = tools.definitions() if (use_tools and _tools_supported) else None
 
     rounds = _tool_rounds()
+    route = route_for(user_input) if offer else None
+    if route:
+        print(f"[llm] work on this goes to {route['model']}", flush=True)
     done_rounds = 0
     last_calls = []
     nudged = False
@@ -804,7 +838,8 @@ def _stream(user_input=None, extra_system=None, use_tools=True, history=None):
         aloud = False if working else None
         unspoken = _Unspoken()
         try:
-            stream = (get_reply_stream(messages, working, tools=offer, tool_choice="auto")
+            routed = {"route": route} if route else {}
+            stream = (get_reply_stream(messages, working, tools=offer, tool_choice="auto", **routed)
                       if offer else get_reply_stream(messages, working))
             for event in stream:
                 if not event.choices:

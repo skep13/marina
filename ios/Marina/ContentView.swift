@@ -36,23 +36,18 @@ struct ContentView: View {
                             }
                             .frame(maxHeight: .infinity)
                         }
-                        if let what = chat.activity {
-                            Label(what, systemImage: "gearshape.2")
-                                .font(.footnote).padding(.horizontal, 12).padding(.vertical, 6)
-                                .background(.ultraThinMaterial, in: Capsule())
-                                .padding(.bottom, 8)
-                        }
                     }
                     .frame(height: 300)
                     .transition(.move(edge: .top).combined(with: .opacity))
                 }
                 Transcript()
+                WorkPanel()
                 Composer()
             }
         }
         .sheet(isPresented: $showSettings) { SettingsView() }
         .alert(item: $chat.ask) { ask in
-            Alert(title: Text(ask.where_ == "mac" ? "On your Mac" : "On her machine"),
+            Alert(title: Text(ask.where_ == "mac" ? "On your Mac" : "On \(chat.workspace ?? "her machine")"),
                   message: Text(ask.text),
                   primaryButton: .default(Text("Allow")) { chat.answer(true) },
                   secondaryButton: .cancel(Text("Deny")) { chat.answer(false) })
@@ -62,6 +57,7 @@ struct ContentView: View {
 
 struct TopBar: View {
     @EnvironmentObject var chat: Chat
+    @EnvironmentObject var handsFree: HandsFree
     @Binding var showSettings: Bool
     @Binding var showAvatar: Bool
 
@@ -73,6 +69,12 @@ struct TopBar: View {
                 Text(statusText).font(.caption).foregroundStyle(.secondary).lineLimit(1)
             }
             Spacer()
+            Button { chat.toggleHandsFree() } label: {
+                Image(systemName: handsFree.on ? "ear.fill" : "ear")
+                    .foregroundStyle(handsFree.on ? Color.accent : Color.primary)
+                    .symbolEffect(.pulse, isActive: handsFree.state == .hearing)
+            }
+            .accessibilityLabel(handsFree.on ? "Turn hands-free off" : "Turn hands-free on")
             Button { withAnimation(.spring(duration: 0.35)) { showAvatar.toggle() } } label: {
                 Image(systemName: showAvatar ? "person.crop.circle.fill" : "person.crop.circle")
             }
@@ -102,7 +104,14 @@ struct TopBar: View {
 
     private var statusText: String {
         switch chat.link {
-        case .ok(let model): return chat.busy ? "typing…" : model
+        case .ok(let model):
+            if chat.busy { return "typing…" }
+            switch handsFree.state {
+            case .hearing: return "hearing you…"
+            case .waiting: return "listening…"
+            case .listening: return "say \u{201C}Marina\u{201D} · \(handsFree.input)"
+            case .off: return model
+            }
         case .down(let why): return why
         case .unknown: return "connecting…"
         }
@@ -139,7 +148,12 @@ struct Transcript: View {
     }
 
     private var emptyText: String {
-        if case .down = chat.link { return "She's not reachable right now. Check Tailscale is on, then pull her settings up from ⋯." }
+        if case .down(let why) = chat.link {
+            if why.hasPrefix("Add the bridge") || why.contains("token") {
+                return "\(why)\n\n⋯ › Settings."
+            }
+            return "She's not reachable right now. Check Tailscale is on, then pull her settings up from ⋯."
+        }
         return "Say something to her."
     }
 }

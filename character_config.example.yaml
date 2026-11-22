@@ -31,6 +31,13 @@ llm:
   # Rounds of tool calls one reply may take, 0 for no limit. Only matters with the
   # workspace on, where a task is a chain of them: run, read, fix, rerun.
   max_tool_rounds: 0         # 0: no limit
+  # Like the Room of AIs: once she starts working on a coding request, the
+  # work goes to KAT-Coder (llama-swap "forge"), still as her, with her
+  # personality prompt. Chat never moves, so it never waits on a model swap.
+  routes:
+    - match: '\b(code|coding|script|program|programme|function|bug|debug|refactor|compile|stack ?trace|traceback|repo|repository|git|commit|python|javascript|typescript|npm|pip|cargo|rust|golang|html|css|unit tests?|pytest|syntax error|exception)\b|\.(py|js|ts|sh|rs|go|cpp|html|css|json|ya?ml)\b'
+      model: forge
+      temperature: 0.3
 
   # Backups. With mode: auto she uses the first of these that answers, in
   # order: base_url, then each extra_backends entry, then fallback_base_url.
@@ -463,6 +470,10 @@ workspace:
   enabled: false
   host: "192.168.1.12"
   user: "marina"
+  # xfce: her own machine, with the shared tmux terminal and desktop tool.
+  # cinnamon: your Linux Mint PC (lab2), used as your account with sudo,
+  # with commands reaching your desktop session (apps, xdotool, Spotify).
+  desktop: xfce
   key: "workspace_key"      # relative to this file, or an absolute path
   root: "~/projects"        # where relative paths and commands start
   timeout_seconds: 120
@@ -505,6 +516,17 @@ api:
 # speaker this host:port for both speech to text and text to speech, and the
 # /v1/ API above as its chat model, with model "marina-voice" and api.key as
 # its key. Wyoming has no keys, so list the speaker's address in allow.
+# Push to the iPhone through a self-hosted ntfy, for when her app isn't open:
+# reminders, timers and (with openers) her checking in. Install ntfy's iPhone
+# app and subscribe to the topic on this server. The topic and the bridge's
+# publish token go in secret_file (topic=... and token=... lines).
+push:
+  enabled: false
+  url: "http://127.0.0.1:2586"      # where the bridge publishes
+  secret_file: "ntfy.secret"
+  openers: true
+  click: "marinaapp://open"          # tapping the notification opens her app
+
 satellite:
   enabled: false
   host: "0.0.0.0"

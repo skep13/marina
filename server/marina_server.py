@@ -16,7 +16,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT / "server"))
 
 from fastapi import FastAPI, File, UploadFile
-from fastapi.responses import JSONResponse, StreamingResponse
+from fastapi.responses import JSONResponse, Response, StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 from openai import APIConnectionError
 from pydantic import BaseModel
@@ -56,6 +56,7 @@ from process import config as cfg
 from process import idle
 from process import call
 from process import notice
+from process import push
 from process import mood as her_mood
 from process import state as her_state
 from process import ratings
@@ -173,7 +174,14 @@ def health():
         "barge_in": _barge_enabled(),
         "idle": idle.status(),
         "call": call.status(),
+        "workspace": _workspace_name(),
+        "push": push.enabled(),
     }
+
+
+def _workspace_name():
+    from process.tools import workspace
+    return workspace.NAME if workspace.available() else None
 
 
 @app.post("/chat")
@@ -323,6 +331,7 @@ def chat_stream(body: ChatIn):
 
 class InterruptIn(BaseModel):
     chunks: int = 0
+    stop_work: bool = False   # also kill the command she is running on her machine
 
 
 @app.post("/interrupt")
@@ -332,7 +341,24 @@ def interrupt(body: InterruptIn):
         _stream["stop_at"] = max(0, body.chunks)
         stream_id = _stream["id"]
     confirm.cancel_all()  # stopping her is a no to anything she was asking
+    if body.stop_work:
+        from process.tools import workspace
+        if workspace.available():
+            threading.Thread(target=workspace.stop_running, daemon=True).start()
     return {"ok": True, "id": stream_id, "heard": max(0, body.chunks)}
+
+
+@app.get("/workspace/screen")
+def workspace_screen(full: bool = False):
+    """What is on the screen of the machine she works on (lab2), for the
+    app to show while she works."""
+    from process.tools import workspace
+    if not workspace.available():
+        return JSONResponse({"error": "She has no machine to work on."}, status_code=404)
+    image = workspace.screen_jpeg(full)
+    if image is None:
+        return JSONResponse({"error": f"Couldn't see {workspace.NAME}'s screen."}, status_code=502)
+    return Response(image, media_type="image/jpeg", headers={"Cache-Control": "no-store"})
 
 
 # ---- stage: type on one device, she answers on another ------------------------
@@ -547,6 +573,60 @@ def voice_stream(audio: UploadFile = File(...)):
     with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
         tmp.write(audio.file.read())
     return _stream_transcript(Path(tmp.name))
+
+
+def _wav_to_float(data):
+    """16-bit PCM WAV bytes to 16 kHz mono float32, or None."""
+    import io
+    import wave
+
+    import numpy as np
+
+    try:
+        with wave.open(io.BytesIO(data)) as w:
+            if w.getsampwidth() != 2:
+                return None
+            channels, rate = w.getnchannels(), w.getframerate()
+            pcm = np.frombuffer(w.readframes(w.getnframes()), dtype="<i2")
+    except (wave.Error, EOFError):
+        return None
+    audio = pcm.astype("float32") / 32768.0
+    if channels > 1:
+        audio = audio.reshape(-1, channels).mean(axis=1)
+    if rate != 16000 and len(audio):
+        idx = np.linspace(0, len(audio) - 1, int(len(audio) * 16000 / rate))
+        audio = np.interp(idx, np.arange(len(audio)), audio).astype("float32")
+    return audio
+
+
+@app.post("/hear")
+def hear(audio: UploadFile = File(...), follow: bool = False):
+    """Hands-free on the phone: one phrase the phone's mic picked up, as a
+    16-bit WAV. She answers if it was said to her ("Marina, ...", "...,
+    Marina?"), or straight away when `follow` says you're still talking to
+    her. Anything else is dropped without a word: {"type": "ignored"}.
+    Her name alone gives {"type": "wake"}, for the phone to listen on."""
+    samples = _wav_to_float(audio.file.read())
+    if samples is None:
+        return _stream_error("That clip wasn't a 16-bit WAV.")
+    with _ears_lock_hear:
+        text = transcribe_audio(whisper(), samples, prompt=WAKE_PROMPT).strip()
+    if not text:
+        return StreamingResponse(iter([_ndjson({"type": "ignored"})]),
+                                 media_type="application/x-ndjson")
+    request = text if follow else wake_match(text, WAKE_WORDS)
+    if request is None:
+        print(f"[hear] (not to her) {text[:80]}", flush=True)
+        return StreamingResponse(iter([_ndjson({"type": "ignored", "text": text})]),
+                                 media_type="application/x-ndjson")
+    if not request.strip(" .,!?"):
+        print("[hear] her name", flush=True)
+        return StreamingResponse(iter([_ndjson({"type": "wake", "text": text})]),
+                                 media_type="application/x-ndjson")
+    return StreamingResponse(_reply_to(request), media_type="application/x-ndjson")
+
+
+_ears_lock_hear = threading.Lock()   # one Whisper run at a time from the phone
 
 
 _listen_cfg = config.get("listen") or {}
@@ -1190,10 +1270,48 @@ def idle_mute(body: MuteIn):
     return {"ok": True, "muted": value}
 
 
-def _idle_stream(timeout):
-    """Long poll: returns when she has something unprompted to say."""
+def _reply_text(events):
+    """Pass a reply's events through, keeping what she said for a push."""
+    said = {"text": ""}
+
+    def run():
+        for line in events:
+            try:
+                ev = json.loads(line)
+                if ev.get("type") in ("done", "interrupted"):
+                    said["text"] = ev.get("reply") or ""
+            except (ValueError, TypeError):
+                pass
+            yield line
+    return run(), said
+
+
+def _idle_stream(timeout, client="desk"):
+    """Long poll: returns when she has something unprompted to say.
+
+    A phone only gets her unprompted words while it says it is in front;
+    from the background they go out as a push instead (see process.push),
+    since a suspended app would never hear them."""
+    phone = client == "phone"
+    if phone:
+        push.phone_polled()
+    else:
+        push.desk_stream(True)
+    try:
+        yield from _idle_wait(timeout, phone)
+    finally:
+        if not phone:
+            push.desk_stream(False)
+
+
+def _idle_wait(timeout, phone):
     waited = 0.0
     while waited < timeout:
+        if phone and not push.phone_here():
+            time.sleep(2.0)
+            waited += 2.0
+            yield _ndjson({"type": "waiting"})
+            continue
         if call.active():
             # On a call she only answers; nothing unprompted cuts across it.
             time.sleep(2.0)
@@ -1204,8 +1322,12 @@ def _idle_stream(timeout):
         if announcement:
             idle.note_interaction()
             print("[idle] a timer went off", flush=True)
-            yield from _stream_reply(None, True, transcript="",
-                                     extra_system="\n\n" + announcement)
+            events, said = _reply_text(_stream_reply(None, True, transcript="",
+                                                     extra_system="\n\n" + announcement))
+            yield from events
+            # Heard on a desktop, but they may not be at it: the phone gets it too.
+            if not phone and not push.phone_here():
+                push.send(said["text"], tags=["alarm_clock"])
             return
 
         noticed = notice.poll()
@@ -1228,12 +1350,55 @@ def _idle_stream(timeout):
 
 
 @app.get("/idle/listen")
-def idle_listen(timeout: float = 120.0):
+def idle_listen(timeout: float = 120.0, client: str = "desk"):
     if not idle.enabled():
         return StreamingResponse(iter([_ndjson({"type": "disabled"})]),
                                  media_type="application/x-ndjson")
-    return StreamingResponse(_idle_stream(timeout),
+    return StreamingResponse(_idle_stream(timeout, client),
                              media_type="application/x-ndjson")
+
+
+class PresenceIn(BaseModel):
+    front: bool
+
+
+@app.post("/presence")
+def presence(body: PresenceIn):
+    """The phone app coming to the front or leaving it."""
+    push.phone_presence(body.front)
+    return {"ok": True, "push": push.enabled()}
+
+
+def _say_unprompted(extra_system, tags=None):
+    """Nobody has her app open: she says it anyway, it is saved like any
+    other turn, and it goes to the phone as a push."""
+    events, said = _reply_text(_stream_reply(None, False, transcript="",
+                                             extra_system=extra_system))
+    for _ in events:
+        pass
+    push.send(said["text"], tags=tags)
+
+
+def _push_loop():
+    """Her unprompted words when no app is there to hear them."""
+    while True:
+        time.sleep(3.0)
+        try:
+            if push.phone_here() or push.desk_here() or call.active():
+                continue
+            announcement = tools.pending_announcement()
+            if announcement:
+                idle.note_interaction()
+                print("[push] a timer went off with no app open", flush=True)
+                _say_unprompted("\n\n" + announcement, tags=["alarm_clock"])
+                continue
+            if push.OPENERS and idle.enabled() and idle.due():
+                idle.note_spoken()
+                print("[push] saying something unprompted with no app open", flush=True)
+                _say_unprompted(idle.OPENER_INSTRUCTION)
+        except Exception as e:
+            print(f"[push] {type(e).__name__}: {e}", flush=True)
+            time.sleep(30)
 
 
 @app.get("/voices")
@@ -1264,6 +1429,10 @@ if __name__ == "__main__":
     from process import telegram
     telegram.start(transcribe=lambda path: transcribe_file(whisper(), path),
                    synthesize=synthesize)
+
+    if push.enabled():
+        threading.Thread(target=_push_loop, daemon=True, name="push").start()
+        print(f"[push] notifications through ntfy ({push.URL})", flush=True)
 
     from process import satellite
     satellite.start(transcribe=lambda audio: transcribe_audio(whisper(), audio, prompt=WAKE_PROMPT),

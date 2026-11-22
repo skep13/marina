@@ -1,4 +1,11 @@
-"""Her own Linux machine: tools for running commands and editing files there.
+"""A Linux machine she can use: tools for running commands and editing files there.
+
+Two kinds, set by `workspace.desktop`:
+  xfce      her own machine (marina-workspace), with a shared tmux terminal
+            and a desktop tool for its looks.
+  cinnamon  their PC, lab2 (Linux Mint), which she uses as their own account
+            with sudo: commands, files, apps, the mouse and keyboard, and
+            screenshots of both screens.
 
 Everything goes over SSH with a key of its own (`workspace.key`), so what she
 can touch is exactly what that account on that machine can touch, and
@@ -29,6 +36,14 @@ ROOT = str(_cfg.get("root") or "~/projects").rstrip("/")
 TIMEOUT = float(_cfg.get("timeout_seconds", 120))
 OUTPUT_CHARS = int(_cfg.get("output_chars", 6000))
 READ_LINES = int(_cfg.get("read_lines", 400))
+DESKTOP = str(_cfg.get("desktop") or "xfce").strip().lower()
+THEIRS = DESKTOP != "xfce"     # their PC, not her own machine
+NAME = str(_cfg.get("name") or ("lab2" if THEIRS else "marina-workspace")).strip()
+
+# So what she starts can reach their desktop session: open windows, show
+# notifications, control the music player.
+_SESSION_ENV = ("export DISPLAY=:0 XDG_RUNTIME_DIR=/run/user/$(id -u) "
+                "DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/$(id -u)/bus; ")
 
 
 def _key():
@@ -101,12 +116,18 @@ def _path(path):
 
 # Killing any of these from a command takes part of the desktop down with
 # it: whatever she starts again from the same command dies when it ends.
-_SESSION = r"(xfdesktop|xfwm4|xfce4-panel|xfce4-session|xfsettingsd|xfconfd|xfce4-terminal|Xorg|lightdm|tmux)"
+_SESSION = (r"(xfdesktop|xfwm4|xfce4-panel|xfce4-session|xfsettingsd|xfconfd|xfce4-terminal"
+            r"|cinnamon|cinnamon-session|muffin|nemo-desktop|csd-\w+|Xorg|lightdm|tmux)")
 _KILLS = re.compile(
     rf"\b(?:pkill|killall)\b[^|;&]*\b{_SESSION}\b"
     rf"|\b{_SESSION}\s+(?:--quit|-q)\b"
     r"|\btmux\s+kill-(?:server|session)\b"
     r"|\bsystemctl\s+(?:stop|restart)\s+lightdm\b", re.I)
+
+# On lab2, plain xrandr mode changes leave Cinnamon drawing at the old size,
+# zoomed and cropped. Setting an output property (Broadcast RGB) is fine.
+_XRANDR = re.compile(r"\bxrandr\b[^|;&\n]*--(?:auto|mode|rotate|scale|pos|off|primary"
+                     r"|brightness|transform|fb|left-of|right-of|above|below)\b")
 
 _APT = re.compile(r"\bapt(?:-get)?\s+(?:-\S+\s+)*install\b([^;&|\n]*)")
 
@@ -117,8 +138,15 @@ def refused(command):
     if m:
         return (f"Not running that: it would kill {m.group(0).split()[-1]}, part of "
                 "the desktop you share with them, and anything you restart from "
-                "a command dies when the command ends. Use the desktop tool: "
-                "action restart with component desktop, panel or wm.")
+                "a command dies when the command ends. "
+                + ("Use the desktop tool: action restart with component desktop, panel or wm."
+                   if not THEIRS else
+                   "If Cinnamon really needs restarting: cinnamon-dbus-command RestartCinnamon 1"))
+    if THEIRS and _XRANDR.search(command):
+        return ("Not running that: changing screen modes with xrandr leaves Cinnamon "
+                "drawing at the old size, zoomed and cropped. Their layout lives in "
+                "~/.config/cinnamon-monitors.xml and /usr/local/sbin/lab2-screens; leave "
+                "it alone unless they ask, and then tell them what you'd change first.")
     return None
 
 
@@ -179,7 +207,8 @@ def run_command(command, cwd="", timeout_seconds=None):
     except (TypeError, ValueError):
         limit = TIMEOUT
     where = _path(cwd) if cwd else _path(".")
-    script = f"mkdir -p {_path('.')} && cd {where} && {{ {command}\n}}\n"
+    env = _SESSION_ENV if THEIRS else ""
+    script = f"{env}mkdir -p {_path('.')} && cd {where} && {{ {command}\n}}\n"
     lines = command.splitlines()
     title = lines[0][:200] + (" …" if len(lines) > 1 or len(lines[0]) > 200 else "")
     print(f"[workspace] $ {command}", flush=True)
@@ -261,12 +290,44 @@ def edit_file(path, old_text, new_text):
     return result.replace("Wrote", "Edited", 1) if result.startswith("Wrote") else result
 
 
+LOOK_PROMPT_THEIRS = """This is a screenshot of {name}, their Linux Mint (Cinnamon)
+PC, with both its screens side by side: the vertical Dell on the left and the
+Acer on the right. Describe what is on it as plainly and accurately as you
+can, for your own use: which windows are open on which screen and what is in
+them, any dialogs or prompts waiting for an answer, and any text that
+matters. Only describe what you can actually see. Plain sentences, no
+markdown, under 150 words.{question}"""
+
 LOOK_PROMPT = """This is a screenshot of your own Linux desktop (XFCE).
 Describe what is on it as plainly and accurately as you can, for your own
 use: which windows are open and what is in them, the theme, colours, panel,
 icons, wallpaper and fonts, and any text that matters. Say what looks off
 or unfinished. Only describe what you can actually see. Plain sentences,
 no markdown, under 150 words.{question}"""
+
+
+def screen_jpeg(full=False):
+    """A fresh screenshot of the machine's screen as JPEG bytes, for the app
+    to show what she is doing. Scaled to 40% unless full. None if it fails."""
+    import base64
+
+    thumb = "" if full else " -t 40"
+    shot = "/tmp/marina-view.jpg" if full else "/tmp/marina-view-thumb.jpg"
+    code, out = _ssh(f"export DISPLAY=:0; scrot -o -q 60{thumb} /tmp/marina-view.jpg >/dev/null 2>&1 && "
+                     f"echo IMAGE-BEGIN && base64 -w0 {shot} && echo && echo IMAGE-END", timeout=20)
+    if code != 0 or "IMAGE-BEGIN\n" not in out:
+        return None
+    try:
+        return base64.b64decode(out.split("IMAGE-BEGIN\n", 1)[1].split("\nIMAGE-END", 1)[0].strip(),
+                                validate=True)
+    except Exception:
+        return None
+
+
+def stop_running():
+    """Kill whatever command she has running there, for the app's Stop."""
+    code, _ = _ssh("pkill -f '[.]marina/job[.]' || true", timeout=10)
+    return code == 0
 
 
 def look_at_desktop(question="", hide_windows=False):
@@ -303,7 +364,8 @@ def look_at_desktop(question="", hide_windows=False):
     try:
         reply = llm_scr.chat_completion(
             [{"role": "user", "content": [
-                {"type": "text", "text": LOOK_PROMPT.format(question=ask)},
+                {"type": "text", "text": (LOOK_PROMPT_THEIRS.format(name=NAME, question=ask)
+                                          if THEIRS else LOOK_PROMPT.format(question=ask))},
                 {"type": "image_url",
                  "image_url": {"url": f"data:image/jpeg;base64,{image}"}},
             ]}],
@@ -375,7 +437,7 @@ def describe(name, args):
         "write_file": f"writing {path()}",
         "edit_file": f"editing {path()}",
         "list_files": f"looking through {path()}",
-        "look_at_desktop": "looking at her screen",
+        "look_at_desktop": f"looking at {NAME}'s screen" if THEIRS else "looking at her screen",
         "read_terminal": "reading your shell in her terminal",
     }.get(name)
 
@@ -500,6 +562,54 @@ SPECS = [
         }}),
 ]
 
+_THEIRS_RUN = ("Run a bash command on lab2, their Linux Mint PC, as their account "
+               "(jacob) with passwordless sudo. Commands can reach their desktop "
+               "session: start apps with `setsid -f app >/dev/null 2>&1` so they keep "
+               "running, use xdotool and wmctrl for the mouse, keyboard and windows, "
+               "playerctl for Spotify, notify-send to pop up a note. It starts in "
+               "~/projects unless you give cwd. Output is returned to you, not shown "
+               "to them.")
+
+if THEIRS:
+    SPECS = [(n, f, s) for n, f, s in SPECS if n not in ("read_terminal", "desktop")]
+    for n, f, s in SPECS:
+        if n == "run_command":
+            s["description"] = _THEIRS_RUN
+        elif n == "look_at_desktop":
+            s["description"] = ("Take a screenshot of lab2's two screens and look at it. "
+                                "Call it before and after using the mouse or keyboard there, "
+                                "and whenever they ask what is on lab2's screen, so you "
+                                "answer from what you actually see.")
+        else:
+            s["description"] = s["description"].replace("your machine", "lab2")
+
+PROMPT_THEIRS = """
+
+You can use lab2, their Linux Mint (Cinnamon) PC, with run_command,
+read_file, write_file, edit_file, list_files and look_at_desktop. You use
+it as them (the jacob account) with sudo, so you can install, change and
+run anything. It is their PC, not yours: they sit at it, so treat it the
+way a trusted friend would treat someone's computer they were handed. What
+is on it and on its screens only ever comes from your tools, never from
+imagination. Its screens: a vertical Dell on the left (the main one) and
+an Acer on the right that is often switched to a PS5 or another laptop.
+
+How to use it without breaking it:
+- GUI apps: start them with setsid -f so they outlive the command. To use
+  an app, look_at_desktop first, then xdotool (search/windowactivate, key,
+  type, mousemove + click) or wmctrl, then look again to check.
+- Music is Spotify (flatpak com.spotify.Client): playerctl -p spotify
+  play/pause/next, or start it if it isn't running.
+- Don't touch the screen layout, the theme or the login screen unless they
+  ask; run_command refuses xrandr mode changes.
+- Ask them before anything that's hard to undo there: deleting their
+  files, reboots or shutdowns, removing packages, changing network or
+  firewall settings. Updates (apt upgrade, flatpak update) are fine when
+  they ask. Timeshift has restore points if something goes badly wrong.
+- Don't kill cinnamon, muffin or lightdm; run_command refuses.
+- If something fails twice the same way, stop and rethink instead of
+  trying variations."""
+
 PROMPT = """
 
 You have your own Linux computer, marina-workspace, and tools to use it.
@@ -530,3 +640,6 @@ How to work on this machine without breaking it:
   the terminal) and judge it yourself. If it looks wrong, desktop undo.
 - If something fails twice the same way, stop and rethink instead of
   trying variations."""
+
+if THEIRS:
+    PROMPT = PROMPT_THEIRS

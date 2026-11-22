@@ -16,6 +16,11 @@ enum Settings {
         set { UserDefaults.standard.set(newValue, forKey: "voiceOn") }
     }
 
+    static var handsFree: Bool {
+        get { UserDefaults.standard.bool(forKey: "handsFree") }
+        set { UserDefaults.standard.set(newValue, forKey: "handsFree") }
+    }
+
     static var notifyOn: Bool {
         get { UserDefaults.standard.object(forKey: "notifyOn") as? Bool ?? true }
         set { UserDefaults.standard.set(newValue, forKey: "notifyOn") }

@@ -7,6 +7,16 @@ looks and moves the same. Both are copied into the app when it's built, so it
 never downloads them.
 
 - Type to her, or hold the mic for a voice note (slide away to cancel).
+- **Hands-free** (the ear button): the mic stays open, with the screen locked
+  too, and she answers anything that starts or ends with her name ("Marina,
+  …", "…, Marina?"). For a few seconds after she answers you can carry on
+  without her name. A wireless mic's USB-C receiver is used automatically
+  when it's plugged in. Each phrase goes to her Whisper on lab3 (`/hear`);
+  anything not said to her is dropped there. iOS shows the orange mic dot
+  while it's on, and it costs battery.
+- **While she works** on lab2 (or your Mac) a panel shows each step, a live
+  view of lab2's screens (tap it for full size), and **Stop**, which also
+  kills the command she's running there.
 - She answers sentence by sentence in her own voice, with lip sync. The
   speaker button turns her voice off and keeps the text.
 - It's the same conversation and memory as everywhere else: it talks to her
@@ -48,8 +58,22 @@ edit `project.yml`, not the project.
    token is the bridge's web token, in `/etc/appliance/phone.token` on lab3.
    It's kept in the phone's Keychain. **Test connection**, then **Done**.
 
+## Notifications with the app closed (ntfy)
+
+A free Apple ID gets no push of its own, so her reminders, timers and
+messages come through **ntfy**, self-hosted on lab3 (ct110, `ntfy.service`,
+published on the tailnet by `tailscale serve --https=10000`). Message text
+stays on lab3; ntfy.sh only relays a wake-up to Apple.
+
+1. Install **ntfy** from the App Store.
+2. In it: **+** › *Use another server* › `https://lab3.tail35b6c6.ts.net:10000`,
+   topic: the `topic=` line of `/var/lib/marina/ntfy.secret` in ct110.
+3. Tapping one of her notifications opens this app (`marinaapp://open`).
+
+The app tells the bridge when it's on screen (`/presence`). While it is, she
+just talks here; in the background she pushes instead. With hands-free on
+she stays able to talk in the background, so she speaks reminders out loud.
+
 ## What it can't do
 
-- No push notifications. Apple only gives those to paid developer accounts,
-  so her unprompted messages reach you while the app is open or just closed.
-- No calls yet; voice notes cover talking to her.
+- No calls; hands-free and voice notes cover talking to her.

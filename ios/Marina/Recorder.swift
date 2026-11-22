@@ -13,8 +13,10 @@ final class Recorder: NSObject, ObservableObject {
         guard await AVAudioApplication.requestRecordPermission() else { return false }
         let session = AVAudioSession.sharedInstance()
         do {
-            try session.setCategory(.playAndRecord, mode: .spokenAudio,
-                                    options: [.defaultToSpeaker])
+            if !Audio.handsFreeOn {
+                try session.setCategory(.playAndRecord, mode: .spokenAudio,
+                                        options: [.defaultToSpeaker])
+            }
             try session.setActive(true)
             let url = FileManager.default.temporaryDirectory.appendingPathComponent("note-\(UUID().uuidString).m4a")
             let settings: [String: Any] = [
@@ -60,8 +62,25 @@ final class Recorder: NSObject, ObservableObject {
 }
 
 enum Audio {
+    private(set) static var handsFreeOn = false
+
+    /// Hands-free keeps the mic open alongside her voice, and keeps the app
+    /// alive with the screen locked.
+    static func handsFree(_ on: Bool) throws {
+        handsFreeOn = on
+        let session = AVAudioSession.sharedInstance()
+        if on {
+            try session.setCategory(.playAndRecord, mode: .default,
+                                    options: [.defaultToSpeaker, .allowBluetoothA2DP])
+            try session.setActive(true)
+        } else {
+            playback()
+        }
+    }
+
     /// Her voice plays even with the ring switch on silent, like a voice note.
     static func playback() {
+        if handsFreeOn { return }
         let session = AVAudioSession.sharedInstance()
         try? session.setCategory(.playback, mode: .spokenAudio)
         try? session.setActive(true)

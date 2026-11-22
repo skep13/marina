@@ -81,6 +81,15 @@ final class Bridge {
         return (try? JSONDecoder().decode([HistoryMessage].self, from: data)) ?? []
     }
 
+    /// A screenshot of the machine she works on (lab2), small unless full.
+    func screen(full: Bool = false) async throws -> Data {
+        var req = try request("workspace/screen", query: full ? [URLQueryItem(name: "full", value: "true")] : [])
+        req.timeoutInterval = 25
+        let (data, response) = try await session.data(for: req)
+        try check(response)
+        return data
+    }
+
     func post(_ path: String, json: [String: Any] = [:]) async throws {
         var req = try request(path, method: "POST")
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
@@ -114,10 +123,30 @@ final class Bridge {
         return stream(req)
     }
 
+    /// Hands-free: one phrase as a 16-bit WAV. The bridge answers only if it
+    /// was said to her (or `follow` is set), else sends {"type": "ignored"}.
+    func hear(_ wav: Data, follow: Bool) throws -> AsyncThrowingStream<BridgeEvent, Error> {
+        var req = try request("hear", method: "POST",
+                              query: follow ? [URLQueryItem(name: "follow", value: "true")] : [])
+        let boundary = "marina-\(UUID().uuidString)"
+        req.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
+        var body = Data()
+        body.append("--\(boundary)\r\n".data(using: .utf8)!)
+        body.append("Content-Disposition: form-data; name=\"audio\"; filename=\"phrase.wav\"\r\n".data(using: .utf8)!)
+        body.append("Content-Type: audio/wav\r\n\r\n".data(using: .utf8)!)
+        body.append(wav)
+        body.append("\r\n--\(boundary)--\r\n".data(using: .utf8)!)
+        req.httpBody = body
+        return stream(req)
+    }
+
     /// Long poll for something she says unprompted: a timer going off, a
     /// follow-up, or just checking in.
     func idle(timeout: Int = 120) throws -> AsyncThrowingStream<BridgeEvent, Error> {
-        var req = try request("idle/listen", query: [URLQueryItem(name: "timeout", value: String(timeout))])
+        // client=phone: the bridge only speaks into this poll while the app
+        // says it's in front, and pushes through ntfy otherwise.
+        var req = try request("idle/listen", query: [URLQueryItem(name: "timeout", value: String(timeout)),
+                                                     URLQueryItem(name: "client", value: "phone")])
         req.timeoutInterval = TimeInterval(timeout + 30)
         return stream(req)
     }
