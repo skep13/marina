@@ -7,6 +7,20 @@ const FIELDS = ["baseURL", "key", "model", "profile", "blocked"];
 const s = await loadSettings();
 for (const f of FIELDS) $(f).value = s[f];
 
+// Preset picker drives the free-text model field; "Other…" leaves it editable.
+const pick = $("modelPick");
+const syncPick = () => {
+  const known = [...pick.options].some((o) => o.value && o.value === $("model").value);
+  pick.value = known ? $("model").value : "";
+  $("model").hidden = known;
+};
+syncPick();
+pick.addEventListener("change", () => {
+  if (pick.value) $("model").value = pick.value;
+  $("model").hidden = !!pick.value;
+  if (!pick.value) $("model").focus();
+});
+
 function read() {
   const v = Object.fromEntries(FIELDS.map((f) => [f, $(f).value.trim()]));
   v.profile = $("profile").value.replace(/\s+$/, "");

@@ -4,7 +4,7 @@
 export const DEFAULTS = {
   baseURL: "http://192.168.1.15:8080/v1",   // llama-swap on lab3 (marina-brain)
   key: "",                                  // its own llama-swap API key
-  model: "browser",                         // Qwen3.6 35B-A3B, plain, no persona
+  model: "browser",                         // Qwen3.6 35B-A3B, plain, no persona; "songbird" = abliterated
   think: true,                              // reason before answering
   profile: "",                              // "Field: value" lines the agent may use in forms
   blocked: "",                              // extra domains it must never touch, one per line

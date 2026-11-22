@@ -9,7 +9,7 @@
     h1 { font-size: 12px; letter-spacing: .12em; text-transform: uppercase; margin: 0 0 14px; color: var(--c1); }
     label { display: block; font-size: 10.5px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-dim); margin: 14px 0 4px; }
     textarea { resize: vertical; line-height: 1.5; }
-    input[type=text], input[type=password], textarea {
+    input[type=text], input[type=password], textarea, select {
       width: 100%; padding: 7px 9px; border-radius: 3px;
       border: 1px solid var(--bezel); background: var(--panel); color: var(--ink); font: inherit;
     }
@@ -39,8 +39,13 @@
     <p class="hint">The browser's own llama-swap key. On the Mac it's in <code>~/.config/lab3/browser.key</code>.</p>
 
     <label for="model">Model</label>
-    <input id="model" type="text" spellcheck="false" placeholder="browser">
-    <p class="hint">The llama-swap model id. <code>browser</code> is Qwen3.6 35B-A3B with no persona.</p>
+    <select id="modelPick">
+      <option value="browser">browser: Qwen3.6 35B-A3B (stock)</option>
+      <option value="songbird">songbird: Qwen3.6 35B-A3B abliterated (won't refuse)</option>
+      <option value="">Other…</option>
+    </select>
+    <input id="model" type="text" spellcheck="false" placeholder="browser" style="margin-top:6px">
+    <p class="hint">The llama-swap model id. <code>songbird</code> is the same model with refusals removed; the extension's own locks (blocked sites, password fields, confirm cards) still apply. Switching models makes lab3 swap, so the first reply takes longer.</p>
 
     <label for="profile">Profile: details it may use in forms</label>
     <textarea id="profile" rows="8" spellcheck="false" placeholder="Name: Jacob …&#10;Email: …&#10;Phone: …&#10;Town: …"></textarea>

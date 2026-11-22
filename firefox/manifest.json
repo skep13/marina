@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Browser agent",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "A plain AI agent in the Firefox sidebar, running on lab3: reads pages, fills forms, works across tabs, and asks before submitting.",
   "icons": {
     "48": "icons/icon-48.png",
