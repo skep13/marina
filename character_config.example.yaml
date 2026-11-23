@@ -467,6 +467,7 @@ weather:
 # through the workspace connection, the bridge's own machine first-hand.
 lab_health:
   enabled: false
+  announce: false     # true: she brings up new lab problems herself
   check_minutes: 5
   disk_warn_percent: 92
   temp_warn_c: 85

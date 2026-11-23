@@ -25,6 +25,10 @@ from process.config import load_config
 _cfg = load_config().get("lab_health") or {}
 
 ENABLED = bool(_cfg.get("enabled", False))
+# Off: she checks the lab only when asked (lab_status), never brings it up
+# herself. On: a watcher checks every `check_minutes` and tells you about
+# new problems unprompted.
+ANNOUNCE = bool(_cfg.get("announce", False))
 EVERY = max(60.0, float(_cfg.get("check_minutes", 5)) * 60)
 DISK_WARN = float(_cfg.get("disk_warn_percent", 92))
 TEMP_WARN = float(_cfg.get("temp_warn_c", 85))
@@ -307,7 +311,7 @@ def _watch():
 def start(announce):
     global on_change, _watcher
     on_change = announce
-    if not ENABLED or (_watcher and _watcher.is_alive()):
+    if not ENABLED or not ANNOUNCE or (_watcher and _watcher.is_alive()):
         return
     _watcher = threading.Thread(target=_watch, daemon=True, name="lab-health")
     _watcher.start()
