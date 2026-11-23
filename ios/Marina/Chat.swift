@@ -80,9 +80,21 @@ final class Chat: ObservableObject {
 
     /// One phrase the mic picked up. Most of it isn't for her, and nothing
     /// shows unless she answers.
+    /// A phrase is on its way to the bridge and she hasn't started answering.
+    private var hearing = false
+
     private func hear(_ wav: Data, follow: Bool) {
-        guard !busy else { handsFree.ready(); return }
+        guard !busy, !hearing else { handsFree.ready(); return }
+        // Stop listening until this one is answered or dropped: each new
+        // phrase cancels the reply before it, so talking on while she was
+        // still thinking left you with no answer at all.
+        hearing = true
+        handsFree.paused = true
         Task {
+            defer {
+                hearing = false
+                if !busy { handsFree.paused = false }
+            }
             do {
                 let stream = try bridge.hear(wav, follow: follow || Settings.noNameNeeded)
                 var events = stream.makeAsyncIterator()
