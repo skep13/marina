@@ -3,8 +3,8 @@
 Listens all the time on the wireless lapel mic (BY-V) and plays her voice in
 the AirPods, whatever macOS has picked as its own input and output. Each
 phrase goes to her bridge on lab3 (/hear); she only answers what starts or
-ends with her name, and for a few seconds after she answers you can carry on
-without it.
+ends with her name only if MARINA_NEED_NAME=1; by default she answers
+everything she hears.
 
 It never listens on the AirPods' own mic: that drops them into call audio.
 Without the BY-V it falls back to the MacBook's mic; without AirPods her
@@ -44,6 +44,8 @@ MAX_FRAMES = int(15 * RATE / FRAME)
 MIN_FRAMES = 12             # shorter than ~360 ms is a click, not a phrase
 MARGIN_DB = 10.0
 FOLLOW_SECONDS = 8.0
+# Answer everything heard, not only what starts or ends with her name.
+NO_NAME = os.environ.get("MARINA_NEED_NAME", "0") != "1"
 RESCAN_SECONDS = 4.0
 
 
@@ -116,7 +118,7 @@ class Listener:
         self.q.put(indata[:, 0].copy())
 
     def send(self, clip):
-        follow = time.time() < self.follow_until
+        follow = NO_NAME or time.time() < self.follow_until
         r = requests.post(f"{BRIDGE}/hear", params={"follow": "true"} if follow else {},
                           headers={"Authorization": f"Bearer {self.token}"},
                           files={"audio": ("phrase.wav", wav_bytes(clip), "audio/wav")},

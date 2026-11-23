@@ -6,6 +6,7 @@ struct SettingsView: View {
     @State private var url = Settings.bridgeURL
     @State private var token = Settings.token
     @State private var notify = Settings.notifyOn
+    @State private var noName = Settings.noNameNeeded
     @State private var result: String?
     @State private var testing = false
 
@@ -40,6 +41,12 @@ struct SettingsView: View {
                 }
 
                 Section {
+                    Toggle("Hands-free: no need to say her name", isOn: $noName)
+                } footer: {
+                    Text("On: she answers everything the mic hears. Off: only what starts or ends with \"Marina\".")
+                }
+
+                Section {
                     Toggle("Notify me when she messages first", isOn: $notify)
                 } footer: {
                     Text("Works while the app is open or recently closed. iPhone stops apps installed with a free Apple ID from getting push notifications.")
@@ -62,6 +69,7 @@ struct SettingsView: View {
         Settings.bridgeURL = url
         Settings.token = token
         Settings.notifyOn = notify
+        Settings.noNameNeeded = noName
         chat.reconfigure()
     }
 

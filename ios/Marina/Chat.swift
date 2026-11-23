@@ -84,7 +84,7 @@ final class Chat: ObservableObject {
         guard !busy else { handsFree.ready(); return }
         Task {
             do {
-                let stream = try bridge.hear(wav, follow: follow)
+                let stream = try bridge.hear(wav, follow: follow || Settings.noNameNeeded)
                 var events = stream.makeAsyncIterator()
                 guard let first = try await events.next() else { handsFree.ready(); return }
                 switch first.type {

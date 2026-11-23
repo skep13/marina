@@ -27,6 +27,13 @@ enum Settings {
         set { UserDefaults.standard.set(newValue, forKey: "handsFree") }
     }
 
+    /// Hands-free answers everything it hears, not only what starts or
+    /// ends with her name. On by default.
+    static var noNameNeeded: Bool {
+        get { UserDefaults.standard.object(forKey: "noNameNeeded") as? Bool ?? true }
+        set { UserDefaults.standard.set(newValue, forKey: "noNameNeeded") }
+    }
+
     static var notifyOn: Bool {
         get { UserDefaults.standard.object(forKey: "notifyOn") as? Bool ?? true }
         set { UserDefaults.standard.set(newValue, forKey: "notifyOn") }
