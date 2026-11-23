@@ -1,17 +1,14 @@
 #!/bin/zsh
-# Signs Marina for your iPhone with your free Apple ID and puts it on lab3,
-# so the phone can install it from a link, no cable:
-#   https://lab3.tail35b6c6.ts.net:8443   (tailnet only; open in Safari)
-#
-# Needs Xcode signed in to the Apple ID the phone is registered with
-# (Xcode > Settings > Accounts). Free-account signatures last 7 days, so run
-# this again and reinstall from the link when the app stops opening.
+# Signs Marina for your iPhone with your free Apple ID and installs it, over
+# the cable or over Wi-Fi once "Show this iPhone when on Wi-Fi" is on in
+# Finder. (A free Apple ID's signature only installs from a connected Mac,
+# never from a link.) Free signatures last 7 days: run this again when the
+# app stops opening. Needs Xcode signed in to that Apple ID.
 set -euo pipefail
 cd "$(dirname "$0")"
 
 TEAM="${TEAM:-W88AXK3MNB}"            # jacobmatthews08@icloud.com's personal team
-LAB3="${LAB3:-root@192.168.1.13}"
-DIR=/srv/marina-install
+DEVICE="${DEVICE:-00008140-001474890247001C}"   # Jacob's iPhone 16
 
 xcodegen generate --quiet
 rm -rf build/ota
@@ -38,6 +35,5 @@ xcodebuild -exportArchive -archivePath build/ota/Marina.xcarchive \
 
 ipa=build/ota/out/Marina.ipa
 [[ -f "$ipa" ]] || { echo "No IPA came out of the export." >&2; exit 1; }
-scp -q "$ipa" "$LAB3:$DIR/Marina.ipa"
-ssh "$LAB3" "chmod 644 $DIR/Marina.ipa"
-echo "Ready: open https://lab3.tail35b6c6.ts.net:8443 in Safari on the iPhone and tap Install."
+xcrun devicectl device install app --device "$DEVICE" "$ipa" | grep -E "installationURL|rror" || true
+echo "Installed. The signature lasts 7 days."

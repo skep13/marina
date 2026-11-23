@@ -26,8 +26,19 @@ enum Settings {
         set { UserDefaults.standard.set(newValue, forKey: "notifyOn") }
     }
 
+    /// The token built into the app (bridge.token next to project.yml, never
+    /// committed), so a fresh install connects without typing it.
+    static let builtInToken: String = {
+        guard let url = Bundle.main.url(forResource: "bridge", withExtension: "token"),
+              let text = try? String(contentsOf: url, encoding: .utf8) else { return "" }
+        return text.trimmingCharacters(in: .whitespacesAndNewlines)
+    }()
+
     static var token: String {
-        get { Keychain.read("bridgeToken") ?? "" }
+        get {
+            let saved = Keychain.read("bridgeToken") ?? ""
+            return saved.isEmpty ? builtInToken : saved
+        }
         set { Keychain.write("bridgeToken", newValue.trimmingCharacters(in: .whitespacesAndNewlines)) }
     }
 }

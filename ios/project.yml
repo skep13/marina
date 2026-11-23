@@ -31,6 +31,11 @@ targets:
         buildPhase: resources
       - path: ../app/models/model.vrm
         buildPhase: resources
+      # The bridge token, if there is one: kept out of git (see .gitignore)
+      # and used until a token is typed in Settings.
+      - path: bridge.token
+        buildPhase: resources
+        optional: true
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.skep13.marina
