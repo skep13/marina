@@ -478,6 +478,10 @@ workspace:
   root: "~/projects"        # where relative paths and commands start
   timeout_seconds: 120
   output_chars: 6000        # longer command output is cut in the middle
+  # lab2 (desktop: cinnamon): a Timeshift restore point is taken before upgrades,
+  # removals and system config edits, at most this often; only her own are pruned.
+  restore_point_hours: 3
+  restore_points_kept: 5
 
 # Texting her over Telegram. Make a bot with @BotFather, paste its token,
 # start the bridge and message the bot: it replies with your chat id, which

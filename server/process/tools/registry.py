@@ -62,6 +62,11 @@ def _announce(text):
         _announcements.append(text)
 
 
+# A background job on her machine finishing is said like a timer going off.
+workspace.on_job_done = _announce
+workspace.resume_watching()
+
+
 def set_timer(minutes, label=""):
     if not _allowed("timers"):
         return "Timers are switched off."

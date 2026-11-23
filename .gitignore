@@ -21,6 +21,7 @@ chat_history*.json
 memory*.json
 models/kokoro/
 app/models/*.vrm
+app/models/*.vrm.bak
 
 app/test/*.png
 app/test/*.json

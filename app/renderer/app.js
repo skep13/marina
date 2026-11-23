@@ -1342,8 +1342,24 @@ function applyWaveIK() {
 
 const timer = new THREE.Timer();
 
-function tick() {
+// Frame cap. The avatar only needs full speed while she's talking, waving or
+// working; resting she breathes and blinks, which reads fine at 24 fps. On a
+// 120 Hz display this cuts the GPU work to a fifth while she's idle, which is
+// most of the day, and nothing is drawn at all while the window is hidden.
+let lastFrame = 0;
+function frameGap() {
+  if (document.hidden) return Infinity;
+  let lively = true;
+  try {
+    lively = busy || recording || speaking() || waveIK.p >= 0 || cueClock >= 0 || !!cursor;
+  } catch { /* first frames run before the state below is declared */ }
+  return lively ? 1000 / 60 : 1000 / 24;
+}
+
+function tick(now) {
   requestAnimationFrame(tick);
+  if (now - lastFrame < frameGap() - 2) return;
+  lastFrame = now;
   timer.update();
   const dt = Math.min(timer.getDelta(), 0.1);
   const t = timer.getElapsed();

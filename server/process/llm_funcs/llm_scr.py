@@ -521,6 +521,10 @@ def turn_notes(history, user_input=None):
             if note:
                 notes.append(note)
 
+    if working:
+        # What she did on the machine lately, so she doesn't repeat a failure.
+        from process.tools import workspace
+        offer(workspace.recent_note)
     if personal:
         offer(lambda: followup.note(their_message=text))
     offer(lambda: lore.note(history, text))

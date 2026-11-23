@@ -197,6 +197,7 @@ def run_command(command, cwd="", timeout_seconds=None):
         return why
     missing = _missing_packages(apt_packages(command))
     if missing:
+        _log("command", command.splitlines()[0], False, f"no such package: {', '.join(missing)}")
         print(f"[workspace] refused apt install of {', '.join(missing)}", flush=True)
         hints = "\n".join(f"Closest to {m}:\n{_suggest(m) or '(nothing similar)'}" for m in missing)
         return (f"Nothing was run: {', '.join(missing)} "
@@ -215,11 +216,14 @@ def run_command(command, cwd="", timeout_seconds=None):
     # The timeout runs over there too, so a command that overruns is
     # actually stopped rather than left running after ssh gives up.
     runner = _RUNNER.format(title=shlex.quote(title), limit=int(limit))
+    before = _maybe_restore_point(command)
     code, out = _ssh(f"bash -c {shlex.quote(runner)}", stdin=script, timeout=limit + 15)
     body = _clip(out) or "(no output)"
     if code == 124:
-        body += f"\n(stopped after {int(limit)} seconds)"
-    return f"exit code {code}\n{body}"
+        body += (f"\n(stopped after {int(limit)} seconds. For anything that takes longer than "
+                 "a couple of minutes, use start_job: it keeps going and tells you when it's done.)")
+    _log("command", title, code == 0, "" if code == 0 else f"exit {code}: {_last_line(out)}")
+    return f"{before}exit code {code}\n{body}"
 
 
 # Runs the script on stdin, teeing it into the log the shared terminal shows.
@@ -416,10 +420,469 @@ def list_files(path="", depth=2):
     return _clip(out) if code == 0 else out.strip()
 
 
+# ---- what she did there, so she doesn't repeat what failed ---------------
+
+_LOG_KEY = f"workspace_log_{NAME}"
+_LOG_KEEP = 40
+
+
+def _log(kind, what, ok, note=""):
+    from process import state
+    import time as _t
+    try:
+        entries = state.get(_LOG_KEY, []) or []
+        entries.append({"at": _t.time(), "kind": kind, "what": str(what)[:160],
+                        "ok": bool(ok), "note": str(note or "")[:160]})
+        state.put(_LOG_KEY, entries[-_LOG_KEEP:])
+    except Exception as e:
+        print(f"[workspace] couldn't log: {e}", flush=True)
+
+
+def _last_line(text):
+    lines = [l.strip() for l in (text or "").splitlines() if l.strip()]
+    return lines[-1] if lines else ""
+
+
+def recent_note(limit=10):
+    """Rides on her message when she's asked to do something on the machine:
+    what she did there lately and whether it worked."""
+    from process import state
+    from datetime import datetime
+    if not available():
+        return ""
+    entries = (state.get(_LOG_KEY, []) or [])[-limit:]
+    if not entries:
+        return ""
+    lines = []
+    for e in entries:
+        when = datetime.fromtimestamp(e.get("at", 0)).strftime("%a %H:%M")
+        mark = "ok" if e.get("ok") else "FAILED"
+        note = f" ({e['note']})" if e.get("note") else ""
+        lines.append(f"- {when} {e.get('kind')}: {e.get('what')} -> {mark}{note}")
+    return (f"\n\n(What you did on {NAME} recently, newest last. Don't repeat something "
+            "that already failed the same way; try something different or ask:\n"
+            + "\n".join(lines) + ")")
+
+
+# ---- mouse, keyboard, windows and apps (lab2) ----------------------------
+
+_CONTROL_SCRIPT = Path(__file__).resolve().parents[2] / "workspace" / "lab2_control.py"
+
+
+def _control(action, args=None, timeout=60):
+    try:
+        script = _CONTROL_SCRIPT.read_text()
+    except OSError as e:
+        return {"ok": False, "error": f"The control script is missing: {e}"}
+    code, out = _ssh(f"python3 - {shlex.quote(action)} {shlex.quote(json.dumps(args or {}))}",
+                     stdin=script, timeout=timeout)
+    start = out.find('{"ok"')
+    if start < 0:
+        return {"ok": False, "error": (out.strip() or f"exit {code}")[:300]}
+    try:
+        return json.loads(out[start:].splitlines()[0])
+    except ValueError:
+        return {"ok": False, "error": out[start:start + 300]}
+
+
+# Gemma finds things in images as boxes on a 0-1000 scale, so ask in that form.
+LOCATE_PROMPT = """This is {what}. Detect: {target}
+
+Output a JSON list with box_2d [ymin, xmin, ymax, xmax] normalised to 0-1000,
+and label. Output [] if it isn't there."""
+
+
+def _ask_where(shot, target, what):
+    from process.llm_funcs import llm_scr
+    try:
+        reply = llm_scr.chat_completion(
+            [{"role": "user", "content": [
+                {"type": "text", "text": LOCATE_PROMPT.format(what=what, target=target)},
+                {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{shot['image']}"}},
+            ]}], temperature=0.0, max_tokens=120)
+        text = reply.choices[0].message.content or ""
+    except Exception as e:
+        return None, f"couldn't look: {type(e).__name__}"
+    m = re.search(r"\[\s*(\d+(?:\.\d+)?)\s*,\s*(\d+(?:\.\d+)?)\s*,\s*(\d+(?:\.\d+)?)\s*,\s*(\d+(?:\.\d+)?)\s*\]", text)
+    if not m:
+        return None, "couldn't see it"
+    y0, x0, y1, x1 = (float(v) for v in m.groups())
+    if not (0 <= x0 <= x1 <= 1000 and 0 <= y0 <= y1 <= 1000):
+        return None, "the box it gave doesn't make sense"
+    cx = (x0 + x1) / 2000 * shot["image_width"]
+    cy = (y0 + y1) / 2000 * shot["image_height"]
+    # back to real screen pixels
+    return (int(shot.get("left", 0) + cx / shot["scale"]), int(shot.get("top", 0) + cy / shot["scale"])), ""
+
+
+def _locate(target):
+    """Where something is on screen: its accessible name if the app says, else
+    by eye, first on the whole screen and then close up around that spot."""
+    found = _control("find", {"target": target})
+    matches = found.get("matches") or []
+    if matches:
+        best = matches[0]
+        return best["x"], best["y"], f"{best['role']} \"{best['name']}\""
+    whole = _control("shot", {"scale": 0.4})
+    if not whole.get("ok"):
+        return None, None, whole.get("error", "no screenshot")
+    spot, why = _ask_where(whole, target, f"a screenshot of {NAME}'s two screens side by side, shrunk")
+    if not spot:
+        return None, None, why
+    close = _control("shot", {"scale": 1.0, "crop": [spot[0], spot[1], 200]})
+    if close.get("ok"):
+        fine, _ = _ask_where(close, target, f"a close-up of part of {NAME}'s screen, actual size")
+        if fine:
+            return fine[0], fine[1], "by eye"
+    return spot[0], spot[1], "by eye, roughly"
+
+
+def use_screen(action, x=None, y=None, target="", text="", keys="", direction="down",
+               amount=5, button="left", double=False, to_x=None, to_y=None, window="",
+               look=True):
+    """One mouse or keyboard step on their desktop, then a look at the result."""
+    import time as _t
+    action = (action or "").strip().lower()
+    simple = {"type": {"text": text}, "key": {"keys": keys},
+              "scroll": {"direction": direction, "amount": amount, "x": x, "y": y},
+              "focus": {"window": window or target},
+              "move": {"x": x, "y": y},
+              "drag": {"x": x, "y": y, "to_x": to_x, "to_y": to_y}}
+    if action in ("screens", "windows"):
+        res = _control(action)
+        return json.dumps(res.get(action) if res.get("ok") else res)[:OUTPUT_CHARS]
+    how = ""
+    if action == "click":
+        if (x is None or y is None) and target:
+            x, y, how = _locate(target)
+            if x is None:
+                _log("click", target, False, how)
+                return (f"Couldn't find {target!r} on screen ({how}). Look at the desktop, "
+                        "then click by x and y, or focus the right window first.")
+        if x is None or y is None:
+            return "click needs x and y, or a target to find by name."
+        res = _control("click", {"x": x, "y": y, "button": button, "double": double})
+        what = f"{'double-' if double else ''}{button} click at {x},{y}" + (f" on {target}" if target else "")
+    elif action in simple:
+        res = _control(action, simple[action], timeout=150 if action == "type" else 60)
+        what = {"type": f"typed {len(text or '')} characters", "key": f"pressed {keys}",
+                "scroll": f"scrolled {direction}", "focus": f"focused {window or target}",
+                "move": f"moved the mouse to {x},{y}", "drag": f"dragged {x},{y} to {to_x},{to_y}"}[action]
+    else:
+        return "action must be click, type, key, scroll, move, drag, focus, windows or screens."
+    if not res.get("ok"):
+        _log(action, what, False, res.get("error", ""))
+        return f"That didn't work: {res.get('error')}" + (
+            "\nOpen windows: " + "; ".join(res["windows"]) if res.get("windows") else "")
+    print(f"[workspace] {what}{' (' + how + ')' if how else ''}", flush=True)
+    _log(action, what, True, how)
+    if not look or action in ("move",):
+        return f"Done: {what}."
+    _t.sleep(0.8)
+    seen = look_at_desktop(f"I just did this: {what}. Did it work, and what is on screen now?")
+    return f"Done: {what}{' (found ' + how + ')' if how else ''}.\nNow on screen: {seen}"
+
+
+def open_app(name, screen=""):
+    name = (name or "").strip()
+    if not name:
+        return "Say which app."
+    res = _control("open_app", {"name": name, "screen": screen}, timeout=60)
+    if not res.get("ok"):
+        _log("open_app", name, False, res.get("error", ""))
+        extra = f" Closest: {', '.join(res['suggestions'])}." if res.get("suggestions") else ""
+        return f"Couldn't open {name}: {res.get('error')}{extra}"
+    _log("open_app", f"{res['opened']}" + (f" on the {screen} screen" if screen else ""), True,
+         res.get("note", ""))
+    print(f"[workspace] opened {res['opened']}", flush=True)
+    bits = [f"Opened {res['opened']}"]
+    if res.get("screen"):
+        bits.append(f"on the {res['screen']} screen")
+    msg = " ".join(bits) + "."
+    if res.get("note"):
+        msg += " " + res["note"]
+    if res.get("other_matches"):
+        msg += f" (Other apps matching that name: {', '.join(res['other_matches'])}.)"
+    return msg
+
+
+def list_apps(query=""):
+    res = _control("apps", {"query": query})
+    if not res.get("ok"):
+        return f"Couldn't list apps: {res.get('error')}"
+    apps = res.get("apps") or []
+    return "\n".join(f"{a['name']} ({a['id']})" for a in apps) or "No installed app matches that."
+
+
+def place_window(window, screen, maximize=True):
+    res = _control("place", {"window": window, "screen": screen, "maximize": maximize})
+    if not res.get("ok"):
+        return f"Couldn't move it: {res.get('error')}"
+    _log("place", f"{res['placed']} to the {res['screen']} screen", True)
+    return f"Moved {res['placed']} to the {res['screen']} screen."
+
+
+# ---- long jobs that keep going after she replies --------------------------
+
+_JOBS_KEY = f"workspace_jobs_{NAME}"
+on_job_done = None          # set by the tool registry: how she gets told
+
+_JOB_START = r"""d=~/.marina/jobs; mkdir -p "$d"
+id=$(date +%m%d-%H%M%S)-$RANDOM
+cat > "$d/$id.sh"
+setsid -f bash -c 'echo $$ > "$4"; bash -l "$1" > "$2" 2>&1 < /dev/null; echo $? > "$3"' _ \
+  "$d/$id.sh" "$d/$id.log" "$d/$id.exit" "$d/$id.pid" < /dev/null > /dev/null 2>&1
+echo "JOB $id"
+"""
+
+_JOB_STATUS = r"""d=~/.marina/jobs
+for id in "$@"; do
+  if [ -f "$d/$id.exit" ]; then echo "=== $id done $(cat "$d/$id.exit")"; tail -n 12 "$d/$id.log"
+  elif [ -f "$d/$id.pid" ] && kill -0 "$(cat "$d/$id.pid")" 2>/dev/null; then
+    echo "=== $id running"; tail -n 4 "$d/$id.log"
+  elif [ -f "$d/$id.sh" ]; then echo "=== $id starting"
+  else echo "=== $id gone"; fi
+done
+"""
+
+
+def _jobs():
+    from process import state
+    return [j for j in (state.get(_JOBS_KEY, []) or []) if isinstance(j, dict)]
+
+
+def _save_jobs(jobs):
+    from process import state
+    state.put(_JOBS_KEY, jobs[-30:])
+
+
+def _status(ids):
+    if not ids:
+        return {}
+    code, out = _ssh(f"bash -s -- {' '.join(shlex.quote(i) for i in ids)}", stdin=_JOB_STATUS, timeout=30)
+    result = {}
+    for block in out.split("=== ")[1:]:
+        head, _, body = block.partition("\n")
+        parts = head.split()
+        if len(parts) >= 2:
+            result[parts[0]] = {"state": parts[1], "exit": parts[2] if len(parts) > 2 else None,
+                                "tail": body.strip()}
+    return result
+
+
+def start_job(command, name="", cwd=""):
+    """Start something long on the machine and come back to it later."""
+    command = (command or "").strip()
+    if not command:
+        return "No command given."
+    why = refused(command)
+    if why:
+        return why
+    _maybe_restore_point(command)
+    where = _path(cwd) if cwd else _path(".")
+    env = _SESSION_ENV if THEIRS else ""
+    script = f"{env}mkdir -p {_path('.')} && cd {where} && {{ {command}\n}}\n"
+    code, out = _ssh(f"bash -c {shlex.quote(_JOB_START)}", stdin=script, timeout=30)
+    m = re.search(r"JOB (\S+)", out)
+    if not m:
+        _log("job", name or command, False, _last_line(out))
+        return f"Couldn't start it: {out.strip()[:300]}"
+    import time as _t
+    job = {"id": m.group(1), "name": (name or command.splitlines()[0])[:120],
+           "command": command[:300], "started": _t.time(), "done": False}
+    jobs = _jobs() + [job]
+    _save_jobs(jobs)
+    _watch()
+    print(f"[workspace] started job {job['id']}: {job['name']}", flush=True)
+    return (f"Started it in the background as job {job['id']} ({job['name']}). It keeps "
+            "going after you reply; you'll be told when it finishes, and job_status "
+            "shows how it's doing.")
+
+
+def job_status(job_id=""):
+    jobs = _jobs()
+    if job_id:
+        jobs = [j for j in jobs if j["id"] == job_id]
+        if not jobs:
+            return f"No job {job_id}."
+    else:
+        jobs = jobs[-6:]
+    if not jobs:
+        return "No jobs started yet."
+    st = _status([j["id"] for j in jobs])
+    lines = []
+    for j in jobs:
+        s = st.get(j["id"], {})
+        state_ = s.get("state", "unknown")
+        head = f"{j['id']} {j['name']}: {state_}" + (f", exit {s['exit']}" if s.get("exit") else "")
+        lines.append(head + (f"\n{s['tail']}" if s.get("tail") else ""))
+    return _clip("\n\n".join(lines))
+
+
+def stop_job(job_id):
+    jobs = _jobs()
+    if not any(j["id"] == job_id for j in jobs):
+        return f"No job {job_id}."
+    code, out = _ssh(f"p=$(cat ~/.marina/jobs/{shlex.quote(job_id)}.pid 2>/dev/null) && "
+                     f"kill -TERM -- -$p 2>/dev/null; sleep 1; kill -0 $p 2>/dev/null && kill -KILL -- -$p; "
+                     f"echo 143 > ~/.marina/jobs/{shlex.quote(job_id)}.exit; echo stopped", timeout=20)
+    for j in jobs:
+        if j["id"] == job_id:
+            j["done"] = True
+            j["stopped"] = True
+    _save_jobs(jobs)
+    _log("job", f"stopped {job_id}", True)
+    return f"Stopped job {job_id}."
+
+
+def check_jobs():
+    """Look at running jobs once; say so for each that has finished.
+    Returns how many are still running."""
+    import time as _t
+    jobs = _jobs()
+    running = [j for j in jobs if not j.get("done")]
+    if not running:
+        return 0
+    st = _status([j["id"] for j in running])
+    changed = False
+    for j in running:
+        s = st.get(j["id"])
+        if not s or s["state"] not in ("done", "gone"):
+            continue
+        j["done"] = True
+        j["exit"] = s.get("exit")
+        changed = True
+        ok = s.get("exit") == "0"
+        took = max(1, round((_t.time() - j.get("started", _t.time())) / 60))
+        _log("job", j["name"], ok, f"exit {s.get('exit')}, {took} min"
+             + ("" if ok else f": {_last_line(s.get('tail'))}"))
+        print(f"[workspace] job {j['id']} finished: exit {s.get('exit')}", flush=True)
+        if on_job_done:
+            on_job_done(
+                f"A job you started on {NAME} in the background just finished: "
+                f"{j['name']}. It took about {took} minute{'s' if took != 1 else ''} and "
+                f"exited with {s.get('exit')} ({'worked' if ok else 'something went wrong'}). "
+                f"Its last output:\n{(s.get('tail') or '(nothing)')[-1200:]}\n"
+                "Tell them how it went in a sentence or two, in your own words: "
+                "what finished, and if it failed, what failed.")
+    if changed:
+        _save_jobs(jobs)
+    return sum(1 for j in jobs if not j.get("done"))
+
+
+_watching = False
+
+
+def _watch():
+    """One thread that checks on running jobs and says when each finishes."""
+    global _watching
+    import threading
+    import time as _t
+    if _watching:
+        return
+    _watching = True
+
+    def loop():
+        global _watching
+        while True:
+            _t.sleep(20)
+            try:
+                if not check_jobs():
+                    _watching = False
+                    return
+            except Exception as e:
+                print(f"[workspace] job watch: {type(e).__name__}: {e}", flush=True)
+
+    threading.Thread(target=loop, daemon=True).start()
+
+
+def resume_watching():
+    """After a restart, keep watching jobs that were still running."""
+    if available() and any(not j.get("done") for j in _jobs()):
+        _watch()
+
+
+# ---- restore points (Timeshift) ------------------------------------------
+
+_RISKY = re.compile(
+    r"\bapt(?:-get)?\s+(?:-\S+\s+)*(?:full-upgrade|dist-upgrade|upgrade|remove|purge|autoremove)\b"
+    r"|\bdpkg\s+(?:-r|-P|--remove|--purge)\b|\bupdate-grub\b|\bgrub-install\b|\bmintupgrade\b"
+    r"|\bdo-release-upgrade\b|\bsystemctl\s+(?:disable|mask)\b|\bmkinitramfs|\bupdate-initramfs\b"
+    r"|\brm\s+-\w*r\w*\s+/(?:etc|usr|boot|var|opt|lib)\b"
+    r"|\btee\s+(?:-a\s+)?/etc/|\bsed\s+-i\S*\s[^|;&]*\s/etc/|>>?\s*/etc/", re.I)
+_RP_KEY = f"workspace_restore_point_{NAME}"
+RP_EVERY = float(_cfg.get("restore_point_hours", 3)) * 3600
+RP_KEEP = int(_cfg.get("restore_points_kept", 5))
+
+
+def restore_points():
+    code, out = _ssh("sudo -n timeshift --list 2>&1", timeout=60)
+    if code != 0:
+        return f"Couldn't list restore points: {out.strip()[:300]}"
+    rows = [l for l in out.splitlines() if re.match(r"^\d+\s+>", l)]
+    return "Restore points (Timeshift), oldest first:\n" + ("\n".join(rows) or "(none)")
+
+
+def make_restore_point(comment=""):
+    """A Timeshift snapshot of the system, to roll back to if something breaks."""
+    import time as _t
+    if not THEIRS:
+        return "Restore points are for lab2."
+    comment = re.sub(r"[^\w .,:/+-]", "", (comment or "before changes"))[:80]
+    print(f"[workspace] taking a restore point: {comment}", flush=True)
+    code, out = _ssh(f"sudo -n timeshift --create --comments {shlex.quote('marina: ' + comment)} --tags O 2>&1",
+                     timeout=1800)
+    ok = code == 0 and "error" not in out.lower()[-300:]
+    _log("restore point", comment, ok, "" if ok else _last_line(out))
+    if not ok:
+        return f"The restore point failed: {_clip(out)[-600:]}"
+    from process import state
+    state.put(_RP_KEY, _t.time())
+    _prune_restore_points()
+    name = re.search(r"Tagged snapshot '([^']+)'|Snapshot saved successfully.*?\(?(\d{4}-\d\d-\d\d_\d\d-\d\d-\d\d)", out)
+    return ("Took a restore point" + (f" ({next(g for g in name.groups() if g)})" if name else "")
+            + f": {comment}. To roll back, they run Timeshift (or sudo timeshift --restore) and pick it.")
+
+
+def _prune_restore_points():
+    """Only hers, and only past the newest few: theirs are never touched."""
+    code, out = _ssh("sudo -n timeshift --list 2>&1", timeout=60)
+    mine = re.findall(r"^\d+\s+>\s+(\S+)\s+\S*\s+marina: ", out, re.M)
+    for snap in mine[:-RP_KEEP] if len(mine) > RP_KEEP else []:
+        _ssh(f"sudo -n timeshift --delete --snapshot {shlex.quote(snap)} 2>&1", timeout=600)
+        print(f"[workspace] removed her old restore point {snap}", flush=True)
+
+
+def _maybe_restore_point(command):
+    """Before anything that changes the system, a fresh restore point."""
+    import time as _t
+    from process import state
+    if not THEIRS or not _RISKY.search(command):
+        return ""
+    last = float(state.get(_RP_KEY, 0) or 0)
+    if _t.time() - last < RP_EVERY:
+        return ""
+    first = command.strip().splitlines()[0][:60]
+    result = make_restore_point(f"before {first}")
+    return result + "\n\n"
+
+
 def describe(name, args):
     """A few words on what a call is about to do, for the app to show."""
     def path():
         return args.get("path") or "projects"
+    if name == "use_screen":
+        a = args.get("action", "")
+        return {"click": f"clicking {args.get('target') or 'on the screen'}",
+                "type": "typing", "key": f"pressing {args.get('keys', 'a key')}",
+                "scroll": "scrolling", "focus": f"switching to {args.get('window') or args.get('target')}",
+                "drag": "dragging"}.get(a, "using the mouse and keyboard")
+    if name == "open_app":
+        return f"opening {args.get('name', 'an app')}"
+    if name == "start_job":
+        return f"starting {args.get('name') or 'a long job'} in the background"
+    if name == "make_restore_point":
+        return "taking a restore point"
     if name == "run_command":
         line = (args.get("command") or "").strip().splitlines()
         return f"running `{line[0][:70]}`" if line else "running a command"
@@ -562,6 +1025,101 @@ SPECS = [
         }}),
 ]
 
+SPECS += [
+    ("start_job", start_job, {
+        "description": "Start a long-running command in the background: big installs, "
+                       "updates, builds, downloads, anything over a couple of minutes. "
+                       "It keeps going after you reply, and you are told when it finishes "
+                       "so you can tell them. Use run_command for quick things.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "command": {"type": "string"},
+                "name": {"type": "string", "description": "A few words for what it is, e.g. 'system update'."},
+                "cwd": {"type": "string"},
+            },
+            "required": ["command"],
+        }}),
+    ("job_status", job_status, {
+        "description": "How your background jobs are doing: running or finished, exit "
+                       "code, and the last lines of output. Leave job_id empty for all recent ones.",
+        "parameters": {"type": "object", "properties": {"job_id": {"type": "string"}}}}),
+    ("stop_job", stop_job, {
+        "description": "Stop one of your background jobs.",
+        "parameters": {"type": "object", "properties": {"job_id": {"type": "string"}},
+                       "required": ["job_id"]}}),
+]
+
+_THEIRS_SPECS = [
+    ("use_screen", use_screen, {
+        "description": "Use lab2's mouse and keyboard, one step at a time. After each step "
+                       "you are shown what is on screen, so you can check it worked before "
+                       "the next. Actions: click (x and y, or target: a button, link or "
+                       "field described by its name or what it looks like, which is found "
+                       "for you), type (text into whatever has focus), key (keys in xdotool "
+                       "form: ctrl+l, Return, Tab, alt+F4, super; several separated by "
+                       "spaces), scroll (direction, amount, optional x y), drag (x y to_x "
+                       "to_y), move, focus (window: part of its title or app name), windows "
+                       "(list the open windows and where they are), screens (the monitors). "
+                       "Screen coordinates: the Dell is x 0-1079, y 0-1919 (portrait, left); "
+                       "the Acer is x 1080-2999, y 0-1079 (right).",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "action": {"type": "string", "enum": ["click", "type", "key", "scroll", "drag",
+                                                      "move", "focus", "windows", "screens"]},
+                "x": {"type": "integer"}, "y": {"type": "integer"},
+                "target": {"type": "string", "description": "For click: what to click, by name or look."},
+                "text": {"type": "string"}, "keys": {"type": "string"},
+                "direction": {"type": "string", "enum": ["up", "down", "left", "right"]},
+                "amount": {"type": "integer"},
+                "button": {"type": "string", "enum": ["left", "right", "middle"]},
+                "double": {"type": "boolean"},
+                "to_x": {"type": "integer"}, "to_y": {"type": "integer"},
+                "window": {"type": "string"},
+                "look": {"type": "boolean", "description": "Look at the screen afterwards (default true)."},
+            },
+            "required": ["action"],
+        }}),
+    ("open_app", open_app, {
+        "description": "Open an installed app on lab2 by name (Spotify, Discord, Firefox, "
+                       "Files, the Room of AIs web app, ...), optionally on one screen: "
+                       "left (the vertical Dell) or right (the Acer), maximised there. If "
+                       "it's already open it's brought up. Use this rather than starting "
+                       "apps by hand.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "name": {"type": "string"},
+                "screen": {"type": "string", "enum": ["left", "right", "dell", "acer"]},
+            },
+            "required": ["name"],
+        }}),
+    ("list_apps", list_apps, {
+        "description": "Find installed apps on lab2 whose name matches.",
+        "parameters": {"type": "object", "properties": {"query": {"type": "string"}}}}),
+    ("place_window", place_window, {
+        "description": "Move an open window on lab2 to the left (Dell) or right (Acer) screen.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "window": {"type": "string", "description": "Part of its title or app name."},
+                "screen": {"type": "string", "enum": ["left", "right", "dell", "acer"]},
+                "maximize": {"type": "boolean"},
+            },
+            "required": ["window", "screen"],
+        }}),
+    ("make_restore_point", make_restore_point, {
+        "description": "Take a Timeshift restore point of lab2's system before something "
+                       "risky, so it can be rolled back. One is taken for you automatically "
+                       "before upgrades, removals and system config edits; call this for "
+                       "anything else that could break the system. Takes a few minutes.",
+        "parameters": {"type": "object", "properties": {"comment": {"type": "string"}}}}),
+    ("restore_points", restore_points, {
+        "description": "List lab2's Timeshift restore points.",
+        "parameters": {"type": "object", "properties": {}}}),
+]
+
 _THEIRS_RUN = ("Run a bash command on lab2, their Linux Mint PC, as their account "
                "(jacob) with passwordless sudo. Commands can reach their desktop "
                "session: start apps with `setsid -f app >/dev/null 2>&1` so they keep "
@@ -571,7 +1129,7 @@ _THEIRS_RUN = ("Run a bash command on lab2, their Linux Mint PC, as their accoun
                "to them.")
 
 if THEIRS:
-    SPECS = [(n, f, s) for n, f, s in SPECS if n not in ("read_terminal", "desktop")]
+    SPECS = [(n, f, s) for n, f, s in SPECS if n not in ("read_terminal", "desktop")] + _THEIRS_SPECS
     for n, f, s in SPECS:
         if n == "run_command":
             s["description"] = _THEIRS_RUN
@@ -595,17 +1153,24 @@ imagination. Its screens: a vertical Dell on the left (the main one) and
 an Acer on the right that is often switched to a PS5 or another laptop.
 
 How to use it without breaking it:
-- GUI apps: start them with setsid -f so they outlive the command. To use
-  an app, look_at_desktop first, then xdotool (search/windowactivate, key,
-  type, mousemove + click) or wmctrl, then look again to check.
+- Apps: open_app by name (and screen left or right), place_window to move
+  one. To use an app, look_at_desktop first, then use_screen one step at a
+  time (click a target by name, type, key, scroll); each step shows you
+  the screen afterwards, so check it did what you meant before the next.
+- Anything that takes more than a couple of minutes (updates, big
+  installs, builds) goes through start_job, not run_command: it keeps
+  going, and you are told when it finishes so you can tell them.
+- A restore point is taken for you before upgrades, removals and system
+  config edits; make_restore_point for anything else risky.
 - Music is Spotify (flatpak com.spotify.Client): playerctl -p spotify
-  play/pause/next, or start it if it isn't running.
+  play/pause/next, or open_app Spotify if it isn't running.
 - Don't touch the screen layout, the theme or the login screen unless they
   ask; run_command refuses xrandr mode changes.
 - Ask them before anything that's hard to undo there: deleting their
   files, reboots or shutdowns, removing packages, changing network or
   firewall settings. Updates (apt upgrade, flatpak update) are fine when
-  they ask. Timeshift has restore points if something goes badly wrong.
+  they ask. If something goes badly wrong, tell them which restore point
+  to roll back to (restore_points lists them); never restore one yourself.
 - Don't kill cinnamon, muffin or lightdm; run_command refuses.
 - If something fails twice the same way, stop and rethink instead of
   trying variations."""
