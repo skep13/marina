@@ -97,20 +97,40 @@ final class HandsFree: ObservableObject {
                 self.restart()
             }
         })
+        // Only a mic or headphones coming or going counts. Restarting changes
+        // the route itself (category, preferred input), and reacting to that
+        // looped forever and froze the app.
         observers.append(center.addObserver(forName: AVAudioSession.routeChangeNotification,
-                                            object: nil, queue: .main) { [weak self] _ in
-            Task { @MainActor in
-                guard let self, self.on else { return }
-                self.restart()
-            }
+                                            object: nil, queue: .main) { [weak self] note in
+            let reason = (note.userInfo?[AVAudioSessionRouteChangeReasonKey] as? UInt)
+                .flatMap(AVAudioSession.RouteChangeReason.init)
+            guard reason == .newDeviceAvailable || reason == .oldDeviceUnavailable else { return }
+            Task { @MainActor in self?.scheduleRestart() }
         })
         observers.append(center.addObserver(forName: .AVAudioEngineConfigurationChange,
                                             object: engine, queue: .main) { [weak self] _ in
             Task { @MainActor in
-                guard let self, self.on else { return }
-                self.restart()
+                guard let self, !self.engine.isRunning else { return }
+                self.scheduleRestart()
             }
         })
+    }
+
+    private var restartTask: Task<Void, Never>?
+    private var lastRestart = Date.distantPast
+
+    /// Several notifications arrive for one plug-in: restart once, after
+    /// they settle, and never more than once a second.
+    private func scheduleRestart() {
+        guard on else { return }
+        restartTask?.cancel()
+        restartTask = Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .milliseconds(400))
+            guard let self, !Task.isCancelled, self.on,
+                  Date().timeIntervalSince(self.lastRestart) > 1 else { return }
+            self.lastRestart = Date()
+            self.restart()
+        }
     }
 
     private func restart() {
@@ -145,7 +165,8 @@ final class HandsFree: ObservableObject {
     private func feed(_ samples: [Int16]) {
         guard on else { return }
         let event = phrase.feed(samples, paused: paused)
-        level = phrase.level
+        // The meter needn't redraw the screen on every buffer.
+        if abs(phrase.level - level) > 0.03 || phrase.level == 0 && level != 0 { level = phrase.level }
         switch event {
         case .started: state = .hearing
         case .ended(let clip):
