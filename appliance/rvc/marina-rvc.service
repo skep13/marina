@@ -6,6 +6,7 @@ After=network.target
 WorkingDirectory=/opt/rvc
 Environment=RVC_MODEL=/opt/rvc/models/marin/Marin.pth
 Environment=RVC_INDEX=/opt/rvc/models/marin/added_IVF1116_Flat_nprobe_1_Marin_v2.index
+Environment=RVC_PITCH=2
 ExecStart=/opt/rvc/.venv/bin/python -u /opt/rvc/rvc_server.py
 Restart=always
 RestartSec=5

@@ -233,8 +233,33 @@ def _speak_segment(segment, index, speak):
     return event
 
 
+_answering = {"n": 0}   # replies to something you said, still streaming
+
+
 def _stream_reply(user_text, speak=True, transcript=None, extra_system=None,
                   record=True):
+    """Stream the reply one sentence at a time. While it's answering you,
+    nothing unprompted (a timer, an opener) starts: a new stream cancels
+    the one before it, and that used to leave you with no answer."""
+    if user_text is None:
+        yield from _stream_reply_now(None, speak, transcript, extra_system, record)
+        return
+    with _stream_lock:
+        _answering["n"] += 1
+    try:
+        yield from _stream_reply_now(user_text, speak, transcript, extra_system, record)
+    finally:
+        with _stream_lock:
+            _answering["n"] -= 1
+
+
+def _answering_you():
+    with _stream_lock:
+        return _answering["n"] > 0
+
+
+def _stream_reply_now(user_text, speak=True, transcript=None, extra_system=None,
+                      record=True):
     """Stream the reply one sentence at a time, synthesizing as it goes."""
     with _stream_lock:
         _stream["id"] += 1
@@ -1312,8 +1337,8 @@ def _idle_wait(timeout, phone):
             waited += 2.0
             yield _ndjson({"type": "waiting"})
             continue
-        if call.active():
-            # On a call she only answers; nothing unprompted cuts across it.
+        if call.active() or _answering_you():
+            # On a call, or while she answers you, nothing unprompted cuts across it.
             time.sleep(2.0)
             waited += 2.0
             yield _ndjson({"type": "waiting"})
@@ -1407,7 +1432,7 @@ def _push_loop():
     while True:
         time.sleep(3.0)
         try:
-            if push.phone_here() or push.desk_here() or call.active():
+            if push.phone_here() or push.desk_here() or call.active() or _answering_you():
                 continue
             announcement = tools.pending_announcement()
             if announcement:
