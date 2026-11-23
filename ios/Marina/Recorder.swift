@@ -73,8 +73,21 @@ enum Audio {
             try session.setCategory(.playAndRecord, mode: .default,
                                     options: [.defaultToSpeaker, .allowBluetoothA2DP])
             try session.setActive(true)
+            preferWiredMic(session)
         } else {
             playback()
+        }
+    }
+
+    /// Listen on a plugged-in mic (the wireless lapel's USB-C receiver) so
+    /// AirPods stay output-only in full-quality A2DP instead of dropping to
+    /// call audio. Without one, the phone's own mic.
+    static func preferWiredMic(_ session: AVAudioSession) {
+        let inputs = session.availableInputs ?? []
+        let pick = inputs.first { $0.portType == .usbAudio || $0.portType == .headsetMic }
+            ?? inputs.first { $0.portType == .builtInMic }
+        if let pick, session.preferredInput?.uid != pick.uid {
+            try? session.setPreferredInput(pick)
         }
     }
 
