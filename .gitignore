@@ -48,3 +48,4 @@ result.json
 # Mac agent (server/agent): lab3 keys live outside the repo; never commit them
 .marina/
 server/agent/agent-keys.env
+appliance/rvc/warmup.wav

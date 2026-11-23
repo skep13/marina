@@ -1,0 +1,15 @@
+[Unit]
+Description=Marina's RVC voice: converts Kokoro speech to her voice model (CPU)
+After=network.target
+
+[Service]
+WorkingDirectory=/opt/rvc
+Environment=RVC_MODEL=/opt/rvc/models/marin/Marin.pth
+Environment=RVC_INDEX=/opt/rvc/models/marin/added_IVF1116_Flat_nprobe_1_Marin_v2.index
+ExecStart=/opt/rvc/.venv/bin/python -u /opt/rvc/rvc_server.py
+Restart=always
+RestartSec=5
+Nice=-5
+
+[Install]
+WantedBy=multi-user.target

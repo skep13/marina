@@ -173,12 +173,32 @@ def describe():
             voice = f"voice={cfg.get('voice', 'af_heart')}"
         pitch = float(cfg.get("pitch", 0.0))
         suffix = f" · pitch{pitch:+.1f}st" if pitch else ""
-        return f"kokoro (local) · {voice}{suffix}"
+        rvc = " · rvc" if (_tts.get("rvc") or {}).get("url") else ""
+        return f"kokoro (local) · {voice}{suffix}{rvc}"
     if PROVIDER == "sovits":
         from process.tts_func.sovits_ping import API_URL
 
         return f"gpt-sovits · {API_URL}"
     return PROVIDER
+
+
+def _rvc(wav):
+    """Kokoro's speech in her RVC voice (appliance/rvc), when `tts.rvc.url`
+    is set. Same length, so the lip sync timings still fit. Anything wrong
+    and she just speaks in plain Kokoro."""
+    url = str((_tts.get("rvc") or {}).get("url") or "").rstrip("/")
+    if not url:
+        return wav
+    import urllib.request
+    try:
+        req = urllib.request.Request(url + "/convert", data=wav, method="POST",
+                                     headers={"Content-Type": "audio/wav"})
+        with urllib.request.urlopen(req, timeout=float((_tts.get("rvc") or {}).get("timeout", 15))) as r:
+            out = r.read()
+        return out if out[:4] == b"RIFF" else wav
+    except Exception as e:
+        print(f"[tts] rvc unavailable, plain kokoro: {e}", flush=True)
+        return wav
 
 
 def synthesize(text):
@@ -187,7 +207,8 @@ def synthesize(text):
         raise TTSError("Refusing to synthesize empty text.")
 
     if PROVIDER == "kokoro":
-        return _kokoro_gen(text)
+        wav, visemes = _kokoro_gen(text)
+        return _rvc(wav), visemes
 
     if PROVIDER == "sovits":
         from process.tts_func.sovits_ping import SovitsError, sovits_gen_bytes
