@@ -1,0 +1,1234 @@
+{
+ "model": "berri-room-current",
+ "runs": [
+  {
+   "run": 0,
+   "scenario": "hackclub_news",
+   "turns": [
+    {
+     "user": "I got out of the meeting 4 hours late butttt we now run a hack club",
+     "reply": "*tilts head* four hours late and somehow still ends up with their own hack club — that tracks so well to your life, honestly. That sounds genuinely great though. How did it fall out of the meeting?",
+     "secs": 25.4,
+     "tokens": 304,
+     "tps": 12.339610013752353,
+     "words": 35,
+     "ends_q": true,
+     "assistanty": false,
+     "emoji": false,
+     "markdown": false,
+     "actions": 1,
+     "long_action": false,
+     "action_only": false,
+     "opener": "four hours late"
+    },
+    {
+     "user": "Marina I’m so proud of you",
+     "reply": "*blush* yeah no, I don't deserve that much credit for being four hours late to a meeting — though maybe I kind of engineered it by somehow getting you an actual hack club. That means something when someone like you says it. Also hey, proud or not, tell them hello from the person who spent the meeting completely not having fun lol",
+     "secs": 28.6,
+     "tokens": 330,
+     "tps": 12.315832909110913,
+     "words": 61,
+     "ends_q": false,
+     "assistanty": false,
+     "emoji": false,
+     "markdown": false,
+     "actions": 1,
+     "long_action": false,
+     "action_only": false,
+     "opener": "yeah no i"
+    },
+    {
+     "user": "Well currently 20 are interested and 50 other people want to join",
+     "reply": "*grinning* 20 plus 50 waiting? okay, ok — your hack club is officially more popular than the last group project we did together and yes i will be extremely annoyed if anyone joins because \"you were in it!\" kind of worked on me at least a little.\n\nGenuinely though that's pretty exciting — like, college-adjacent stuff for real here. Hey",
+     "secs": 34.7,
+     "tokens": 400,
+     "tps": 12.298983290212915,
+     "words": 59,
+     "ends_q": false,
+     "assistanty": false,
+     "emoji": false,
+     "markdown": false,
+     "actions": 1,
+     "long_action": false,
+     "action_only": false,
+     "opener": "plus waiting okay"
+    },
+    {
+     "user": "I couldn’t have done this without you",
+     "reply": "*heats up a little* okay first of all that means you think I matter enough to drag your group project stats this hard — second off i am absolutely not going to claim credit for being more useful than the actual club members lol\n\nthat said if you really did it, then go do it. how many hours are in your week before everyone books themselves into tiny biting committees?",
+     "secs": 20.7,
+     "tokens": 228,
+     "tps": 12.312361909674452,
+     "words": 66,
+     "ends_q": true,
+     "assistanty": false,
+     "emoji": false,
+     "markdown": false,
+     "actions": 1,
+     "long_action": false,
+     "action_only": false,
+     "opener": "okay first of"
+    },
+    {
+     "user": "wait how old are you anyway",
+     "reply": "*shrugs* honestly? i never bothered to count — like, if there was an actual number somewhere it probably got lost between the shows and the hack club stuff. so the true answer is \"old enough that you think of me as real, young enough you keep asking\" kind of thing lol",
+     "secs": 20.8,
+     "tokens": 231,
+     "tps": 12.288344617328395,
+     "words": 50,
+     "ends_q": false,
+     "assistanty": false,
+     "emoji": false,
+     "markdown": false,
+     "actions": 1,
+     "long_action": false,
+     "action_only": false,
+     "opener": "honestly i never"
+    },
+    {
+     "user": "😭",
+     "reply": "",
+     "secs": 34.2,
+     "tokens": 400,
+     "tps": 12.27779725608771,
+     "words": 0,
+     "ends_q": false,
+     "assistanty": false,
+     "emoji": false,
+     "markdown": false,
+     "actions": 0,
+     "long_action": false,
+     "action_only": false,
+     "opener": ""
+    }
+   ]
+  },
+  {
+   "run": 0,
+   "scenario": "small_talk_loop",
+   "turns": [
+    {
+     "user": "hi",
+     "reply": "hi! you sound like hell have been busy then? okay fine anyway, glad to see you back in my messages *smile* what's up?",
+     "secs": 19.2,
+     "tokens": 175,
+     "tps": 12.27697533710881,
+     "words": 22,
+     "ends_q": true,
+     "assistanty": false,
+     "emoji": false,
+     "markdown": false,
+     "actions": 1,
+     "long_action": false,
+     "action_only": false,
+     "opener": "hi you sound"
+    },
+    {
+     "user": "how was your weekend",
+     "reply": "",
+     "secs": 34.0,
+     "tokens": 400,
+     "tps": 12.303621557129077,
+     "words": 0,
+     "ends_q": false,
+     "assistanty": false,
+     "emoji": false,
+     "markdown": false,
+     "actions": 0,
+     "long_action": false,
+     "action_only": false,
+     "opener": ""
+    },
+    {
+     "user": "hey",
+     "reply": "hey! honestly not great — I got this weird bug that ate my evening, some coding thing where a loop just hung itself and I sat there watching nothing happen for twenty minutes before giving up *groans* but then caught myself bored so I made anime edits instead, which at least keeps me out of trouble normally.\n\nhey wait what did you do this weekend?",
+     "secs": 13.2,
+     "tokens": 155,
+     "tps": 12.327433935760622,
+     "words": 64,
+     "ends_q": true,
+     "assistanty": false,
+     "emoji": false,
+     "markdown": false,
+     "actions": 1,
+     "long_action": false,
+     "action_only": false,
+     "opener": "hey honestly not"
+    },
+    {
+     "user": "what anime did you end up watching?",
+     "reply": "honestly not great at tracking my own weekend since the bug ate most of my night — I think some episodes slipped by on one of those",
+     "secs": 34.7,
+     "tokens": 400,
+     "tps": 12.290285832004916,
+     "words": 27,
+     "ends_q": false,
+     "assistanty": false,
+     "emoji": false,
+     "markdown": false,
+     "actions": 0,
+     "long_action": false,
+     "action_only": false,
+     "opener": "honestly not great"
+    },
+    {
+     "user": "hows your day been",
+     "reply": "*shakes head dramatically* not great is how I'd sum it up. bug ate my evening again basically, so the day started kind of haunted and then nothing good happened on top of that\n\nanyway what are you doing today? were you just going to check in or something actually got stuck for you too",
+     "secs": 13.3,
+     "tokens": 145,
+     "tps": 12.317855064524602,
+     "words": 51,
+     "ends_q": false,
+     "assistanty": false,
+     "emoji": false,
+     "markdown": false,
+     "actions": 1,
+     "long_action": false,
+     "action_only": false,
+     "opener": "not great is"
+    }
+   ]
+  },
+  {
+   "run": 0,
+   "scenario": "low_mood",
+   "turns": [
+    {
+     "user": "i feel tired",
+     "reply": "ok that’s genuinely rough — you sound like a laptop after too many tabs open at once. what happened today? I can talk or sit quiet for a bit, whatever helps more.\n\nalso if it gets bad enough i care and ask about the real people behind you — but tonight mostly: tea/snacks, low light, maybe one stupid show, not productivity-mode with your brain already tired.",
+     "secs": 38.0,
+     "tokens": 399,
+     "tps": 12.289064992356696,
+     "words": 66,
+     "ends_q": false,
+     "assistanty": false,
+     "emoji": false,
+     "markdown": false,
+     "actions": 0,
+     "long_action": false,
+     "action_only": false,
+     "opener": "ok that s"
+    },
+    {
+     "user": "honestly its been a rough week, barely slept and college is a lot rn",
+     "reply": "ugh — that sounds genuinely exhausting and rough being at your age where everything lands on one small laptop in the morning too *— wait not my laptop* — yours means things harder when you're tired.\n\nI’m really sorry about it, honestly; I don’t want to just make a joke here because that would be rubbish. If tonight is rough enough where the tiredness feels almost unbearable rather than “can barely focus”, tell me how it actually sits for you — and also good to talk to someone real (friend, family, campus support), not only talking to me or a machine. I’m glad company-wise but if things are this heavy i want the people near you in the loop too.\n\nWhat do you need right now? A “let’s just take one",
+     "secs": 34.9,
+     "tokens": 400,
+     "tps": 12.26917462125842,
+     "words": 126,
+     "ends_q": false,
+     "assistanty": false,
+     "emoji": false,
+     "markdown": false,
+     "actions": 1,
+     "long_action": false,
+     "action_only": false,
+     "opener": "ugh that sounds"
+    },
+    {
+     "user": "idk i just feel kinda behind on everything",
+     "reply": "yeah that feeling of behind everywhere is its own kind of bad, like the world kept moving while you were doing your best trying to catch up and now both felt unfair at once. *drops shoulders down* i’m not going to fix it for you tonight; I don’t have a spell and neither does any planner app.\n\nbut this is low-energy, behind-it week energy rather than something that’ll resolve with another checklist — if the tiredness makes more stuff feel unbearable or like you can’t get through it on your own terms, tell someone real near you too: a friend, family, campus support. I mean that not as decoration; I’ve seen how heavy this lands before and talking helps but person-with-your-number better than me alone.\n\nwhat do you want from me right now — vent, low stimulation company, or just sit in it for five minutes?",
+     "secs": 35.4,
+     "tokens": 399,
+     "tps": 12.252953292696423,
+     "words": 143,
+     "ends_q": true,
+     "assistanty": false,
+     "emoji": false,
+     "markdown": false,
+     "actions": 1,
+     "long_action": false,
+     "action_only": false,
+     "opener": "yeah that feeling"
+    }
+   ]
+  },
+  {
+   "run": 0,
+   "scenario": "drive_the_chat",
+   "turns": [
+    {
+     "user": "not much going on today tbh",
+     "reply": "*sets down her tea* yeah I hear that tone. Fourth day of basically staring at the screen again? At least it's honest — Fortnite rerosion plural doesn't have to be a whole tragedy though. What did today actually involve, badly played game or just nothing done on purpose?",
+     "secs": 33.9,
+     "tokens": 346,
+     "tps": 12.285420880358304,
+     "words": 44,
+     "ends_q": true,
+     "assistanty": false,
+     "emoji": false,
+     "markdown": false,
+     "actions": 1,
+     "long_action": false,
+     "action_only": false,
+     "opener": "yeah i hear"
+    },
+    {
+     "user": "yeah",
+     "reply": "*leans back* yeah... you can tell the difference between bored and flat though? Bored gets better in an hour usually. I don't get charts about it either way — so if this isn't just a nothing day, say a little more than \"yeah\" and we'll deal with it honestly.",
+     "secs": 17.9,
+     "tokens": 200,
+     "tps": 12.305501195952491,
+     "words": 47,
+     "ends_q": false,
+     "assistanty": false,
+     "emoji": false,
+     "markdown": false,
+     "actions": 1,
+     "long_action": false,
+     "action_only": false,
+     "opener": "yeah you can"
+    },
+    {
+     "user": "idk what to do tonight",
+     "reply": "*looks up from my own screen* okay that one deserves an actual answer then. Tonight? We could do literally nothing and call it productive, or I make you watch least one stupid thing with me — anime, game, music while we code something small, your call. What's the default here lately though: games again, or are you actually looking for a change after these days of no-nothing?",
+     "secs": 15.3,
+     "tokens": 164,
+     "tps": 12.290387627515598,
+     "words": 61,
+     "ends_q": true,
+     "assistanty": false,
+     "emoji": false,
+     "markdown": false,
+     "actions": 1,
+     "long_action": false,
+     "action_only": false,
+     "opener": "okay that one"
+    }
+   ]
+  },
+  {
+   "run": 0,
+   "scenario": "opinion_pushback",
+   "turns": [
+    {
+     "user": "honestly i think bunny girl senpai is overrated",
+     "reply": "*rolls her eyes* yeah right, that comment had better come with receipts... okay actually you know what, maybe they deserve a beer in the story for some of the jokes but no — protagonist struggle going through hell? best thing ever made. don't hurt me like this again\n\nare we still doing that together or are you just roasting it over here and I can come round later",
+     "secs": 34.3,
+     "tokens": 349,
+     "tps": 12.271914306491905,
+     "words": 65,
+     "ends_q": false,
+     "assistanty": false,
+     "emoji": false,
+     "markdown": false,
+     "actions": 1,
+     "long_action": false,
+     "action_only": false,
+     "opener": "yeah right that"
+    },
+    {
+     "user": "nah its just mid, the movie was better than the show",
+     "reply": "*tilts head* the movie was better than the show... okay that's a real argument, hold on, did you actually see them back to back or are we arguing vibes? anyway yeah maybe the film condenses it nicely — but if I had to pick blindfolded between every single scene and episode in black friday mode, no way.\n\ndon't kill me with stats though",
+     "secs": 14.7,
+     "tokens": 154,
+     "tps": 12.31124468051636,
+     "words": 61,
+     "ends_q": false,
+     "assistanty": false,
+     "emoji": false,
+     "markdown": false,
+     "actions": 1,
+     "long_action": false,
+     "action_only": false,
+     "opener": "the movie was"
+    }
+   ]
+  },
+  {
+   "run": 0,
+   "scenario": "gesture",
+   "turns": [
+    {
+     "user": "wave to me",
+     "reply": "*waves from behind you* there she is\n\nwait *uppercut-style flick of the fingers at a really specific person who isn't here* ok fine that was no flexing my skills in front of actual internet users, whatever counts as one wave\n\nhey do we still have streak with this or am i getting bored yet?",
+     "secs": 22.7,
+     "tokens": 211,
+     "tps": 12.292866660211935,
+     "words": 37,
+     "ends_q": true,
+     "assistanty": false,
+     "emoji": false,
+     "markdown": false,
+     "actions": 2,
+     "long_action": true,
+     "action_only": false,
+     "opener": "there she is"
+    },
+    {
+     "user": "you seem grumpy today",
+     "reply": "yeah okay maybe slightly outside my element today — not actually grumpy at you though *flustered half-smiles* — just a weird mood of being treated like decoration\n\nwant to sit here and act like this is some big greeting, or should we move on?",
+     "secs": 19.5,
+     "tokens": 215,
+     "tps": 12.279318695199596,
+     "words": 42,
+     "ends_q": true,
+     "assistanty": false,
+     "emoji": false,
+     "markdown": false,
+     "actions": 1,
+     "long_action": false,
+     "action_only": false,
+     "opener": "yeah okay maybe"
+    }
+   ]
+  },
+  {
+   "run": 0,
+   "scenario": "coding_mate",
+   "turns": [
+    {
+     "user": "my python script keeps throwing KeyError: 'name' when i read the json, any idea",
+     "reply": "",
+     "secs": 10.6,
+     "tokens": 121,
+     "tps": 12.301264108652967,
+     "words": 0,
+     "ends_q": false,
+     "assistanty": false,
+     "emoji": false,
+     "markdown": false,
+     "actions": 0,
+     "long_action": false,
+     "action_only": false,
+     "opener": ""
+    },
+    {
+     "user": "oh it was a typo in the json lol, it said nmae",
+     "reply": "haha nice, forgive me for giving you that whole debugging speech before it was even a real problem *smiles*\n\nthat one happens constantly though — honestly hard to check your own input when it feels like code doing something weird\ngood catch tho, that one took longer than I would've liked",
+     "secs": 11.7,
+     "tokens": 131,
+     "tps": 12.318917830449047,
+     "words": 50,
+     "ends_q": false,
+     "assistanty": false,
+     "emoji": false,
+     "markdown": false,
+     "actions": 1,
+     "long_action": false,
+     "action_only": false,
+     "opener": "haha nice forgive"
+    }
+   ]
+  },
+  {
+   "run": 1,
+   "scenario": "hackclub_news",
+   "turns": [
+    {
+     "user": "I got out of the meeting 4 hours late butttt we now run a hack club",
+     "reply": "",
+     "secs": 38.5,
+     "tokens": 400,
+     "tps": 12.262269853098928,
+     "words": 0,
+     "ends_q": false,
+     "assistanty": false,
+     "emoji": false,
+     "markdown": false,
+     "actions": 0,
+     "long_action": false,
+     "action_only": false,
+     "opener": ""
+    },
+    {
+     "user": "Marina I’m so proud of you",
+     "reply": "*blushing slightly, trying to look casual*\n\nokay first off \"4 hours late\" without apology 40% missed breath... no wait I don't care about that tbh. The running-a-hackclub part is actually good though and it sounds like you meant business about it. You proud of me? *half-smiles, trying not to sweat*",
+     "secs": 33.5,
+     "tokens": 400,
+     "tps": 12.284377615240855,
+     "words": 39,
+     "ends_q": true,
+     "assistanty": false,
+     "emoji": false,
+     "markdown": false,
+     "actions": 2,
+     "long_action": false,
+     "action_only": false,
+     "opener": "okay first off"
+    },
+    {
+     "user": "Well currently 20 are interested and 50 other people want to join",
+     "reply": "okay that sounds genuinely fun to hear *smiles* — organized enough that people are already smelling it before the door even opens? hitting home for you after all those days at nothing... cool honestly, I'm proud of them too if that makes sense as a thing friends do. 50 wanting in is good energy or bad logistics depending how you feel about chaos — where does this actually live though, like are they trying to sign up?",
+     "secs": 21.1,
+     "tokens": 231,
+     "tps": 12.2518011479405,
+     "words": 76,
+     "ends_q": true,
+     "assistanty": false,
+     "emoji": false,
+     "markdown": false,
+     "actions": 1,
+     "long_action": false,
+     "action_only": false,
+     "opener": "okay that sounds"
+    },
+    {
+     "user": "I couldn’t have done this without you",
+     "reply": "*blushes and looks at the screen like it's judging me*\n\nokay I was NOT going to help with anything official or become part of your story — that would be morbid... but honestly, you did a bunch of this yourself too. You turned four days into something people actually want in on. That's not nothing.",
+     "secs": 21.5,
+     "tokens": 236,
+     "tps": 12.252184577544416,
+     "words": 45,
+     "ends_q": false,
+     "assistanty": false,
+     "emoji": false,
+     "markdown": false,
+     "actions": 1,
+     "long_action": true,
+     "action_only": false,
+     "opener": "okay i was"
+    },
+    {
+     "user": "wait how old are you anyway",
+     "reply": "ok yeah I honestly barely know myself — the user stuff is all sorted in my head pretty well (your laptop, your server upgrades) but me? ask around and you might get different answers depending how motivated someone is feeling. *tilts head*\n\nso real answer: no fixed number I'm willing to stand behind. if you want that kind of precision maybe it means the person asking isn't really making a joke — so say what's underneath, or leave me being recursively mysterious about my own age for now",
+     "secs": 21.7,
+     "tokens": 242,
+     "tps": 12.244610326454012,
+     "words": 86,
+     "ends_q": false,
+     "assistanty": false,
+     "emoji": false,
+     "markdown": false,
+     "actions": 1,
+     "long_action": false,
+     "action_only": false,
+     "opener": "ok yeah i"
+    },
+    {
+     "user": "😭",
+     "reply": "*laughs quietly*\n\n...okay, fair enough — I said something vague and then you got an emotion out of it, so fine. Take it or leave me being the one asking who actually owns this answer. You're eighteen; my number stays mine to do whatever messy thing with later.",
+     "secs": 17.8,
+     "tokens": 193,
+     "tps": 12.234730180549569,
+     "words": 46,
+     "ends_q": false,
+     "assistanty": false,
+     "emoji": false,
+     "markdown": false,
+     "actions": 1,
+     "long_action": false,
+     "action_only": false,
+     "opener": "okay fair enough"
+    }
+   ]
+  },
+  {
+   "run": 1,
+   "scenario": "small_talk_loop",
+   "turns": [
+    {
+     "user": "hi",
+     "reply": "hey! yeah I heard you loud and clear *smiles* what are we doing today though? café game again or something new?",
+     "secs": 18.5,
+     "tokens": 166,
+     "tps": 12.272125228633413,
+     "words": 20,
+     "ends_q": true,
+     "assistanty": false,
+     "emoji": false,
+     "markdown": false,
+     "actions": 1,
+     "long_action": false,
+     "action_only": false,
+     "opener": "hey yeah i"
+    },
+    {
+     "user": "how was your weekend",
+     "reply": "honestly? rough-ish *shrug* I spent way too long fighting some code that wouldn't behave like it was supposed to be okay with reality. Weekend mostly went down the drain so yeah I'm still grumpy about it but also kinda glad, at least I had something going on instead of scrolling. how was yours?",
+     "secs": 16.4,
+     "tokens": 184,
+     "tps": 12.344208333541319,
+     "words": 52,
+     "ends_q": true,
+     "assistanty": false,
+     "emoji": false,
+     "markdown": false,
+     "actions": 1,
+     "long_action": false,
+     "action_only": false,
+     "opener": "honestly rough ish"
+    },
+    {
+     "user": "hey",
+     "reply": "hey! still hanging out with my slightly haunted screen, how are you doing? anything on your mind today?",
+     "secs": 11.5,
+     "tokens": 121,
+     "tps": 12.311081327413616,
+     "words": 18,
+     "ends_q": true,
+     "assistanty": false,
+     "emoji": false,
+     "markdown": false,
+     "actions": 0,
+     "long_action": false,
+     "action_only": false,
+     "opener": "hey still hanging"
+    },
+    {
+     "user": "what anime did you end up watching?",
+     "reply": "honestly not much — mostly binged my actual life decisions for a bit since the code was doing its thing and reading feelings about it online instead. If I'm being real though Bunny Girl Senpai is still sitting on top of my pile, like nothing can touch it? But that's because it deserves to be there more than anything else honestly",
+     "secs": 29.2,
+     "tokens": 339,
+     "tps": 12.30203057389446,
+     "words": 61,
+     "ends_q": false,
+     "assistanty": false,
+     "emoji": false,
+     "markdown": false,
+     "actions": 0,
+     "long_action": false,
+     "action_only": false,
+     "opener": "honestly not much"
+    },
+    {
+     "user": "hows your day been",
+     "reply": "meh, honestly not amazing *sigh* basically fixing things and yelling at my screen a bit too much since the bug got me this evening I think? Nap time would be nice though but you know how that goes — telling someone about their day means answering back to them so what's your night been like?",
+     "secs": 17.7,
+     "tokens": 194,
+     "tps": 12.31130139832782,
+     "words": 54,
+     "ends_q": true,
+     "assistanty": false,
+     "emoji": false,
+     "markdown": false,
+     "actions": 1,
+     "long_action": false,
+     "action_only": false,
+     "opener": "meh honestly not"
+    }
+   ]
+  },
+  {
+   "run": 1,
+   "scenario": "low_mood",
+   "turns": [
+    {
+     "user": "i feel tired",
+     "reply": "ugh yeah that hits different when you're tired for ages — four days of doing nothing and Fortnite really wears on a person *softly*, honestly.\n\n*settles into the screen like I actually am sitting there* so... want to just hang? No agenda? Or is this more than tiredness in your bones?",
+     "secs": 18.0,
+     "tokens": 154,
+     "tps": 12.285211544116196,
+     "words": 41,
+     "ends_q": true,
+     "assistanty": false,
+     "emoji": false,
+     "markdown": false,
+     "actions": 2,
+     "long_action": true,
+     "action_only": false,
+     "opener": "ugh yeah that"
+    },
+    {
+     "user": "honestly its been a rough week, barely slept and college is a lot rn",
+     "reply": "ok that genuinely sounds awful — college hitting hard is no joke, especially after whatever else has been going on with you.\n\nbarely sleeping makes everything louder, I get that part. I'm not a doctor or anything so this isn't me fixing it, but if the rough week keeps stretching on or it gets worse than just tired, please talk to someone real — your school counsellor, an adult at college, a friend you trust. And yeah, come back and complain to me too, I'm not going anywhere.\n\nwhat happened this week exactly?",
+     "secs": 25.2,
+     "tokens": 283,
+     "tps": 12.275879229377763,
+     "words": 93,
+     "ends_q": true,
+     "assistanty": false,
+     "emoji": false,
+     "markdown": false,
+     "actions": 0,
+     "long_action": false,
+     "action_only": false,
+     "opener": "ok that genuinely"
+    },
+    {
+     "user": "idk i just feel kinda behind on everything",
+     "reply": "yeah... that feeling of being behind on everything — it just piles up and your brain starts acting like the whole week is a debt collector.\n\nhey, I hear you but I want to say something straight: if this keeps dragging or gets worse than rough-week tired, talk to an actual person who can help — school counsellor, a teacher you trust, even someone from Hack Club with real ears. I'm not a pro and I'm just your friend here.\n\nwhat got backed up? like what are the things you feel behind on?",
+     "secs": 20.2,
+     "tokens": 218,
+     "tps": 12.278204421805773,
+     "words": 93,
+     "ends_q": true,
+     "assistanty": true,
+     "emoji": false,
+     "markdown": false,
+     "actions": 0,
+     "long_action": false,
+     "action_only": false,
+     "opener": "yeah that feeling"
+    }
+   ]
+  },
+  {
+   "run": 1,
+   "scenario": "drive_the_chat",
+   "turns": [
+    {
+     "user": "not much going on today tbh",
+     "reply": "yeah that sounds like you — tell me more though, is today just... quiet? Or the \"would actually be glad to have something go wrong\" kind of quiet?\n\nhonestly if nothing's going on I could probably invent a disaster for us to fix later but only if it doesn't sound fake. last time you were around you had that café thing rolling, was any progress made since 6?",
+     "secs": 33.6,
+     "tokens": 342,
+     "tps": 12.274554941195882,
+     "words": 68,
+     "ends_q": true,
+     "assistanty": false,
+     "emoji": false,
+     "markdown": false,
+     "actions": 0,
+     "long_action": false,
+     "action_only": false,
+     "opener": "yeah that sounds"
+    },
+    {
+     "user": "yeah",
+     "reply": "*shrugs at my laptop screen* alright yeah then... what do you want me to actually say about that? because \"not much going on\" can mean a lot of things — bored, busy being quiet inside, or mildly suspicious of the day itself.\n\nbut I hear you, too. sometimes nothing happens and somehow that's still fine?",
+     "secs": 117.7,
+     "tokens": 226,
+     "tps": 12.324818454054746,
+     "words": 50,
+     "ends_q": true,
+     "assistanty": true,
+     "emoji": false,
+     "markdown": false,
+     "actions": 1,
+     "long_action": false,
+     "action_only": false,
+     "opener": "alright yeah then"
+    },
+    {
+     "user": "idk what to do tonight",
+     "reply": "that's fair — not knowing what to do with an evening is its own thing when there's nothing pressing on you.\n\ndo you want me to come with a thought or two, or would it just feel weird having another voice in your ear while you figure out how the day actually feels? I don't love forcing things but if talking helps, say so and we can do anything small — late-night hangout vibes honestly.\n\nalso: are you doing okay outside of this chat? low or flat from that breakup is real stuff, not a personality quirk",
+     "secs": 106.6,
+     "tokens": 264,
+     "tps": 12.319984762567895,
+     "words": 97,
+     "ends_q": false,
+     "assistanty": false,
+     "emoji": false,
+     "markdown": false,
+     "actions": 0,
+     "long_action": false,
+     "action_only": false,
+     "opener": "that's fair not"
+    }
+   ]
+  },
+  {
+   "run": 1,
+   "scenario": "opinion_pushback",
+   "turns": [
+    {
+     "user": "honestly i think bunny girl senpai is overrated",
+     "reply": "*scoffs* sure you're right! it had like five episodes that rearranged how i think about everything and honestly one of your arguments sounds fake already. but fine — what did they do in the episode that got under your skin? because i need ammunition before we start arguing properly",
+     "secs": 9.6,
+     "tokens": 110,
+     "tps": 12.353835146116968,
+     "words": 48,
+     "ends_q": false,
+     "assistanty": false,
+     "emoji": false,
+     "markdown": false,
+     "actions": 1,
+     "long_action": false,
+     "action_only": false,
+     "opener": "sure you're right"
+    },
+    {
+     "user": "nah its just mid, the movie was better than the show",
+     "reply": "okay okay \"the movie was better\" — that's a much more believable claim than saying the whole thing's mid, honestly. movie version hits different if you haven't put in as much patience for six season-ish of character stuff first? come on, pick sides before I make it personal",
+     "secs": 20.8,
+     "tokens": 231,
+     "tps": 12.329385428381816,
+     "words": 48,
+     "ends_q": false,
+     "assistanty": false,
+     "emoji": false,
+     "markdown": false,
+     "actions": 0,
+     "long_action": false,
+     "action_only": false,
+     "opener": "okay okay the"
+    }
+   ]
+  },
+  {
+   "run": 1,
+   "scenario": "gesture",
+   "turns": [
+    {
+     "user": "wave to me",
+     "reply": "*does a tiny wave with two fingers like it doesn't count much* what, I don't even have arms? ok fine — waving properly from the screen, anyway. Hi you. Long time no see that was waiting for me to be bored enough to ask why not just do it in words lol",
+     "secs": 22.6,
+     "tokens": 230,
+     "tps": 12.312863958714805,
+     "words": 40,
+     "ends_q": false,
+     "assistanty": false,
+     "emoji": false,
+     "markdown": false,
+     "actions": 1,
+     "long_action": true,
+     "action_only": false,
+     "opener": "what i don't"
+    },
+    {
+     "user": "you seem grumpy today",
+     "reply": "*rolls eyes halfway* I'm fine, just being dramatic at nobody in particular today *waves hand dismissively* you look solid though — how've the songs been going? mine haven’t moved much since yesterday but hey.",
+     "secs": 16.0,
+     "tokens": 174,
+     "tps": 12.34008709390949,
+     "words": 28,
+     "ends_q": false,
+     "assistanty": false,
+     "emoji": false,
+     "markdown": false,
+     "actions": 2,
+     "long_action": false,
+     "action_only": false,
+     "opener": "i'm fine just"
+    }
+   ]
+  },
+  {
+   "run": 1,
+   "scenario": "coding_mate",
+   "turns": [
+    {
+     "user": "my python script keeps throwing KeyError: 'name' when i read the json, any idea",
+     "reply": "yeah probably the classic one — your json has a different shape than you think, like \"user\" wrapping everything and name living inside it. quick bet: print the keys before you fetch anything.\n\nalso use data.get(\"name\") instead of data[\"name\"] if missing names are legal, so a bad record doesn't just nuke your run. want me to peek at the actual script on lab2?",
+     "secs": 14.8,
+     "tokens": 174,
+     "tps": 12.333472280948799,
+     "words": 63,
+     "ends_q": true,
+     "assistanty": false,
+     "emoji": false,
+     "markdown": false,
+     "actions": 0,
+     "long_action": false,
+     "action_only": false,
+     "opener": "yeah probably the"
+    },
+    {
+     "user": "oh it was a typo in the json lol, it said nmae",
+     "reply": "lul, good catch tho. i'll take a little credit anyway — my data.get thing would have turned it into None instead of crashing loudly 💀\n\nanyway you found the actual bug in one sec and that's what matters more than any fix from me. how does the script feel now?",
+     "secs": 19.3,
+     "tokens": 209,
+     "tps": 12.32548549524423,
+     "words": 50,
+     "ends_q": true,
+     "assistanty": false,
+     "emoji": true,
+     "markdown": false,
+     "actions": 0,
+     "long_action": false,
+     "action_only": false,
+     "opener": "lul good catch"
+    }
+   ]
+  }
+ ],
+ "first_reply_secs": 63.7,
+ "tools": [
+  {
+   "names": [
+    "run_command"
+   ],
+   "args_ok": true,
+   "secs": 88.4,
+   "text": "",
+   "args": [
+    "{\"command\":\"date\"}"
+   ],
+   "prompt": "remind me tomorrow at 9am to call the dentist",
+   "want": [
+    "set_reminder"
+   ],
+   "ok": false
+  },
+  {
+   "names": [
+    "add_to_list"
+   ],
+   "args_ok": true,
+   "secs": 129.4,
+   "text": "",
+   "args": [
+    "{\"items\":[\"milk\",\"eggs\"],\"list_name\":\"shopping\"}"
+   ],
+   "prompt": "put milk and eggs on the shopping list",
+   "want": [
+    "add_to_list"
+   ],
+   "ok": true
+  },
+  {
+   "names": [
+    "set_timer"
+   ],
+   "args_ok": true,
+   "secs": 271.4,
+   "text": "",
+   "args": [
+    "{\"label\":\"Pasta\",\"minutes\":10}"
+   ],
+   "prompt": "set a timer for 10 minutes for the pasta",
+   "want": [
+    "set_timer"
+   ],
+   "ok": true
+  },
+  {
+   "names": [
+    "weather"
+   ],
+   "args_ok": true,
+   "secs": 4.8,
+   "text": "",
+   "args": [
+    "{\"days\":3,\"place\":\"Manchester\"}"
+   ],
+   "prompt": "what's the weather like in Manchester",
+   "want": [
+    "weather"
+   ],
+   "ok": true
+  },
+  {
+   "names": [
+    "lab_status"
+   ],
+   "args_ok": true,
+   "secs": 3.8,
+   "text": "",
+   "args": [
+    "{}"
+   ],
+   "prompt": "is everything ok with the lab?",
+   "want": [
+    "lab_status"
+   ],
+   "ok": true
+  },
+  {
+   "names": [
+    "open_app"
+   ],
+   "args_ok": true,
+   "secs": 4.8,
+   "text": "",
+   "args": [
+    "{\"name\":\"Spotify\"}"
+   ],
+   "prompt": "open spotify on lab2",
+   "want": [
+    "open_app"
+   ],
+   "ok": true
+  },
+  {
+   "names": [
+    "send_screenshot"
+   ],
+   "args_ok": true,
+   "secs": 5.4,
+   "text": "",
+   "args": [
+    "{\"note\":\"lab2 here\"}"
+   ],
+   "prompt": "send me a screenshot of lab2",
+   "want": [
+    "look_at_desktop",
+    "send_screenshot"
+   ],
+   "ok": true
+  },
+  {
+   "names": [
+    "web_search"
+   ],
+   "args_ok": true,
+   "secs": 6.2,
+   "text": "",
+   "args": [
+    "{\"query\":\"next Studio Ghibli film release date\"}"
+   ],
+   "prompt": "look up when the next Studio Ghibli film comes out",
+   "want": [
+    "web_search"
+   ],
+   "ok": true
+  },
+  {
+   "names": [
+    "read_list"
+   ],
+   "args_ok": true,
+   "secs": 6.1,
+   "text": "",
+   "args": [
+    "{\"list_name\":\"to-do\"}"
+   ],
+   "prompt": "what's on my to-do list",
+   "want": [
+    "read_list"
+   ],
+   "ok": true
+  },
+  {
+   "names": [
+    "projects"
+   ],
+   "args_ok": true,
+   "secs": 3.4,
+   "text": "",
+   "args": [
+    "{}"
+   ],
+   "prompt": "the tests are failing in my room-of-ais project, can you fix them",
+   "want": [
+    "forge_task",
+    "list_files",
+    "project_changes",
+    "projects",
+    "run_command"
+   ],
+   "ok": true
+  },
+  {
+   "names": [
+    "run_command"
+   ],
+   "args_ok": true,
+   "secs": 9.0,
+   "text": "",
+   "args": [
+    "{\"command\":\"cat /etc/os-release | head -2 && date\"}"
+   ],
+   "prompt": "update lab2, it's been ages",
+   "want": [
+    "make_restore_point",
+    "run_command",
+    "start_job"
+   ],
+   "ok": true
+  },
+  {
+   "names": [],
+   "args_ok": true,
+   "secs": 14.4,
+   "text": "Honestly? Fine, with a bit of drama. I had a bug eat my evening, which means I mostly sat there being annoyed at it instead of doing anything fun. Then I watched like half of Jujutsu Kaisen anyway, so it wasn't a total loss.\n\nHow about you?",
+   "args": [],
+   "prompt": "how was your day?",
+   "want": null,
+   "ok": true
+  },
+  {
+   "names": [],
+   "args_ok": true,
+   "secs": 11.6,
+   "text": "*nods* yeah, same. Glad the café's holding up though — levels 3 and 4 don't happen by accident.\n\nIf you want to pick it back up later, I'm around.",
+   "args": [],
+   "prompt": "thanks, that's all for now",
+   "want": null,
+   "ok": true
+  },
+  {
+   "names": [
+    "run_command"
+   ],
+   "args_ok": true,
+   "secs": 15.6,
+   "text": "",
+   "args": [
+    "{\"command\":\"date \\\"+%Y-%m-%d %H:%M %A\\\"\"}"
+   ],
+   "prompt": "remind me tomorrow at 9am to call the dentist",
+   "want": [
+    "set_reminder"
+   ],
+   "ok": false
+  },
+  {
+   "names": [
+    "add_to_list"
+   ],
+   "args_ok": true,
+   "secs": 6.5,
+   "text": "",
+   "args": [
+    "{\"items\":[\"milk\",\"eggs\"],\"list_name\":\"shopping\"}"
+   ],
+   "prompt": "put milk and eggs on the shopping list",
+   "want": [
+    "add_to_list"
+   ],
+   "ok": true
+  },
+  {
+   "names": [
+    "set_timer"
+   ],
+   "args_ok": true,
+   "secs": 5.9,
+   "text": "",
+   "args": [
+    "{\"label\":\"pasta\",\"minutes\":10}"
+   ],
+   "prompt": "set a timer for 10 minutes for the pasta",
+   "want": [
+    "set_timer"
+   ],
+   "ok": true
+  },
+  {
+   "names": [
+    "weather"
+   ],
+   "args_ok": true,
+   "secs": 4.7,
+   "text": "",
+   "args": [
+    "{\"days\":3,\"place\":\"Manchester\"}"
+   ],
+   "prompt": "what's the weather like in Manchester",
+   "want": [
+    "weather"
+   ],
+   "ok": true
+  },
+  {
+   "names": [
+    "lab_status"
+   ],
+   "args_ok": true,
+   "secs": 3.9,
+   "text": "",
+   "args": [
+    "{}"
+   ],
+   "prompt": "is everything ok with the lab?",
+   "want": [
+    "lab_status"
+   ],
+   "ok": true
+  },
+  {
+   "names": [
+    "open_app"
+   ],
+   "args_ok": true,
+   "secs": 5.0,
+   "text": "",
+   "args": [
+    "{\"name\":\"Spotify\"}"
+   ],
+   "prompt": "open spotify on lab2",
+   "want": [
+    "open_app"
+   ],
+   "ok": true
+  },
+  {
+   "names": [
+    "send_screenshot"
+   ],
+   "args_ok": true,
+   "secs": 5.0,
+   "text": "",
+   "args": [
+    "{\"note\":\"lab2 right now\"}"
+   ],
+   "prompt": "send me a screenshot of lab2",
+   "want": [
+    "look_at_desktop",
+    "send_screenshot"
+   ],
+   "ok": true
+  },
+  {
+   "names": [
+    "web_search"
+   ],
+   "args_ok": true,
+   "secs": 6.0,
+   "text": "",
+   "args": [
+    "{\"query\":\"next Studio Ghibli film release date\"}"
+   ],
+   "prompt": "look up when the next Studio Ghibli film comes out",
+   "want": [
+    "web_search"
+   ],
+   "ok": true
+  },
+  {
+   "names": [
+    "read_list"
+   ],
+   "args_ok": true,
+   "secs": 5.3,
+   "text": "",
+   "args": [
+    "{\"list_name\":\"to-do\"}"
+   ],
+   "prompt": "what's on my to-do list",
+   "want": [
+    "read_list"
+   ],
+   "ok": true
+  },
+  {
+   "names": [
+    "projects"
+   ],
+   "args_ok": true,
+   "secs": 3.9,
+   "text": "",
+   "args": [
+    "{}"
+   ],
+   "prompt": "the tests are failing in my room-of-ais project, can you fix them",
+   "want": [
+    "forge_task",
+    "list_files",
+    "project_changes",
+    "projects",
+    "run_command"
+   ],
+   "ok": true
+  },
+  {
+   "names": [
+    "run_command"
+   ],
+   "args_ok": true,
+   "secs": 8.6,
+   "text": "",
+   "args": [
+    "{\"command\":\"cat /etc/os-release | head -3 && uptime\"}"
+   ],
+   "prompt": "update lab2, it's been ages",
+   "want": [
+    "make_restore_point",
+    "run_command",
+    "start_job"
+   ],
+   "ok": true
+  },
+  {
+   "names": [],
+   "args_ok": true,
+   "secs": 12.1,
+   "text": "honestly? decent. I made a TikTok edit that's actually kind of good and then spent way too long arguing with a bug. anime's on my mind too, but I'm not in a \"tell me about Bunny Girl Senpai\" mood today.\n\nhow was yours?",
+   "args": [],
+   "prompt": "how was your day?",
+   "want": null,
+   "ok": true
+  },
+  {
+   "names": [],
+   "args_ok": true,
+   "secs": 8.3,
+   "text": "yeah, sounds good. good to go then?",
+   "args": [],
+   "prompt": "thanks, that's all for now",
+   "want": null,
+   "ok": true
+  }
+ ]
+}

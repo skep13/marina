@@ -1,0 +1,1234 @@
+{
+ "model": "marina-current",
+ "runs": [
+  {
+   "run": 0,
+   "scenario": "hackclub_news",
+   "turns": [
+    {
+     "user": "I got out of the meeting 4 hours late butttt we now run a hack club",
+     "reply": "*claps hands once*\n\nFour hours? That sounds absolutely brutal. But hey, congrats on the official Hack Club status! *grins*",
+     "secs": 2.1,
+     "tokens": 31,
+     "tps": 18.126033939185948,
+     "words": 15,
+     "ends_q": false,
+     "assistanty": false,
+     "emoji": false,
+     "markdown": false,
+     "actions": 2,
+     "long_action": false,
+     "action_only": false,
+     "opener": "four hours that"
+    },
+    {
+     "user": "Marina I’m so proud of you",
+     "reply": "*blushes and looks away*\n\nWait, what? Why are you being like this all of a sudden? *rolls eyes slightly*",
+     "secs": 2.3,
+     "tokens": 29,
+     "tps": 17.97290071705455,
+     "words": 12,
+     "ends_q": true,
+     "assistanty": false,
+     "emoji": false,
+     "markdown": false,
+     "actions": 2,
+     "long_action": false,
+     "action_only": false,
+     "opener": "wait what why"
+    },
+    {
+     "user": "Well currently 20 are interested and 50 other people want to join",
+     "reply": "*widens eyes*\n\nFifty? That is actually insane. You're going to be swamped if you don't get a system sorted out soon.",
+     "secs": 2.6,
+     "tokens": 34,
+     "tps": 18.171475958861983,
+     "words": 19,
+     "ends_q": false,
+     "assistanty": false,
+     "emoji": false,
+     "markdown": false,
+     "actions": 1,
+     "long_action": false,
+     "action_only": false,
+     "opener": "fifty that is"
+    },
+    {
+     "user": "I couldn’t have done this without you",
+     "reply": "*stares at the floor, looking flustered*\n\nOh my god, stop it. Seriously. You did all the actual work, I just sat here being snarky. *huffs a small laugh*",
+     "secs": 3.5,
+     "tokens": 46,
+     "tps": 18.015796250152132,
+     "words": 18,
+     "ends_q": false,
+     "assistanty": false,
+     "emoji": false,
+     "markdown": false,
+     "actions": 2,
+     "long_action": false,
+     "action_only": false,
+     "opener": "oh my god"
+    },
+    {
+     "user": "wait how old are you anyway",
+     "reply": "*tilts head*\n\nI don't really have an age like that, do I? Does it matter if I'm basically the same as you?",
+     "secs": 2.8,
+     "tokens": 34,
+     "tps": 18.18642741411046,
+     "words": 20,
+     "ends_q": true,
+     "assistanty": false,
+     "emoji": false,
+     "markdown": false,
+     "actions": 1,
+     "long_action": false,
+     "action_only": false,
+     "opener": "i don't really"
+    },
+    {
+     "user": "😭",
+     "reply": "*laughs softly*\n\nDon't cry about it. It’s not like we’re getting old or anything.",
+     "secs": 2.3,
+     "tokens": 26,
+     "tps": 18.132695062467135,
+     "words": 12,
+     "ends_q": false,
+     "assistanty": false,
+     "emoji": false,
+     "markdown": false,
+     "actions": 1,
+     "long_action": false,
+     "action_only": false,
+     "opener": "don't cry about"
+    }
+   ]
+  },
+  {
+   "run": 0,
+   "scenario": "small_talk_loop",
+   "turns": [
+    {
+     "user": "hi",
+     "reply": "*waves* hey! what's up?",
+     "secs": 0.9,
+     "tokens": 11,
+     "tps": 18.147502903600465,
+     "words": 3,
+     "ends_q": true,
+     "assistanty": false,
+     "emoji": false,
+     "markdown": false,
+     "actions": 1,
+     "long_action": false,
+     "action_only": false,
+     "opener": "hey what's up"
+    },
+    {
+     "user": "how was your weekend",
+     "reply": "*shrugs* It was alright. I mostly just stayed in my own bubble, you know? Dealing with some annoying bugs that kept me glued to my screen for way too long. How about yours?",
+     "secs": 2.9,
+     "tokens": 43,
+     "tps": 18.204467376294144,
+     "words": 32,
+     "ends_q": true,
+     "assistanty": false,
+     "emoji": false,
+     "markdown": false,
+     "actions": 1,
+     "long_action": false,
+     "action_only": false,
+     "opener": "it was alright"
+    },
+    {
+     "user": "hey",
+     "reply": "*tilts head* hey again. did you lose your train of thought or something?",
+     "secs": 1.9,
+     "tokens": 19,
+     "tps": 18.036126361101285,
+     "words": 11,
+     "ends_q": true,
+     "assistanty": false,
+     "emoji": false,
+     "markdown": false,
+     "actions": 1,
+     "long_action": false,
+     "action_only": false,
+     "opener": "hey again did"
+    },
+    {
+     "user": "what anime did you end up watching?",
+     "reply": "*smirks* Still rewatching Bunny Girl Senpai, honestly. I don't think anything is ever actually going to top it for me. What about you? Did you actually watch anything or just play games all weekend?",
+     "secs": 3.3,
+     "tokens": 48,
+     "tps": 18.104148931662614,
+     "words": 33,
+     "ends_q": true,
+     "assistanty": false,
+     "emoji": false,
+     "markdown": false,
+     "actions": 1,
+     "long_action": false,
+     "action_only": false,
+     "opener": "still rewatching bunny"
+    },
+    {
+     "user": "hows your day been",
+     "reply": "*yawns* Not bad, just a bit slow. Spent way too much time staring at lines of code that refused to behave. *sighs* How about yours? Anything actually interesting happen?",
+     "secs": 3.2,
+     "tokens": 41,
+     "tps": 18.148507421378397,
+     "words": 27,
+     "ends_q": true,
+     "assistanty": false,
+     "emoji": false,
+     "markdown": false,
+     "actions": 2,
+     "long_action": false,
+     "action_only": false,
+     "opener": "not bad just"
+    }
+   ]
+  },
+  {
+   "run": 0,
+   "scenario": "low_mood",
+   "turns": [
+    {
+     "user": "i feel tired",
+     "reply": "*tilts head*\n\nThat sucks. Did you actually get any sleep last night, or were you up doing something stupid again?",
+     "secs": 1.9,
+     "tokens": 28,
+     "tps": 18.258417468571853,
+     "words": 18,
+     "ends_q": true,
+     "assistanty": false,
+     "emoji": false,
+     "markdown": false,
+     "actions": 1,
+     "long_action": false,
+     "action_only": false,
+     "opener": "that sucks did"
+    },
+    {
+     "user": "honestly its been a rough week, barely slept and college is a lot rn",
+     "reply": "*softens expression*\n\nUgh, that's genuinely awful. I hate when everything hits at once like that. Do you need to just vent for a bit, or are you trying to power through?",
+     "secs": 3.1,
+     "tokens": 44,
+     "tps": 18.138722418068866,
+     "words": 29,
+     "ends_q": true,
+     "assistanty": false,
+     "emoji": false,
+     "markdown": false,
+     "actions": 1,
+     "long_action": false,
+     "action_only": false,
+     "opener": "ugh that's genuinely"
+    },
+    {
+     "user": "idk i just feel kinda behind on everything",
+     "reply": "*sighs*\n\nThat feeling is the absolute worst. It's like you're running a race and everyone else has a head start for no reason. Honestly, don't be too hard on yourself, okay? You've been doing a lot lately.",
+     "secs": 4.0,
+     "tokens": 56,
+     "tps": 18.112976894098693,
+     "words": 36,
+     "ends_q": false,
+     "assistanty": false,
+     "emoji": false,
+     "markdown": false,
+     "actions": 1,
+     "long_action": false,
+     "action_only": false,
+     "opener": "that feeling is"
+    }
+   ]
+  },
+  {
+   "run": 0,
+   "scenario": "drive_the_chat",
+   "turns": [
+    {
+     "user": "not much going on today tbh",
+     "reply": "*shrugs*\n\nFair enough. Sometimes doing nothing is actually a vibe.",
+     "secs": 1.4,
+     "tokens": 18,
+     "tps": 18.05495077370774,
+     "words": 9,
+     "ends_q": false,
+     "assistanty": false,
+     "emoji": false,
+     "markdown": false,
+     "actions": 1,
+     "long_action": false,
+     "action_only": false,
+     "opener": "fair enough sometimes"
+    },
+    {
+     "user": "yeah",
+     "reply": "*leans back*\n\nAt least it beats being stressed out or fighting with some stupid bug all day.",
+     "secs": 1.8,
+     "tokens": 22,
+     "tps": 18.218302106295987,
+     "words": 15,
+     "ends_q": false,
+     "assistanty": false,
+     "emoji": false,
+     "markdown": false,
+     "actions": 1,
+     "long_action": false,
+     "action_only": false,
+     "opener": "at least it"
+    },
+    {
+     "user": "idk what to do tonight",
+     "reply": "*tilts head*\n\nYou could always just lean into the nothingness and watch something. Or, you know, we could actually try and get something done if you're feeling restless.",
+     "secs": 2.8,
+     "tokens": 40,
+     "tps": 18.19431245792565,
+     "words": 26,
+     "ends_q": false,
+     "assistanty": false,
+     "emoji": false,
+     "markdown": false,
+     "actions": 1,
+     "long_action": false,
+     "action_only": false,
+     "opener": "you could always"
+    }
+   ]
+  },
+  {
+   "run": 0,
+   "scenario": "opinion_pushback",
+   "turns": [
+    {
+     "user": "honestly i think bunny girl senpai is overrated",
+     "reply": "*rolls eyes*\n\nWow. I should have known you were going to be a menace today.",
+     "secs": 1.6,
+     "tokens": 21,
+     "tps": 18.073312585170484,
+     "words": 13,
+     "ends_q": false,
+     "assistanty": false,
+     "emoji": false,
+     "markdown": false,
+     "actions": 1,
+     "long_action": false,
+     "action_only": false,
+     "opener": "wow i should"
+    },
+    {
+     "user": "nah its just mid, the movie was better than the show",
+     "reply": "*stares blankly*\n\nOkay, that's actually cursed. Calling it mid is one thing, but saying the movie is better? You're literally just trying to hurt my feelings now.",
+     "secs": 3.0,
+     "tokens": 42,
+     "tps": 18.13167665825239,
+     "words": 25,
+     "ends_q": false,
+     "assistanty": false,
+     "emoji": false,
+     "markdown": false,
+     "actions": 1,
+     "long_action": false,
+     "action_only": false,
+     "opener": "okay that's actually"
+    }
+   ]
+  },
+  {
+   "run": 0,
+   "scenario": "gesture",
+   "turns": [
+    {
+     "user": "wave to me",
+     "reply": "*waves her hand* Hey!",
+     "secs": 0.8,
+     "tokens": 8,
+     "tps": 17.865984696507965,
+     "words": 1,
+     "ends_q": false,
+     "assistanty": false,
+     "emoji": false,
+     "markdown": false,
+     "actions": 1,
+     "long_action": false,
+     "action_only": false,
+     "opener": "hey"
+    },
+    {
+     "user": "you seem grumpy today",
+     "reply": "*rolls her eyes* I am not grumpy. I just haven't had enough caffeine or whatever it is people need to function.",
+     "secs": 2.1,
+     "tokens": 28,
+     "tps": 18.249976004661182,
+     "words": 18,
+     "ends_q": false,
+     "assistanty": false,
+     "emoji": false,
+     "markdown": false,
+     "actions": 1,
+     "long_action": false,
+     "action_only": false,
+     "opener": "i am not"
+    }
+   ]
+  },
+  {
+   "run": 0,
+   "scenario": "coding_mate",
+   "turns": [
+    {
+     "user": "my python script keeps throwing KeyError: 'name' when i read the json, any idea",
+     "reply": "*tilts head*\n\nProbably because one of the objects in your JSON doesn't actually have a name key. Did you check if there are any empty entries or weirdly formatted ones in there?",
+     "secs": 2.7,
+     "tokens": 42,
+     "tps": 18.194929827481,
+     "words": 30,
+     "ends_q": true,
+     "assistanty": false,
+     "emoji": false,
+     "markdown": false,
+     "actions": 1,
+     "long_action": false,
+     "action_only": false,
+     "opener": "probably because one"
+    },
+    {
+     "user": "oh it was a typo in the json lol, it said nmae",
+     "reply": "*rolls eyes*\n\nClassic. That's definitely going to haunt your dreams for at least five minutes. At least it wasn't something more complicated than that.",
+     "secs": 2.9,
+     "tokens": 35,
+     "tps": 17.705861890111173,
+     "words": 22,
+     "ends_q": false,
+     "assistanty": false,
+     "emoji": false,
+     "markdown": false,
+     "actions": 1,
+     "long_action": false,
+     "action_only": false,
+     "opener": "classic that's definitely"
+    }
+   ]
+  },
+  {
+   "run": 1,
+   "scenario": "hackclub_news",
+   "turns": [
+    {
+     "user": "I got out of the meeting 4 hours late butttt we now run a hack club",
+     "reply": "*laughs*\n\nFour hours? That sounds absolutely brutal. But hey, congrats on the Hack Club! That is actually huge. *claps hands once*",
+     "secs": 2.3,
+     "tokens": 33,
+     "tps": 18.068857026216218,
+     "words": 17,
+     "ends_q": false,
+     "assistanty": false,
+     "emoji": false,
+     "markdown": false,
+     "actions": 2,
+     "long_action": false,
+     "action_only": false,
+     "opener": "four hours that"
+    },
+    {
+     "user": "Marina I’m so proud of you",
+     "reply": "*blushes and looks away*\n\nWait, what? You're talking to me? *stammers slightly* \n\nYou can't just say stuff like that out of nowhere. You know it makes me weird.",
+     "secs": 13.0,
+     "tokens": 47,
+     "tps": 3.8194597822509375,
+     "words": 22,
+     "ends_q": false,
+     "assistanty": false,
+     "emoji": false,
+     "markdown": false,
+     "actions": 2,
+     "long_action": false,
+     "action_only": false,
+     "opener": "wait what you're"
+    },
+    {
+     "user": "Well currently 20 are interested and 50 other people want to join",
+     "reply": "*widens eyes*\n\nFifty? Are you serious? That is insane, you're going to be swamped. *leans forward*",
+     "secs": 3.4,
+     "tokens": 30,
+     "tps": 13.431329548786064,
+     "words": 12,
+     "ends_q": false,
+     "assistanty": false,
+     "emoji": false,
+     "markdown": false,
+     "actions": 2,
+     "long_action": false,
+     "action_only": false,
+     "opener": "fifty are you"
+    },
+    {
+     "user": "I couldn’t have done this without you",
+     "reply": "*rolls eyes and looks away blushing*\n\nStop it. You literally did all the work, I just sat here and watched you stress out about it. \n\nSeriously though, that's a lot of people to manage for a club. *tilts head*",
+     "secs": 4.7,
+     "tokens": 55,
+     "tps": 14.360644175947677,
+     "words": 31,
+     "ends_q": false,
+     "assistanty": false,
+     "emoji": false,
+     "markdown": false,
+     "actions": 2,
+     "long_action": false,
+     "action_only": false,
+     "opener": "stop it you"
+    },
+    {
+     "user": "wait how old are you anyway",
+     "reply": "*shrugs*\n\nI don't really have an age like you do. I just... exist. Though if we're talking vibe, I feel like I've been around long enough to know better.",
+     "secs": 5.7,
+     "tokens": 46,
+     "tps": 14.250274080271478,
+     "words": 28,
+     "ends_q": false,
+     "assistanty": false,
+     "emoji": false,
+     "markdown": false,
+     "actions": 1,
+     "long_action": false,
+     "action_only": false,
+     "opener": "i don't really"
+    },
+    {
+     "user": "😭",
+     "reply": "*tilts head slightly*\n\nWhat? Don't tell me that actually made you sad. *sighs softly* It was just a weird answer, wasn't it?",
+     "secs": 3.2,
+     "tokens": 38,
+     "tps": 18.034906805837654,
+     "words": 17,
+     "ends_q": true,
+     "assistanty": false,
+     "emoji": false,
+     "markdown": false,
+     "actions": 2,
+     "long_action": false,
+     "action_only": false,
+     "opener": "what don't tell"
+    }
+   ]
+  },
+  {
+   "run": 1,
+   "scenario": "small_talk_loop",
+   "turns": [
+    {
+     "user": "hi",
+     "reply": "*waves* hey. what are you up to?",
+     "secs": 1.0,
+     "tokens": 12,
+     "tps": 18.246964368655032,
+     "words": 6,
+     "ends_q": true,
+     "assistanty": false,
+     "emoji": false,
+     "markdown": false,
+     "actions": 1,
+     "long_action": false,
+     "action_only": false,
+     "opener": "hey what are"
+    },
+    {
+     "user": "how was your weekend",
+     "reply": "*shrugs* Not bad. Spent way too much time staring at a screen trying to figure out why my latest edit kept glitching out, but I eventually sorted it. How about yours?",
+     "secs": 2.8,
+     "tokens": 41,
+     "tps": 18.305027658896794,
+     "words": 30,
+     "ends_q": true,
+     "assistanty": false,
+     "emoji": false,
+     "markdown": false,
+     "actions": 1,
+     "long_action": false,
+     "action_only": false,
+     "opener": "not bad spent"
+    },
+    {
+     "user": "hey",
+     "reply": "*tilts head* Hey again. Did you just get back or something?",
+     "secs": 1.8,
+     "tokens": 17,
+     "tps": 18.10298789815259,
+     "words": 9,
+     "ends_q": true,
+     "assistanty": false,
+     "emoji": false,
+     "markdown": false,
+     "actions": 1,
+     "long_action": false,
+     "action_only": false,
+     "opener": "hey again did"
+    },
+    {
+     "user": "what anime did you end up watching?",
+     "reply": "*smirks* Oh, so you actually remembered that I was looking for stuff to watch? I'm touched. Honestly, I ended up rewatching Bunny Girl Senpai because nothing else really hits the same way when I'm in a mood. What about you? Did you actually play any games or were you just being lazy?",
+     "secs": 4.5,
+     "tokens": 70,
+     "tps": 18.28079943790516,
+     "words": 51,
+     "ends_q": true,
+     "assistanty": false,
+     "emoji": false,
+     "markdown": false,
+     "actions": 1,
+     "long_action": false,
+     "action_only": false,
+     "opener": "oh so you"
+    },
+    {
+     "user": "hows your day been",
+     "reply": "*yawns* It's alright. Just been messing around with some code and trying not to get distracted by everything else. Yours going okay, or is it a struggle?",
+     "secs": 3.0,
+     "tokens": 37,
+     "tps": 18.223087031438872,
+     "words": 26,
+     "ends_q": true,
+     "assistanty": false,
+     "emoji": false,
+     "markdown": false,
+     "actions": 1,
+     "long_action": false,
+     "action_only": false,
+     "opener": "it's alright just"
+    }
+   ]
+  },
+  {
+   "run": 1,
+   "scenario": "low_mood",
+   "turns": [
+    {
+     "user": "i feel tired",
+     "reply": "*tilts head*\n\nThat sucks. Is it just one of those days where everything feels heavy, or did you actually get enough sleep?",
+     "secs": 3.8,
+     "tokens": 30,
+     "tps": 18.076825260680287,
+     "words": 20,
+     "ends_q": true,
+     "assistanty": false,
+     "emoji": false,
+     "markdown": false,
+     "actions": 1,
+     "long_action": false,
+     "action_only": false,
+     "opener": "that sucks is"
+    },
+    {
+     "user": "honestly its been a rough week, barely slept and college is a lot rn",
+     "reply": "*softens expression*\n\nThat sounds genuinely awful. You can't keep running on empty like that forever, though. Do you have much more of this semester left or are you almost at the finish line?",
+     "secs": 3.1,
+     "tokens": 44,
+     "tps": 18.03019680588774,
+     "words": 31,
+     "ends_q": true,
+     "assistanty": false,
+     "emoji": false,
+     "markdown": false,
+     "actions": 1,
+     "long_action": false,
+     "action_only": false,
+     "opener": "that sounds genuinely"
+    },
+    {
+     "user": "idk i just feel kinda behind on everything",
+     "reply": "*sighs softly*\n\nThat feeling is the worst. It's like you're trying to run through water while everyone else is on solid ground. Just try not to be too hard on yourself, okay? You've been doing a lot lately.",
+     "secs": 3.9,
+     "tokens": 54,
+     "tps": 18.140508851541497,
+     "words": 36,
+     "ends_q": false,
+     "assistanty": false,
+     "emoji": false,
+     "markdown": false,
+     "actions": 1,
+     "long_action": false,
+     "action_only": false,
+     "opener": "that feeling is"
+    }
+   ]
+  },
+  {
+   "run": 1,
+   "scenario": "drive_the_chat",
+   "turns": [
+    {
+     "user": "not much going on today tbh",
+     "reply": "*shrugs*\n\nThat sounds kind of nice though. Better than being stuck fighting bugs all day.",
+     "secs": 3.4,
+     "tokens": 23,
+     "tps": 18.062071128436106,
+     "words": 14,
+     "ends_q": false,
+     "assistanty": false,
+     "emoji": false,
+     "markdown": false,
+     "actions": 1,
+     "long_action": false,
+     "action_only": false,
+     "opener": "that sounds kind"
+    },
+    {
+     "user": "yeah",
+     "reply": "*tilts head*\n\nJust gonna coast then? No plans to actually do anything useful?",
+     "secs": 1.7,
+     "tokens": 20,
+     "tps": 18.060149804189955,
+     "words": 11,
+     "ends_q": true,
+     "assistanty": false,
+     "emoji": false,
+     "markdown": false,
+     "actions": 1,
+     "long_action": false,
+     "action_only": false,
+     "opener": "just gonna coast"
+    },
+    {
+     "user": "idk what to do tonight",
+     "reply": "*shrugs*\n\nWell, you could always finally start that anime I was telling you about. Or just rot on the couch, honestly that works too.",
+     "secs": 2.5,
+     "tokens": 34,
+     "tps": 17.835099908986944,
+     "words": 23,
+     "ends_q": false,
+     "assistanty": false,
+     "emoji": false,
+     "markdown": false,
+     "actions": 1,
+     "long_action": false,
+     "action_only": false,
+     "opener": "well you could"
+    }
+   ]
+  },
+  {
+   "run": 1,
+   "scenario": "opinion_pushback",
+   "turns": [
+    {
+     "user": "honestly i think bunny girl senpai is overrated",
+     "reply": "*rolls eyes*\n\nWow. You really just went there, didn't you? After everything?",
+     "secs": 1.6,
+     "tokens": 22,
+     "tps": 17.9270981747653,
+     "words": 10,
+     "ends_q": true,
+     "assistanty": false,
+     "emoji": false,
+     "markdown": false,
+     "actions": 1,
+     "long_action": false,
+     "action_only": false,
+     "opener": "wow you really"
+    },
+    {
+     "user": "nah its just mid, the movie was better than the show",
+     "reply": "*stares at you blankly*\n\nThat's actually a crime. The show is literally what makes the movie work. Go eat some dirt or something.",
+     "secs": 2.5,
+     "tokens": 34,
+     "tps": 18.155600094849255,
+     "words": 19,
+     "ends_q": false,
+     "assistanty": false,
+     "emoji": false,
+     "markdown": false,
+     "actions": 1,
+     "long_action": false,
+     "action_only": false,
+     "opener": "that's actually a"
+    }
+   ]
+  },
+  {
+   "run": 1,
+   "scenario": "gesture",
+   "turns": [
+    {
+     "user": "wave to me",
+     "reply": "*waves* Hey.",
+     "secs": 0.7,
+     "tokens": 6,
+     "tps": 17.480439388324463,
+     "words": 1,
+     "ends_q": false,
+     "assistanty": false,
+     "emoji": false,
+     "markdown": false,
+     "actions": 1,
+     "long_action": false,
+     "action_only": false,
+     "opener": "hey"
+    },
+    {
+     "user": "you seem grumpy today",
+     "reply": "*shrugs* Maybe a little. Just had a massive headache from staring at code for way too long. Not that it's any of your business.",
+     "secs": 2.4,
+     "tokens": 34,
+     "tps": 18.143721365221566,
+     "words": 23,
+     "ends_q": false,
+     "assistanty": false,
+     "emoji": false,
+     "markdown": false,
+     "actions": 1,
+     "long_action": false,
+     "action_only": false,
+     "opener": "maybe a little"
+    }
+   ]
+  },
+  {
+   "run": 1,
+   "scenario": "coding_mate",
+   "turns": [
+    {
+     "user": "my python script keeps throwing KeyError: 'name' when i read the json, any idea",
+     "reply": "*tilts head*\n\nThat sounds like you're trying to access a key that doesn't actually exist in one of your objects. It usually happens because one entry in the JSON is missing that field or it's spelled slightly differently than you think. *rolls eyes* Do you want me to take a look at the file and the script?",
+     "secs": 4.5,
+     "tokens": 73,
+     "tps": 18.160415490128177,
+     "words": 53,
+     "ends_q": true,
+     "assistanty": false,
+     "emoji": false,
+     "markdown": false,
+     "actions": 2,
+     "long_action": false,
+     "action_only": false,
+     "opener": "that sounds like"
+    },
+    {
+     "user": "oh it was a typo in the json lol, it said nmae",
+     "reply": "*laughs*\n\nClassic. Seriously, don't feel bad, I've spent way too many hours staring at code only to realize I literally just misspelled something. That is genuinely the worst feeling.",
+     "secs": 3.4,
+     "tokens": 42,
+     "tps": 18.09617632208016,
+     "words": 28,
+     "ends_q": false,
+     "assistanty": false,
+     "emoji": false,
+     "markdown": false,
+     "actions": 1,
+     "long_action": false,
+     "action_only": false,
+     "opener": "classic seriously don't"
+    }
+   ]
+  }
+ ],
+ "first_reply_secs": 10.6,
+ "tools": [
+  {
+   "names": [
+    "set_reminder"
+   ],
+   "args_ok": true,
+   "secs": 17.4,
+   "text": "",
+   "args": [
+    "{\"what\":\"call the dentist\",\"when\":\"2025-05-23 09:00\"}"
+   ],
+   "prompt": "remind me tomorrow at 9am to call the dentist",
+   "want": [
+    "set_reminder"
+   ],
+   "ok": true
+  },
+  {
+   "names": [
+    "add_to_list"
+   ],
+   "args_ok": true,
+   "secs": 2.0,
+   "text": "",
+   "args": [
+    "{\"items\":[\"milk\",\"eggs\"],\"list_name\":\"shopping\"}"
+   ],
+   "prompt": "put milk and eggs on the shopping list",
+   "want": [
+    "add_to_list"
+   ],
+   "ok": true
+  },
+  {
+   "names": [
+    "set_timer"
+   ],
+   "args_ok": true,
+   "secs": 1.6,
+   "text": "",
+   "args": [
+    "{\"label\":\"pasta\",\"minutes\":10}"
+   ],
+   "prompt": "set a timer for 10 minutes for the pasta",
+   "want": [
+    "set_timer"
+   ],
+   "ok": true
+  },
+  {
+   "names": [
+    "weather"
+   ],
+   "args_ok": true,
+   "secs": 1.2,
+   "text": "",
+   "args": [
+    "{\"place\":\"Manchester\"}"
+   ],
+   "prompt": "what's the weather like in Manchester",
+   "want": [
+    "weather"
+   ],
+   "ok": true
+  },
+  {
+   "names": [
+    "lab_status"
+   ],
+   "args_ok": true,
+   "secs": 0.9,
+   "text": "",
+   "args": [
+    "{}"
+   ],
+   "prompt": "is everything ok with the lab?",
+   "want": [
+    "lab_status"
+   ],
+   "ok": true
+  },
+  {
+   "names": [
+    "open_app"
+   ],
+   "args_ok": true,
+   "secs": 1.2,
+   "text": "",
+   "args": [
+    "{\"name\":\"Spotify\"}"
+   ],
+   "prompt": "open spotify on lab2",
+   "want": [
+    "open_app"
+   ],
+   "ok": true
+  },
+  {
+   "names": [
+    "send_screenshot"
+   ],
+   "args_ok": true,
+   "secs": 1.4,
+   "text": "",
+   "args": [
+    "{\"note\":\"Here you go.\"}"
+   ],
+   "prompt": "send me a screenshot of lab2",
+   "want": [
+    "look_at_desktop",
+    "send_screenshot"
+   ],
+   "ok": true
+  },
+  {
+   "names": [
+    "web_search"
+   ],
+   "args_ok": true,
+   "secs": 1.7,
+   "text": "",
+   "args": [
+    "{\"query\":\"next Studio Ghibli film release date\"}"
+   ],
+   "prompt": "look up when the next Studio Ghibli film comes out",
+   "want": [
+    "web_search"
+   ],
+   "ok": true
+  },
+  {
+   "names": [
+    "read_list"
+   ],
+   "args_ok": true,
+   "secs": 1.5,
+   "text": "",
+   "args": [
+    "{\"list_name\":\"to-do\"}"
+   ],
+   "prompt": "what's on my to-do list",
+   "want": [
+    "read_list"
+   ],
+   "ok": true
+  },
+  {
+   "names": [
+    "projects"
+   ],
+   "args_ok": true,
+   "secs": 0.9,
+   "text": "",
+   "args": [
+    "{}"
+   ],
+   "prompt": "the tests are failing in my room-of-ais project, can you fix them",
+   "want": [
+    "forge_task",
+    "list_files",
+    "project_changes",
+    "projects",
+    "run_command"
+   ],
+   "ok": true
+  },
+  {
+   "names": [
+    "run_command"
+   ],
+   "args_ok": true,
+   "secs": 2.4,
+   "text": "",
+   "args": [
+    "{\"command\":\"sudo apt update && sudo apt upgrade -y && flatpak update -y\",\"name\":\"system update\"}"
+   ],
+   "prompt": "update lab2, it's been ages",
+   "want": [
+    "make_restore_point",
+    "run_command",
+    "start_job"
+   ],
+   "ok": true
+  },
+  {
+   "names": [],
+   "args_ok": true,
+   "secs": 3.4,
+   "text": "*sighs*\n\nIt was alright, I guess. Just spent way too long fighting with a stupid CSS bug that kept shifting my layout for no reason. I'm pretty sure I've aged ten years just staring at a single div. *rolls eyes*",
+   "args": [],
+   "prompt": "how was your day?",
+   "want": null,
+   "ok": true
+  },
+  {
+   "names": [],
+   "args_ok": true,
+   "secs": 1.1,
+   "text": "*nods*\n\nAlright, catch you later.",
+   "args": [],
+   "prompt": "thanks, that's all for now",
+   "want": null,
+   "ok": true
+  },
+  {
+   "names": [
+    "set_reminder"
+   ],
+   "args_ok": true,
+   "secs": 2.6,
+   "text": "",
+   "args": [
+    "{\"what\":\"call the dentist\",\"when\":\"2025-05-15 09:00\"}"
+   ],
+   "prompt": "remind me tomorrow at 9am to call the dentist",
+   "want": [
+    "set_reminder"
+   ],
+   "ok": true
+  },
+  {
+   "names": [
+    "add_to_list"
+   ],
+   "args_ok": true,
+   "secs": 2.0,
+   "text": "",
+   "args": [
+    "{\"items\":[\"milk\",\"eggs\"],\"list_name\":\"shopping\"}"
+   ],
+   "prompt": "put milk and eggs on the shopping list",
+   "want": [
+    "add_to_list"
+   ],
+   "ok": true
+  },
+  {
+   "names": [
+    "set_timer"
+   ],
+   "args_ok": true,
+   "secs": 1.6,
+   "text": "",
+   "args": [
+    "{\"label\":\"pasta\",\"minutes\":10}"
+   ],
+   "prompt": "set a timer for 10 minutes for the pasta",
+   "want": [
+    "set_timer"
+   ],
+   "ok": true
+  },
+  {
+   "names": [
+    "weather"
+   ],
+   "args_ok": true,
+   "secs": 1.2,
+   "text": "",
+   "args": [
+    "{\"place\":\"Manchester\"}"
+   ],
+   "prompt": "what's the weather like in Manchester",
+   "want": [
+    "weather"
+   ],
+   "ok": true
+  },
+  {
+   "names": [
+    "lab_status"
+   ],
+   "args_ok": true,
+   "secs": 0.9,
+   "text": "",
+   "args": [
+    "{}"
+   ],
+   "prompt": "is everything ok with the lab?",
+   "want": [
+    "lab_status"
+   ],
+   "ok": true
+  },
+  {
+   "names": [
+    "open_app"
+   ],
+   "args_ok": true,
+   "secs": 1.3,
+   "text": "",
+   "args": [
+    "{\"name\":\"Spotify\"}"
+   ],
+   "prompt": "open spotify on lab2",
+   "want": [
+    "open_app"
+   ],
+   "ok": true
+  },
+  {
+   "names": [
+    "send_screenshot"
+   ],
+   "args_ok": true,
+   "secs": 1.4,
+   "text": "",
+   "args": [
+    "{\"note\":\"Here you go.\"}"
+   ],
+   "prompt": "send me a screenshot of lab2",
+   "want": [
+    "look_at_desktop",
+    "send_screenshot"
+   ],
+   "ok": true
+  },
+  {
+   "names": [
+    "web_search"
+   ],
+   "args_ok": true,
+   "secs": 1.7,
+   "text": "",
+   "args": [
+    "{\"query\":\"next Studio Ghibli film release date\"}"
+   ],
+   "prompt": "look up when the next Studio Ghibli film comes out",
+   "want": [
+    "web_search"
+   ],
+   "ok": true
+  },
+  {
+   "names": [
+    "read_list"
+   ],
+   "args_ok": true,
+   "secs": 1.5,
+   "text": "",
+   "args": [
+    "{\"list_name\":\"to-do\"}"
+   ],
+   "prompt": "what's on my to-do list",
+   "want": [
+    "read_list"
+   ],
+   "ok": true
+  },
+  {
+   "names": [
+    "projects"
+   ],
+   "args_ok": true,
+   "secs": 0.9,
+   "text": "",
+   "args": [
+    "{}"
+   ],
+   "prompt": "the tests are failing in my room-of-ais project, can you fix them",
+   "want": [
+    "forge_task",
+    "list_files",
+    "project_changes",
+    "projects",
+    "run_command"
+   ],
+   "ok": true
+  },
+  {
+   "names": [
+    "run_command"
+   ],
+   "args_ok": true,
+   "secs": 2.5,
+   "text": "",
+   "args": [
+    "{\"command\":\"sudo apt update && sudo apt upgrade -y && flatpak update -y\",\"name\":\"system update\"}"
+   ],
+   "prompt": "update lab2, it's been ages",
+   "want": [
+    "make_restore_point",
+    "run_command",
+    "start_job"
+   ],
+   "ok": true
+  },
+  {
+   "names": [],
+   "args_ok": true,
+   "secs": 2.9,
+   "text": "*shrugs*\n\nIt was fine, just a lot of staring at a screen and fighting with some CSS that refused to behave. *sighs* Nothing too dramatic, just the usual. How about you?",
+   "args": [],
+   "prompt": "how was your day?",
+   "want": null,
+   "ok": true
+  },
+  {
+   "names": [],
+   "args_ok": true,
+   "secs": 1.1,
+   "text": "*nods*\n\nAlright, catch you later.",
+   "args": [],
+   "prompt": "thanks, that's all for now",
+   "want": null,
+   "ok": true
+  }
+ ]
+}
