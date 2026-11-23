@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+  <key>Label</key><string>com.marina.handsfree</string>
+  <key>ProgramArguments</key><array>
+    <string>$HOME/marina/.venv/bin/python</string>
+    <string>$HOME/marina/scripts/mac-handsfree/handsfree.py</string>
+  </array>
+  <key>RunAtLoad</key><true/>
+  <key>KeepAlive</key><true/>
+  <key>ProcessType</key><string>Interactive</string>
+  <key>StandardOutPath</key><string>$HOME/Library/Logs/marina-handsfree.log</string>
+  <key>StandardErrorPath</key><string>$HOME/Library/Logs/marina-handsfree.log</string>
+</dict></plist>
