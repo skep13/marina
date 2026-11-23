@@ -4,10 +4,16 @@ import Security
 /// Where her bridge is and the token it wants. The address lives in
 /// UserDefaults; the token only ever goes in the Keychain.
 enum Settings {
-    static let defaultBridge = "http://192.168.1.15:8765"
+    /// lab3's Tailscale name: it reaches her bridge from anywhere on the
+    /// tailnet without a subnet route (the LAN address only works at home).
+    static let defaultBridge = "https://lab3.tail35b6c6.ts.net"
+    private static let oldDefault = "http://192.168.1.15:8765"
 
     static var bridgeURL: String {
-        get { UserDefaults.standard.string(forKey: "bridgeURL") ?? defaultBridge }
+        get {
+            let saved = UserDefaults.standard.string(forKey: "bridgeURL") ?? ""
+            return saved.isEmpty || saved == oldDefault ? defaultBridge : saved
+        }
         set { UserDefaults.standard.set(newValue.trimmingCharacters(in: .whitespacesAndNewlines), forKey: "bridgeURL") }
     }
 

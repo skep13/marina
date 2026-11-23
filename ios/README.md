@@ -54,7 +54,7 @@ edit `project.yml`, not the project.
 1. Install **Tailscale** from the App Store and sign in with the same account
    as the Mac. lab3 routes `192.168.1.15`, so the same address works at home
    and away.
-2. In the app: ⋯ › Settings. The address is `http://192.168.1.15:8765`. The
+2. In the app: ⋯ › Settings. The address is `https://lab3.tail35b6c6.ts.net` (built in; works anywhere with Tailscale on). The
    token is the bridge's web token, in `/etc/appliance/phone.token` on lab3.
    It's kept in the phone's Keychain. **Test connection**, then **Done**.
 
