@@ -37,8 +37,23 @@ def build_model():
     return WhisperModel(name, **kwargs)
 
 
+# Words Whisper mishears unless it's told about them: names, machines,
+# projects. `asr.vocabulary` in the config adds to these.
+VOCABULARY = ["Marina", "Jacob", "lab1", "lab2", "lab3", "Proxmox", "Tailscale",
+              "Forge", "Room of AIs", "Arty", "Songbird", "Kokoro", "llama"]
+
+
+def _prompt(extra=None):
+    """A short line in your words, so Whisper spells them right and
+    punctuates like normal speech."""
+    words = list(dict.fromkeys(VOCABULARY + [str(w) for w in
+                 (load_config().get("asr", {}).get("vocabulary") or [])]))
+    line = "Talking to Marina about " + ", ".join(words[1:]) + "."
+    return f"{extra} {line}" if extra else line
+
+
 def transcribe_file(model, path):
-    segments, _ = model.transcribe(str(path), vad_filter=True)
+    segments, _ = model.transcribe(str(path), vad_filter=True, initial_prompt=_prompt())
     return " ".join(segment.text for segment in segments).strip()
 
 
@@ -48,7 +63,7 @@ def transcribe_audio(model, audio, prompt=None):
     her name."""
     if audio is None or len(audio) < 16000 * 0.25:
         return ""
-    segments, _ = model.transcribe(audio, vad_filter=True, initial_prompt=prompt)
+    segments, _ = model.transcribe(audio, vad_filter=True, initial_prompt=_prompt(prompt))
     return " ".join(segment.text for segment in segments).strip()
 
 

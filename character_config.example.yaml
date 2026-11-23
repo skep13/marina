@@ -357,7 +357,7 @@ care:
   crisis_line: ""
 
 asr:
-  model: "base.en"
+  model: "small.en"
   # Which mic she listens with: "auto", "default", or part of a device's
   # name. Auto avoids Bluetooth headsets, whose mic switches them into call
   # mode and cuts off her voice, and uses the Mac's own mic instead.
