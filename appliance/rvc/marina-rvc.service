@@ -11,9 +11,14 @@ Environment=RVC_INDEX_RATE=0.85
 Environment=RVC_PROTECT=0.5
 Environment=RVC_RMS_MIX=0.25
 ExecStart=/opt/rvc/.venv/bin/python -u /opt/rvc/rvc_server.py
+Environment=RVC_THREADS=4
+# Killed and restarted if it grows, instead of lab3 running out of RAM.
+MemoryMax=2560M
+MemorySwapMax=0
+OOMScoreAdjust=500
 Restart=always
 RestartSec=5
-Nice=-5
+Nice=5
 
 [Install]
 WantedBy=multi-user.target
