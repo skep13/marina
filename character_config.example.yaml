@@ -38,6 +38,10 @@ llm:
     - match: '\b(code|coding|script|program|programme|function|bug|debug|refactor|compile|stack ?trace|traceback|repo|repository|git|commit|python|javascript|typescript|npm|pip|cargo|rust|golang|html|css|unit tests?|pytest|syntax error|exception)\b|\.(py|js|ts|sh|rs|go|cpp|html|css|json|ya?ml)\b'
       model: forge
       temperature: 0.3
+  # Once she's worked on a route's model, the conversation stays on it this
+  # long (her replies too), so a back-and-forth about code doesn't swap
+  # models twice a message.
+  route_sticky_minutes: 10
 
   # Backups. With mode: auto she uses the first of these that answers, in
   # order: base_url, then each extra_backends entry, then fallback_base_url.
@@ -439,6 +443,7 @@ tools:
   enabled: true
   timers: true
   reminders: true         # "remind me Thursday at 3", kept in reminders.json
+  lists: true             # shopping, to-do and other lists, kept in lists.json
   web: true               # web search and reading pages
   weather: true
   calendar: true          # read their calendar (Mac only)
@@ -455,10 +460,39 @@ weather:
   location: ""
   units: metric
 
+# Watching the homelab. Only switch this on for the bridge that lives in the
+# lab (ct110 on lab3), or every bridge will warn about it. She checks every
+# few minutes and says so when a machine goes down, runs hot, fills its disk
+# or loses the internet, and again when it comes right. lab2 is checked
+# through the workspace connection, the bridge's own machine first-hand.
+lab_health:
+  enabled: false
+  check_minutes: 5
+  disk_warn_percent: 92
+  temp_warn_c: 85
+  local_name: lab3
+  machines:
+    - {name: lab1, host: 192.168.1.10, port: 8006}
+
 # Calendars to leave out, by part of their name. Subscribed holiday calendars
 # are slow to read, so they're out unless you take "Holiday" off this list.
+# Away from the Mac (the bridge in the lab) it reads iCloud instead: set
+# icloud_user to their Apple ID email and put an app-specific password
+# (account.apple.com > Sign-In and Security) alone in icloud.secret next to
+# this file. Read-only.
 calendar:
   skip: ["Holiday", "Siri Suggestions", "Scheduled Reminders"]
+  icloud_user: ""
+
+# The first time they talk to her each day she catches them up. Switch off
+# any part they don't want in it.
+brief:
+  enabled: true
+  weather: true      # needs weather.location
+  calendar: true
+  reminders: true
+  lists: true
+  lab: true
 
 # Her own Linux machine, where she runs commands and edits code with you.
 # She reaches it over SSH with a key of her own: generate one with

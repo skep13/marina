@@ -521,6 +521,10 @@ def turn_notes(history, user_input=None):
             if note:
                 notes.append(note)
 
+    if personal and user_input is not None:
+        # Their first message of the day: the weather, calendar, lists, lab.
+        from process import brief
+        offer(brief.note)
     if working:
         # What she did on the machine lately, so she doesn't repeat a failure.
         from process.tools import workspace
@@ -629,13 +633,44 @@ def route_for(user_input):
     return None
 
 
+# A route's model only fits on lab3 by pushing hers out, and each swap
+# costs about a minute. So once she's worked on one, the conversation stays
+# with it for a while: her first round on the next message goes there too,
+# and so does a follow-up that doesn't say "code" ("ok, try it now"). After
+# this long without work for it, she's back on her own model.
+STICKY_SECONDS = float(_llm.get("route_sticky_minutes", 10)) * 60
+_sticky = {"route": None, "until": 0.0}
+
+
+def _keep_route(route):
+    _sticky.update(route=route, until=time.time() + STICKY_SECONDS)
+
+
+def sticky_route():
+    """The route still loaded from recent work, or None. While Forge is
+    working on her machine its model is the one loaded, so she talks on it
+    too rather than pulling the model out from under it."""
+    if _sticky["route"] and time.time() < _sticky["until"]:
+        return _sticky["route"]
+    try:
+        from process.tools import workspace
+        if workspace.available() and workspace.forge_running():
+            for r in ROUTES:
+                if r.get("model") == "forge":
+                    return r
+    except Exception:
+        pass
+    return None
+
+
 def get_reply_stream(messages, working=False, route=None, **kw):
     settings = _work_settings() if working else {
         "temperature": _temperature(), "max_tokens": MAX_TOKENS}
-    if working and route:
+    if route and (working or sticky_route() is route):
         settings["_model"] = route["model"]
-        if route.get("temperature") is not None:
+        if working and route.get("temperature") is not None:
             settings["temperature"] = float(route["temperature"])
+        _keep_route(route)
     return chat_completion(messages, stream=True, **settings, **kw)
 
 
@@ -825,6 +860,8 @@ def _stream(user_input=None, extra_system=None, use_tools=True, history=None):
 
     rounds = _tool_rounds()
     route = route_for(user_input) if offer else None
+    if offer and user_input is not None and sticky_route():
+        route = sticky_route()   # still loaded from the last job: no swap back
     if route:
         print(f"[llm] work on this goes to {route['model']}", flush=True)
     done_rounds = 0

@@ -16,7 +16,10 @@ from urllib.parse import urlparse
 
 from process.config import load_config, setting
 from process.memory import store as memory
+from process.tools import calendar_source
 from process.tools import desk
+from process.tools import lab_health
+from process.tools import lists
 from process.tools import lookup
 from process.tools import mac
 from process.tools import reminders
@@ -212,8 +215,16 @@ SPECS += [(name, fn, lambda key=key: _allowed(key), spec)
           for name, fn, key, spec in lookup.SPECS]
 SPECS += [(name, fn, lambda: _allowed("reminders"), spec)
           for name, fn, spec in reminders.SPECS]
-SPECS += [(name, fn, _mac_only(key), spec) for name, fn, key, spec in desk.SPECS]
+SPECS += [(name, fn, _mac_only(key), spec) for name, fn, key, spec in desk.SPECS
+          if name != "calendar"]
+# Calendar on the Mac, or iCloud from the lab: one tool either way.
+SPECS += [(name, fn, calendar_source.available, spec)
+          for name, fn, spec in calendar_source.SPECS]
+SPECS += [(name, fn, lambda: _allowed("lists"), spec) for name, fn, spec in lists.SPECS]
 reminders.start(_announce)
+SPECS += [(name, fn, lambda: lab_health.enabled() and _allowed("lab_health"), spec)
+          for name, fn, spec in lab_health.SPECS]
+lab_health.start(_announce)
 
 SPECS += [(name, fn, _workspace_allowed, spec) for name, fn, spec in workspace.SPECS]
 
@@ -254,6 +265,11 @@ def needs_ok(name, arguments, consented):
     """A question to put to them before running this call, or None."""
     if name in _MAC_TOOLS:
         return mac.needs_ok(name, _args(arguments), consented)
+    if name == "git_push":
+        # Every push, every time: what goes out under their name is theirs to say.
+        args = _args(arguments)
+        return (workspace.push_question(args.get("project", ""), args.get("remote", "origin"))
+                or f"Let Marina push {args.get('project', 'a project')}?")
     return None
 
 

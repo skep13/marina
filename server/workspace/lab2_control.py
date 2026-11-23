@@ -257,7 +257,7 @@ def find(target, limit=6):
 
 # ---- screenshots ---------------------------------------------------------
 
-def shot(grid=False, scale=0.5, crop=None):
+def shot(grid=False, scale=0.5, crop=None, screen=""):
     path = "/tmp/marina-control.png"
     code, msg = run("scrot", "-o", path)
     if code:
@@ -270,7 +270,13 @@ def shot(grid=False, scale=0.5, crop=None):
     im = Image.open(path).convert("RGB")
     W, H = im.size
     left = top = 0
-    if crop:
+    mon = screen_named(screen) if screen else None
+    if screen and not mon:
+        fail(f"No screen called {screen!r}.")
+    if mon:
+        left, top = mon["x"], mon["y"]
+        im = im.crop((left, top, left + mon["width"], top + mon["height"]))
+    elif crop:
         cx, cy, half = int(crop[0]), int(crop[1]), int(crop[2])
         left, top = max(0, min(cx - half, W - 2 * half)), max(0, min(cy - half, H - 2 * half))
         im = im.crop((left, top, min(W, left + 2 * half), min(H, top + 2 * half)))
@@ -431,7 +437,8 @@ def main():
     if action == "find":
         out(find(a.get("target", "")))
     if action == "shot":
-        out(shot(bool(a.get("grid")), float(a.get("scale", 0.5)), a.get("crop")))
+        out(shot(bool(a.get("grid")), float(a.get("scale", 0.5)), a.get("crop"),
+                 a.get("screen", "")))
     if action == "apps":
         out({"ok": True, "apps": [{"name": x["name"], "id": x["id"]} for x in match_apps(a.get("query", ""))][:20]})
     if action == "open_app":

@@ -119,3 +119,27 @@ def send(text, title="Marina", priority=None, tags=None):
         return False
     print(f"[push] sent: {text[:80]}", flush=True)
     return ok
+
+
+def send_image(jpeg, text="", title="Marina", filename="screen.jpg"):
+    """Publish a picture, with `text` as its message. ntfy keeps attachments
+    on lab3 for a few hours, long enough to look at it from the phone."""
+    if not enabled() or not jpeg:
+        return False
+    req = urllib.request.Request(f"{URL}/{TOPIC}", data=jpeg, method="PUT")
+    req.add_header("Title", title)
+    req.add_header("Filename", filename)
+    req.add_header("Click", CLICK)
+    if text:
+        # Header values must be latin-1; anything else becomes "?".
+        req.add_header("Message", text[:500].encode("latin-1", "replace").decode("latin-1"))
+    if TOKEN:
+        req.add_header("Authorization", f"Bearer {TOKEN}")
+    try:
+        with urllib.request.urlopen(req, timeout=30) as r:
+            ok = 200 <= r.status < 300
+    except Exception as e:
+        print(f"[push] couldn't send the picture: {type(e).__name__}: {e}", flush=True)
+        return False
+    print(f"[push] sent a picture ({len(jpeg) // 1024} KB)", flush=True)
+    return ok

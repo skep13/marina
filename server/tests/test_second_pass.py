@@ -68,6 +68,8 @@ def test_only_the_most_important_notes_ride_along(monkeypatch):
     monkeypatch.setattr(llm_scr.fresh, "steer", said("steer"))
     monkeypatch.setattr(llm_scr.fresh, "note", said("fresh"))
     monkeypatch.setattr(llm_scr.persona, "as_prompt_block", said("life"))
+    from process import brief
+    monkeypatch.setattr(brief, "note", lambda: "")
     assert llm_scr.turn_notes([], "hello there") == "<ask><lore>"
     monkeypatch.setattr(llm_scr.followup, "note", lambda **k: "")
     monkeypatch.setattr(llm_scr.lore, "note", lambda h, t: "")

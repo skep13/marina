@@ -132,6 +132,10 @@ _XRANDR = re.compile(r"\bxrandr\b[^|;&\n]*--(?:auto|mode|rotate|scale|pos|off|pr
 _APT = re.compile(r"\bapt(?:-get)?\s+(?:-\S+\s+)*install\b([^;&|\n]*)")
 
 
+_PUSH = re.compile(r"\bgit(?:\s+-[cC]\s+\S+|\s+--?[\w-]+(?:=\S+)?)*\s+push\b|\bgh\s+(?:pr\s+(?:create|merge)|repo\s+create"
+                   r"|release\s+create)\b")
+
+
 def refused(command):
     """Why a command mustn't run, or None."""
     m = _KILLS.search(command)
@@ -142,6 +146,9 @@ def refused(command):
                 + ("Use the desktop tool: action restart with component desktop, panel or wm."
                    if not THEIRS else
                    "If Cinnamon really needs restarting: cinnamon-dbus-command RestartCinnamon 1"))
+    if _PUSH.search(command):
+        return ("Not running that: pushing goes through git_push, which asks them "
+                "first. Use git_push for the project.")
     if THEIRS and _XRANDR.search(command):
         return ("Not running that: changing screen modes with xrandr leaves Cinnamon "
                 "drawing at the old size, zoomed and cropped. Their layout lives in "
@@ -622,6 +629,192 @@ def place_window(window, screen, maximize=True):
     return f"Moved {res['placed']} to the {res['screen']} screen."
 
 
+# ---- projects: git repos in ~/projects ------------------------------------
+
+_NAME_OK = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$")
+
+
+def _project_dir(project):
+    project = (project or "").strip().strip("/")
+    if project.startswith(("~/projects/", ROOT + "/")):
+        project = project.split("/", 2 if project.startswith("~") else 1)[-1]
+    if not _NAME_OK.match(project):
+        raise ValueError(f"{project!r} isn't a project name (one folder in {ROOT}).")
+    return f"{ROOT}/{project}"
+
+
+_PROJECTS = r"""cd {root} 2>/dev/null || exit 0
+shopt -s nullglob
+for d in */; do d=${{d%/}}; [ -d "$d/.git" ] || {{ echo "$d|-|not a git repo|||"; continue; }}
+  cd "$d"
+  b=$(git branch --show-current 2>/dev/null)
+  c=$(git status --porcelain 2>/dev/null | wc -l)
+  l=$(git log -1 --format='%cr: %s' 2>/dev/null | cut -c1-80)
+  r=$(git remote get-url origin 2>/dev/null)
+  a=$(git rev-list --count @{{u}}..HEAD 2>/dev/null)
+  echo "$d|$b|$l|$c|$r|$a"; cd ..; done"""
+
+
+def _qp(path):
+    """A quoted path for the shell that still expands a leading ~."""
+    if path.startswith("~/"):
+        return '"$HOME/' + path[2:].replace('"', '') + '"'
+    return shlex.quote(path)
+
+
+def projects():
+    code, out = _ssh(_PROJECTS.format(root=ROOT), timeout=30)
+    rows = [l.split("|") for l in out.splitlines() if l.count("|") == 5]
+    if code != 0 or not rows:
+        return f"No projects in {ROOT} yet." if code == 0 else f"Couldn't look: {out[:300]}"
+    lines = []
+    for name, branch, last, changed, remote, ahead in rows:
+        if branch == "-":
+            lines.append(f"- {name}: {last}")
+            continue
+        bits = [f"on {branch or '(no branch)'}", last or "no commits yet"]
+        if changed and changed != "0":
+            bits.append(f"{changed} uncommitted change{'s' * (changed != '1')}")
+        if ahead and ahead != "0":
+            bits.append(f"{ahead} commit{'s' * (ahead != '1')} not pushed")
+        bits.append(f"from {remote}" if remote else "no remote")
+        lines.append(f"- {name}: " + ", ".join(bits))
+    return f"Projects in {ROOT}:\n" + "\n".join(lines)
+
+
+def new_project(name, clone_url=""):
+    try:
+        path = _project_dir(name)
+    except ValueError as e:
+        return str(e)
+    url = (clone_url or "").strip()
+    if url and not re.match(r"^(https://|git@)[\w.-]+[:/][\w./-]+$", url):
+        return "That doesn't look like a git URL (https://... or git@host:owner/repo)."
+    q = _qp(path)
+    if url:
+        cmd = (f"mkdir -p {ROOT} && [ ! -e {q} ] && "
+               f"GIT_TERMINAL_PROMPT=0 git clone --quiet {shlex.quote(url)} {q} 2>&1 && "
+               f"cd {q} && git log -1 --format='%h %s' 2>&1")
+    else:
+        cmd = (f"mkdir -p {ROOT} && [ ! -e {q} ] && mkdir {q} && cd {q} && "
+               "git init -q -b main 2>&1 && echo started")
+    code, out = _ssh(cmd, timeout=600)
+    ok = code == 0
+    _log("project", f"{'cloned' if url else 'started'} {name}", ok, _last_line(out))
+    if not ok:
+        return (f"{path} already exists." if not out.strip()
+                else f"Couldn't {'clone' if url else 'start'} it: {_clip(out)}")
+    return (f"Cloned into {path}: {out.strip()}" if url
+            else f"Started {path} as a new git repo on branch main.")
+
+
+def git_save(project, message):
+    """Commit everything changed in a project."""
+    try:
+        path = _project_dir(project)
+    except ValueError as e:
+        return str(e)
+    message = (message or "").strip()
+    if not message:
+        return "A commit needs a message saying what changed."
+    q = _qp(path)
+    code, out = _ssh(f"cd {q} && git add -A && git commit -q -m {shlex.quote(message)} 2>&1 "
+                     "&& git log -1 --stat --format='%h %s' | tail -n +1 | head -30", timeout=60)
+    if "nothing to commit" in out:
+        return "Nothing had changed, so there was nothing to commit."
+    ok = code == 0
+    _log("commit", f"{project}: {message[:60]}", ok, _last_line(out))
+    return f"Committed in {project}:\n{_clip(out)}" if ok else f"Commit failed: {_clip(out)}"
+
+
+def project_changes(project, since="today"):
+    """What changed in a project lately: commits and what's not committed."""
+    try:
+        path = _project_dir(project)
+    except ValueError as e:
+        return str(e)
+    since = since if re.match(r"^[\w .:-]{1,30}$", since or "") else "today"
+    when = "midnight" if since == "today" else since
+    q = _qp(path)
+    code, out = _ssh(f"cd {q} && echo '## commits' && git log --since={shlex.quote(when)} "
+                     "--format='%h %ar: %s' --shortstat 2>&1 | head -60 && echo '## uncommitted' "
+                     "&& git status --short 2>&1 | head -30", timeout=30)
+    return _clip(out) if code == 0 else f"Couldn't read it: {_clip(out)}"
+
+
+_AHEAD = r"""cd {q} || exit 1
+b=$(git branch --show-current); r=$(git remote get-url {remote} 2>/dev/null) || {{ echo "NOREMOTE"; exit 0; }}
+echo "branch=$b"; echo "remote=$r"
+if git rev-parse --verify -q {remote}/$b >/dev/null; then
+  git log --format='%h %s' {remote}/$b..HEAD | head -8; echo "count=$(git rev-list --count {remote}/$b..HEAD)"
+else git log --format='%h %s' -5; echo "count=new branch"; fi"""
+
+
+def push_question(project, remote="origin"):
+    """What to ask them before a push: where it goes and what's in it."""
+    try:
+        q = _qp(_project_dir(project))
+    except ValueError:
+        return None
+    remote = remote if re.match(r"^[\w.-]+$", remote or "") else "origin"
+    code, out = _ssh(_AHEAD.format(q=q, remote=remote), timeout=20)
+    if code != 0 or "NOREMOTE" in out:
+        return None          # git_push will say what's wrong
+    info = dict(l.split("=", 1) for l in out.splitlines() if "=" in l and l.split("=")[0]
+                in ("branch", "remote", "count"))
+    commits = [l for l in out.splitlines() if "=" not in l][:5]
+    head = (f"Let Marina push {project} ({info.get('branch')}, "
+            f"{info.get('count')} commit{'s' * (info.get('count') != '1')}) to "
+            f"{info.get('remote')}?")
+    return head + ("\n" + "\n".join(commits) if commits else "")
+
+
+def git_push(project, remote="origin"):
+    try:
+        path = _project_dir(project)
+    except ValueError as e:
+        return str(e)
+    remote = remote if re.match(r"^[\w.-]+$", remote or "") else "origin"
+    q = _qp(path)
+    code, out = _ssh(f"cd {q} && git remote get-url {remote} && git rev-parse -q --verify HEAD",
+                     timeout=20)
+    if code != 0:
+        if "remote" in out.lower():
+            return (f"{project} has no remote called {remote}. Ask them which GitHub "
+                    "repo it should go to, then add it with git remote add.")
+        return f"{project} has no commits yet, so there's nothing to push."
+    code, out = _ssh(f"cd {q} && GIT_TERMINAL_PROMPT=0 git push -u {remote} HEAD 2>&1",
+                     timeout=180)
+    ok = code == 0
+    _log("push", f"{project} to {remote}", ok, _last_line(out))
+    if ok:
+        return f"Pushed:\n{_clip(out)}"
+    if re.search(r"Authentication failed|could not read Username|Permission denied \(publickey\)"
+                 r"|Host key verification failed", out):
+        return ("Push failed: lab2 isn't signed in to GitHub. They need to run "
+                "`gh auth login` on lab2 once (it's their account, so they do it, not you).")
+    return f"Push failed:\n{_clip(out)}"
+
+
+def send_screenshot(screen="", note=""):
+    """lab2's screen (or one of them) to their phone, through ntfy."""
+    import base64
+    from process import push
+    if not push.enabled():
+        return "Push notifications aren't set up, so there's nowhere to send it."
+    res = _control("shot", {"scale": 0.6 if not screen else 0.8, "screen": screen},
+                   timeout=40)
+    if not res.get("ok"):
+        return f"Couldn't take the screenshot: {res.get('error')}"
+    jpeg = base64.b64decode(res["image"])
+    where = f"lab2's {screen} screen" if screen else "lab2's screens"
+    ok = push.send_image(jpeg, (note or "").strip() or f"Here's {where}.",
+                         filename="lab2.jpg")
+    _log("screenshot", f"sent {where} to the phone", ok)
+    return (f"Sent {where} to their phone." if ok
+            else "ntfy didn't take the picture; it wasn't sent.")
+
+
 # ---- long jobs that keep going after she replies --------------------------
 
 _JOBS_KEY = f"workspace_jobs_{NAME}"
@@ -697,6 +890,39 @@ def start_job(command, name="", cwd=""):
     return (f"Started it in the background as job {job['id']} ({job['name']}). It keeps "
             "going after you reply; you'll be told when it finishes, and job_status "
             "shows how it's doing.")
+
+
+FORGE = str(_cfg.get("forge") or "~/.local/bin/forge")
+
+
+def forge_task(project, task):
+    """Hand a whole coding task to Forge on the machine, in the background."""
+    try:
+        path = _project_dir(project)
+    except ValueError as e:
+        return str(e)
+    task = (task or "").strip()
+    if len(task) < 10:
+        return "Give Forge the whole task: what to change, where, and how to check it."
+    brief = (task + "\n\nWork only inside this project folder. Run the tests or the code "
+             "to check your change works. Don't commit or push; say in a few lines what "
+             "you changed and how you checked it.")
+    command = (f"{FORGE} run {shlex.quote(brief)} 2>&1 | grep -v '^dsh: reasoning:'")
+    out = start_job(command, name=f"Forge: {task.splitlines()[0][:80]}",
+                    cwd=path)
+    if "Started it" not in out:
+        return out
+    jobs = _jobs()
+    jobs[-1]["forge"] = True
+    _save_jobs(jobs)
+    return (out + " Forge (KAT-Coder) has the model on lab3 while it works, so "
+            "check on it with job_status, then read what it changed with "
+            "project_changes before telling them it's done.")
+
+
+def forge_running():
+    """Whether a Forge job is going, so her own replies can use its model."""
+    return any(j.get("forge") and not j.get("done") for j in _jobs())
 
 
 def job_status(job_id=""):
@@ -883,6 +1109,16 @@ def describe(name, args):
         return f"starting {args.get('name') or 'a long job'} in the background"
     if name == "make_restore_point":
         return "taking a restore point"
+    if name == "forge_task":
+        return f"handing {args.get('project', 'a project')} to Forge"
+    if name == "git_push":
+        return f"pushing {args.get('project', 'a project')}"
+    if name == "git_save":
+        return f"committing in {args.get('project', 'a project')}"
+    if name == "new_project":
+        return f"{'cloning' if args.get('clone_url') else 'starting'} {args.get('name', 'a project')}"
+    if name == "send_screenshot":
+        return "sending lab2's screen to your phone"
     if name == "run_command":
         line = (args.get("command") or "").strip().splitlines()
         return f"running `{line[0][:70]}`" if line else "running a command"
@@ -1026,6 +1262,48 @@ SPECS = [
 ]
 
 SPECS += [
+    ("projects", projects, {
+        "description": "The git projects in ~/projects: branch, last commit, uncommitted "
+                       "changes, commits not pushed yet. Start here for any coding work.",
+        "parameters": {"type": "object", "properties": {}}}),
+    ("new_project", new_project, {
+        "description": "Start a project in ~/projects: clone it from a git URL, or "
+                       "leave clone_url empty for a new empty repo.",
+        "parameters": {"type": "object", "properties": {
+            "name": {"type": "string", "description": "Folder name, e.g. room-of-ais."},
+            "clone_url": {"type": "string"}}, "required": ["name"]}}),
+    ("git_save", git_save, {
+        "description": "Commit everything changed in a project, with a message saying "
+                       "what changed and why in a line. Do this when a piece of work is "
+                       "done and works, not after every edit. Never add yourself or any "
+                       "AI as an author or co-author.",
+        "parameters": {"type": "object", "properties": {
+            "project": {"type": "string"}, "message": {"type": "string"}},
+            "required": ["project", "message"]}}),
+    ("project_changes", project_changes, {
+        "description": "What changed in a project: commits since a time (default today) "
+                       "and what's not committed. Use it to tell them what you did.",
+        "parameters": {"type": "object", "properties": {
+            "project": {"type": "string"},
+            "since": {"type": "string", "description": "today, yesterday, '3 days ago', ..."}},
+            "required": ["project"]}}),
+    ("git_push", git_push, {
+        "description": "Push a project's current branch to GitHub (or its remote). They "
+                       "are asked to Allow or Deny every push first, so just call it; "
+                       "never push any other way.",
+        "parameters": {"type": "object", "properties": {
+            "project": {"type": "string"}, "remote": {"type": "string"}},
+            "required": ["project"]}}),
+    ("forge_task", forge_task, {
+        "description": "Hand a bigger coding task in one of the projects to Forge, the "
+                       "coding agent on this machine: it reads the code, edits, runs the "
+                       "tests and fixes what fails, in a loop, in the background. Use it "
+                       "for anything more than a small edit. Write the task in full; Forge "
+                       "only knows what you tell it. You're told when it finishes.",
+        "parameters": {"type": "object", "properties": {
+            "project": {"type": "string"},
+            "task": {"type": "string", "description": "What to do, where, and how to check it."}},
+            "required": ["project", "task"]}}),
     ("start_job", start_job, {
         "description": "Start a long-running command in the background: big installs, "
                        "updates, builds, downloads, anything over a couple of minutes. "
@@ -1109,6 +1387,12 @@ _THEIRS_SPECS = [
             },
             "required": ["window", "screen"],
         }}),
+    ("send_screenshot", send_screenshot, {
+        "description": "Send a screenshot of lab2 to their phone as a notification, so "
+                       "they can see it while they're out. Both screens, or one.",
+        "parameters": {"type": "object", "properties": {
+            "screen": {"type": "string", "enum": ["", "left", "right", "dell", "acer"]},
+            "note": {"type": "string", "description": "A short line to go with it."}}}}),
     ("make_restore_point", make_restore_point, {
         "description": "Take a Timeshift restore point of lab2's system before something "
                        "risky, so it can be rolled back. One is taken for you automatically "
@@ -1162,6 +1446,14 @@ How to use it without breaking it:
   going, and you are told when it finishes so you can tell them.
 - A restore point is taken for you before upgrades, removals and system
   config edits; make_restore_point for anything else risky.
+- Coding lives in ~/projects, one git repo per folder: projects to see
+  them, new_project to clone or start one. Small edits you make yourself;
+  bigger work goes to forge_task (Forge edits, runs the tests and fixes in
+  a loop). When a piece of work is done and checked, git_save it with a
+  plain message (never credit yourself or any AI), and tell them what
+  changed (project_changes). Push only with git_push, which asks them.
+- send_screenshot sends lab2's screen to their phone when they're out and
+  want to see it.
 - Music is Spotify (flatpak com.spotify.Client): playerctl -p spotify
   play/pause/next, or open_app Spotify if it isn't running.
 - Don't touch the screen layout, the theme or the login screen unless they
