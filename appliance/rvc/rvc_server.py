@@ -22,13 +22,16 @@ from rvc_python.infer import RVCInference  # noqa: E402
 MODEL = os.environ.get("RVC_MODEL", "/opt/rvc/models/marin/Marin.pth")
 INDEX = os.environ.get("RVC_INDEX", "")
 PITCH = int(os.environ.get("RVC_PITCH", "0"))
-INDEX_RATE = float(os.environ.get("RVC_INDEX_RATE", "0.5"))
+INDEX_RATE = float(os.environ.get("RVC_INDEX_RATE", "0.85"))
+PROTECT = float(os.environ.get("RVC_PROTECT", "0.5"))       # keeps breaths and consonants natural
+RMS_MIX = float(os.environ.get("RVC_RMS_MIX", "0.25"))      # loudness follows the voice model
 PORT = int(os.environ.get("RVC_PORT", "8790"))
 MAX_BODY = 20 << 20
 
 rvc = RVCInference(device="cpu:0")
 rvc.load_model(MODEL, index_path=INDEX)
-rvc.set_params(f0method="rmvpe", f0up_key=PITCH, index_rate=INDEX_RATE, protect=0.33)
+rvc.set_params(f0method="rmvpe", f0up_key=PITCH, index_rate=INDEX_RATE, protect=PROTECT,
+               rms_mix_rate=RMS_MIX)
 lock = threading.Lock()
 
 
