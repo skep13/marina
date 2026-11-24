@@ -6,6 +6,7 @@ import base64
 import hmac
 import json
 import queue
+import re
 import sys
 import tempfile
 import threading
@@ -15,7 +16,7 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT / "server"))
 
-from fastapi import FastAPI, File, UploadFile
+from fastapi import FastAPI, File, Query, UploadFile
 from fastapi.responses import JSONResponse, Response, StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 from openai import APIConnectionError
@@ -155,6 +156,30 @@ def _respond(user_text, speak, transcript=None):
     return out
 
 
+# Little sounds she makes the moment you stop talking ("mm-hm", "hmm"), so a
+# voice reply never starts with dead air while the model thinks. Rendered in
+# her current voice once per personality and kept. A preset can list its own
+# (style.backchannel) or turn them off with an empty list.
+BACKCHANNEL = ["mm-hm.", "hmm.", "yeah.", "oh?", "okay.", "mm."]
+_backchannel_cache = {}
+
+
+@app.get("/backchannel")
+def backchannel():
+    words = cfg.setting("style", "backchannel", BACKCHANNEL) or []
+    key = (cfg.preset(), tuple(words))
+    if key not in _backchannel_cache:
+        clips = []
+        for w in words:
+            try:
+                wav, _ = synthesize(str(w))
+                clips.append(base64.b64encode(wav).decode("ascii"))
+            except TTSError as e:
+                print(f"[backchannel] {e}", flush=True)
+        _backchannel_cache[key] = clips
+    return {"preset": cfg.preset(), "clips": _backchannel_cache[key]}
+
+
 @app.get("/health")
 def health():
     return {
@@ -205,8 +230,37 @@ def _ndjson(event):
     return json.dumps(event, ensure_ascii=False) + "\n"
 
 
+# Her *giggles* and *sighs* as sounds she makes, not just animations: the
+# sound goes into what she says at the spot the action was, so Kokoro and
+# her RVC voice render it inline and the lip sync stays in step. First match
+# wins; tts.vocal_sounds: false turns it off.
+VOCAL_SOUNDS = [
+    (re.compile(r"\b(chuckl|snicker|snort)", re.I), "heh."),
+    (re.compile(r"\bsigh", re.I), "haahh..."),
+    (re.compile(r"\bgasp", re.I), "hah!"),
+    (re.compile(r"\bhum", re.I), "mmm,"),
+]
+
+
+def _with_vocal_sounds(speech, cues):
+    if not cues or not cfg.setting("tts", "vocal_sounds", True):
+        return speech
+    out, last = [], 0
+    for cue in sorted(cues, key=lambda c: c.get("at", 0)):
+        sound = next((w for rx, w in VOCAL_SOUNDS if rx.search(cue.get("action", ""))), None)
+        if not sound:
+            continue
+        at = max(last, min(len(speech), int(cue.get("at", 0))))
+        out.append(speech[last:at])
+        out.append(f" {sound} ")
+        last = at
+    out.append(speech[last:])
+    return re.sub(r"\s{2,}", " ", "".join(out)).strip()
+
+
 def _speak_segment(segment, index, speak):
     parts = split_reply(segment)
+    parts["speech"] = _with_vocal_sounds(parts["speech"], parts["cues"])
     if parts["mood"]["name"] == "neutral":
         # Nothing in the sentence itself: her face rests on the mood she is in.
         parts["mood"] = her_mood.face() or parts["mood"]
@@ -280,7 +334,10 @@ def _stream_reply_now(user_text, speak=True, transcript=None, extra_system=None,
     spoken = []
     index = 0
     interrupted = False
-    generator = llm_stream(user_text, extra_system=call.extra_for(user_text, extra_system))
+    # Said out loud (a transcript) is talking; typed with her voice off is texting.
+    channel = "voice" if transcript is not None and transcript == user_text else (
+        "text" if not speak else None)
+    generator = llm_stream(user_text, extra_system=call.extra_for(user_text, extra_system, channel))
 
     def emit(segment):
         nonlocal index
@@ -317,6 +374,14 @@ def _stream_reply_now(user_text, speak=True, transcript=None, extra_system=None,
                         yield event
         finally:
             generator.close()
+    except GeneratorExit:
+        # The app hung up mid-reply. This used to vanish without a trace:
+        # no log line, and nothing she'd said saved for the next history load.
+        heard = " ".join(spoken)
+        print(f"[marina] (app hung up after {index} sentence(s)) {heard}", flush=True)
+        if record:
+            save_turn(user_text, (heard + " —") if heard else "")
+        raise
     except Exception as e:
         message = llm_error_message(e)
         print(f"[llm] {message}", flush=True)
@@ -624,8 +689,14 @@ def _wav_to_float(data):
     return audio
 
 
+def _wake_words():
+    """Her names for the current personality (wake.words in a preset)."""
+    return [str(w) for w in (cfg.setting("wake", "words", WAKE_WORDS) or WAKE_WORDS)]
+
+
 @app.post("/hear")
-def hear(audio: UploadFile = File(...), follow: bool = False):
+def hear(audio: UploadFile = File(...), follow: bool = False,
+         anything: bool = Query(False, alias="any")):
     """Hands-free on the phone: one phrase the phone's mic picked up, as a
     16-bit WAV. She answers if it was said to her ("Marina, ...", "...,
     Marina?"), or straight away when `follow` says you're still talking to
@@ -635,11 +706,17 @@ def hear(audio: UploadFile = File(...), follow: bool = False):
     if samples is None:
         return _stream_error("That clip wasn't a 16-bit WAV.")
     with _ears_lock_hear:
-        text = transcribe_audio(whisper(), samples, prompt=WAKE_PROMPT).strip()
+        words = _wake_words()
+        text = transcribe_audio(whisper(), samples,
+                                prompt=words[0].capitalize() + ".").strip()
     if not text:
         return StreamingResponse(iter([_ndjson({"type": "ignored"})]),
                                  media_type="application/x-ndjson")
-    request = text if follow else wake_match(text, WAKE_WORDS)
+    # `follow`: just after she answered, so no name needed. `any`: the phone's
+    # "no need to say her name", which a personality can overrule with
+    # wake.require_name (Berri waits for her name).
+    free = follow or (anything and not cfg.setting("wake", "require_name", False))
+    request = text if free else wake_match(text, words)
     if request is None:
         print(f"[hear] (not to her) {text[:80]}", flush=True)
         return StreamingResponse(iter([_ndjson({"type": "ignored", "text": text})]),
@@ -1366,7 +1443,7 @@ def _idle_wait(timeout, phone):
             idle.note_spoken()
             print("[idle] saying something unprompted", flush=True)
             yield from _stream_reply(None, True, transcript="",
-                                     extra_system=idle.OPENER_INSTRUCTION)
+                                     extra_system=idle.opener_instruction())
             return
         time.sleep(2.0)
         waited += 2.0
@@ -1443,7 +1520,7 @@ def _push_loop():
             if push.OPENERS and idle.enabled() and idle.due():
                 idle.note_spoken()
                 print("[push] saying something unprompted with no app open", flush=True)
-                _say_unprompted(idle.OPENER_INSTRUCTION)
+                _say_unprompted(idle.opener_instruction())
         except Exception as e:
             print(f"[push] {type(e).__name__}: {e}", flush=True)
             time.sleep(30)

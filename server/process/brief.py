@@ -112,9 +112,10 @@ def note(now=None):
     when = ("morning" if DAY_STARTS <= hour < 12 else
             "afternoon" if hour < 18 else "evening")
     print(f"[brief] {len(lines)} parts for {day}", flush=True)
-    return ("\n\n(This is the first time they've talked to you today. Before or "
-            f"after answering them, catch them up on their {when}, briefly and in "
-            "your own voice: say what matters and skip what doesn't, two to four "
-            "spoken sentences, no list. If they're clearly busy with something "
-            "urgent, keep it to one line or save it. What you know:\n"
+    return ("\n\n(This is the first time they've talked to you today. You're "
+            "their friend, not their secretary: answer them first, then mention "
+            f"whatever from their {when} is actually worth a friend saying, the "
+            "way a mate would (\"also it's going to chuck it down later\"). One or "
+            "two casual sentences at most, skip the rest, never a rundown. If "
+            "nothing here is interesting, say nothing about it. What you know:\n"
             + "\n".join(f"- {l}" for l in lines) + ")")

@@ -140,6 +140,8 @@ def add(text, source="auto", due=None):
 
 SELF = "self"  # the source of notes she keeps about herself
 MAX_SELF_IN_PROMPT = 20
+JOKE = "joke"  # running jokes and nicknames the two of them share
+MAX_JOKES = 20
 
 
 def _is_self_note(text):
@@ -157,7 +159,7 @@ def _acceptable(text, source):
         return 20 <= len(text) <= 600
     if source == EVENT:
         return 8 <= len(text) <= 200 and text[-1] != "?"
-    if source == SELF:
+    if source in (SELF, JOKE):
         return _is_self_note(text)
     return _is_durable_fact(text)
 
@@ -171,7 +173,9 @@ def _trim(facts):
         out += sorted(mine, key=lambda f: f.get("created", ""))[-limit:]
     hers = [f for f in facts if f.get("source") == "self"]
     out += sorted(hers, key=lambda f: f.get("created", ""))[-MAX_SELF:]
-    plain = [f for f in facts if _kind(f) == "fact" and f.get("source") != "self"]
+    ours = [f for f in facts if f.get("source") == JOKE]
+    out += sorted(ours, key=lambda f: f.get("created", ""))[-MAX_JOKES:]
+    plain = [f for f in facts if _kind(f) == "fact" and f.get("source") not in ("self", JOKE)]
     over = len(plain) - MAX_FACTS
     if over > 0:
         loose = sorted((f for f in plain if f.get("source") in _EVICTABLE),
@@ -339,6 +343,7 @@ def as_prompt_block(today=None):
                         if f.get("source") not in (SELF, EVENT, EPISODE)],
                        today or date.today())
     mine = [f for f in everything if f.get("source") == SELF]
+    jokes = [f for f in everything if f.get("source") == JOKE]
     told = [f for f in everything if f.get("source") == EPISODE]
     out = ""
     if facts:
@@ -372,6 +377,14 @@ def as_prompt_block(today=None):
             "\n\nNotes you've kept about yourself: your own opinions, tastes and "
             "what you've been up to. They're yours, so stay true to them, but "
             "don't announce them.\n"
+            f"{lines}"
+        )
+    if jokes:
+        jokes = sorted(jokes, key=lambda f: f.get("created", ""))[-MAX_JOKES:]
+        lines = "\n".join(f"- {f['text']}" for f in jokes)
+        out += (
+            "\n\nRunning jokes and names between the two of you. Bring one back "
+            "now and then when it fits, the way friends do, without explaining it.\n"
             f"{lines}"
         )
     return out

@@ -39,6 +39,11 @@ concrete about your own life, tastes or opinions that you would need to
 stay consistent with later, record it as {"self": "You ..."}. Not moods,
 not reactions to them, nothing about them.
 
+ALSO: if the two of you just made a joke, nickname or bit that could become
+a running joke (a silly name for something, a phrase you both latched onto,
+a teasing callback), record it as {"joke": "..."}, describing it so it makes
+sense later. Only real shared bits, not every pun.
+
 ALSO: if the user sounds genuinely low, struggling or hopeless in this
 message, even quietly, add {"feeling": "low"}; if they talk about not
 wanting to be alive or hurting themselves, {"feeling": "crisis"}. Not for
@@ -63,6 +68,9 @@ user: "got an interview next week, kind of dreading it" (today is Monday 12 Octo
 
 user: "what are you watching" / you replied: "rewatching Mob Psycho, season two is the best one"
 [{"self": "You think season two of Mob Psycho is the best one"}]
+
+user: "my laptop is basically a space heater at this point" / you replied: "the space heater lives. long live the space heater"
+[{"joke": "You both call the user's overheating laptop 'the space heater'"}]
 
 user: "i don't really see the point of any of it lately"
 [{"feeling": "low"}]
@@ -116,7 +124,7 @@ def _parse(raw, today=None):
     out = []
     for item in parsed:
         if isinstance(item, dict):
-            found = _event(item, today) or _self(item) or _feeling(item)
+            found = _event(item, today) or _self(item) or _joke(item) or _feeling(item)
             if found:
                 out.append(found)
             continue
@@ -136,6 +144,14 @@ def _self(item):
     if 8 <= len(text) <= MAX_FACT_CHARS and text.lower().startswith("you "):
         return {"self": text}
     return None
+
+
+def _joke(item):
+    text = item.get("joke")
+    if not isinstance(text, str):
+        return None
+    text = " ".join(text.split())
+    return {"joke": text} if 8 <= len(text) <= MAX_FACT_CHARS else None
 
 
 def _feeling(item):
@@ -264,6 +280,10 @@ def remember_async(client, model, user_text, assistant_text):
             if isinstance(item, dict) and "feeling" in item:
                 from process import care
                 care.heard(item["feeling"])
+                continue
+            if isinstance(item, dict) and "joke" in item:
+                if store.add(item["joke"], source=store.JOKE):
+                    print(f"[memory] +{item['joke']} (running joke)", flush=True)
                 continue
             if isinstance(item, dict) and "self" in item:
                 if store.add(item["self"], source=store.SELF):

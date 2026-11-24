@@ -16,6 +16,7 @@ from process import backend
 from process import care
 from process import gap
 from process import mood
+from process import rhythm
 
 from process.backend import current as backend_current
 from process.backend import mode as backend_mode
@@ -111,7 +112,7 @@ def system_message():
                     + tools.prompt_addition()
                     + _stable_context()
                     + (ambient.NOTE_EXPLAINED if ambient.ENABLED else "")
-                    + LET_IT_GO
+                    + (LET_IT_GO if _preset_llm("let_it_go", True) else "")
                     + _style_note()),
     }
 
@@ -226,7 +227,7 @@ def describe_endpoint():
 
 
 def active_model():
-    return model_for()
+    return (_preset_llm("model") if backend_current() == "server" else None) or model_for()
 
 
 def active_endpoint():
@@ -249,9 +250,16 @@ def _pick():
     return _clients[which], model_for(which), which
 
 
+def _preset_llm(key, default=None):
+    """An llm setting the current personality sets for itself (not the
+    global one): Assistant runs on its own model, with thinking on."""
+    over = (config.presets().get(config.preset()) or {}).get("llm") or {}
+    return over.get(key, default)
+
+
 def _request_extras(kw):
     kw = dict(kw)
-    if not THINKING:
+    if not bool(_preset_llm("thinking", THINKING)):
         extra = dict(kw.get("extra_body") or {})
         tmpl = dict(extra.get("chat_template_kwargs") or {})
         tmpl.setdefault("enable_thinking", False)
@@ -314,7 +322,9 @@ def chat_completion(messages, **kw):
         send, send_kw = _for_backup(messages, kw) if _is_backup(which) else (messages, kw)
         try:
             # A route only ever moves work on lab3; the backup keeps its own model.
-            model = routed if (routed and which == "server") else model_for(which)
+            model = (routed if (routed and which == "server")
+                     else (_preset_llm("model") if which == "server" else None)
+                     or model_for(which))
             out = _clients[which].chat.completions.create(
                 model=model, messages=send, **send_kw)
         except (APIConnectionError, APITimeoutError):
@@ -535,6 +545,7 @@ def turn_notes(history, user_input=None):
     offer(lambda: her_room.home_note(text))
     if personal:
         offer(lambda: gap.note(history))
+        offer(lambda: rhythm.note(text))
         offer(lambda: recall.note(text))
         if not working and user_input is not None:
             offer(lambda: fresh.steer(history, text))

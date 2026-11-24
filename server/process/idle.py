@@ -25,6 +25,25 @@ OPENER_INSTRUCTION = (
     "said above; the conversation is in front of you, so pick something else."
 )
 
+OWN_LIFE_RATE = float(_idle.get("own_life_rate", 0.5))
+
+
+def opener_instruction(roll=None):
+    """What to say when she breaks a silence. About half the time it is
+    news from her own day, told like texting a friend, rather than a
+    thought about them."""
+    if (roll if roll is not None else random.random()) < OWN_LIFE_RATE:
+        from process.memory import persona
+        thread = persona.current_thread()
+        if thread:
+            return OPENER_INSTRUCTION + (
+                " This time, tell them something from your own day, the way you'd "
+                f"text a friend an update: {thread} Make it a reaction or a "
+                "complaint or a tiny win, not a summary, and don't ask them to "
+                "reply.")
+    return OPENER_INSTRUCTION
+
+
 _lock = threading.Lock()
 _last_interaction = time.time()
 _spoken_at = []
