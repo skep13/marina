@@ -1,5 +1,6 @@
 """Text-to-speech. `tts.provider` picks kokoro (local) or sovits (HTTP)."""
 import io
+import re
 import threading
 
 from process.config import load_config, resolve
@@ -18,8 +19,19 @@ _kokoro = None
 _kokoro_lock = threading.Lock()
 
 
+def _preset_tts():
+    """The current personality's own voice settings, if it has any:
+    tts: {voice, speed, pitch, rvc: false} in its preset."""
+    from process import config
+    return (config.presets().get(config.preset()) or {}).get("tts") or {}
+
+
 def _kokoro_cfg():
-    return _tts.get("kokoro") or {}
+    over = {k: v for k, v in _preset_tts().items() if k in ("voice", "blend", "speed", "pitch")}
+    base = dict(_tts.get("kokoro") or {})
+    if "voice" in over:
+        base.pop("blend", None)
+    return {**base, **over}
 
 
 def _load_kokoro():
@@ -85,42 +97,71 @@ def _pitch_shift(audio, semitones):
         return np.interp(idx, np.arange(len(audio)), audio).astype(np.float32)
 
 
+_SENTENCE = re.compile(r"[^.!?…]+(?:[.!?…]+|$)")
+
+
+def _tone(sentence):
+    """How a sentence should sound from its punctuation: (speed, semitones).
+    Kokoro on its own reads everything in one tone, so exclamations come out
+    quicker and higher, questions lift, trailing "..." slows and drops."""
+    s = sentence.strip()
+    if s.endswith(("...", "…")):
+        return 0.9, -0.6
+    if "!" in s[-3:]:
+        return 1.08, 0.9 + (0.4 if s.count("!") > 1 or s.isupper() else 0.0)
+    if s.endswith("?"):
+        return 1.03, 0.5
+    return 1.0, 0.0
+
+
 def _kokoro_gen(text):
+    import numpy as np
     import soundfile as sf
 
     cfg = _kokoro_cfg()
     kokoro = _load_kokoro()
 
     voice = _resolve_voice(kokoro, cfg)
-    semitones = float(cfg.get("pitch", 0.0))
-    ratio = 2.0 ** (semitones / 12.0)
+    base_semitones = float(cfg.get("pitch", 0.0))
 
     from process import mood
-    speed = float(cfg.get("speed", 1.0)) * mood.voice_speed() / ratio
+    base_speed = float(cfg.get("speed", 1.0)) * mood.voice_speed()
+    expressive = cfg.get("expressive", True) is not False
+    parts = [p for p in _SENTENCE.findall(text) if p.strip()] if expressive else [text]
+    parts = parts or [text]
 
-    try:
-        audio, sample_rate, timings = kokoro.create_timed(
-            text,
-            voice=voice,
-            speed=speed,
-            lang=cfg.get("lang", "en-us"),
-        )
-        audio = _pitch_shift(audio, semitones)
-    except Exception as e:
-        available = ""
+    chunks, visemes, offset, sample_rate = [], [], 0.0, 24000
+    for part in parts:
+        speed_mul, lift = _tone(part) if expressive else (1.0, 0.0)
+        semitones = base_semitones + lift
+        ratio = 2.0 ** (semitones / 12.0)
         try:
-            available = ", ".join(sorted(kokoro.get_voices())[:8]) + ", ..."
-        except Exception:
-            pass
-        label = voice if isinstance(voice, str) else "blend"
-        raise TTSError(
-            f"Kokoro failed on voice '{label}': {e}"
-            + (f" Available voices: {available}" if available else "")
-        ) from e
+            audio, sample_rate, timings = kokoro.create_timed(
+                part.strip(),
+                voice=voice,
+                speed=base_speed * speed_mul / ratio,
+                lang=cfg.get("lang", "en-us"),
+            )
+            audio = _pitch_shift(audio, semitones)
+        except Exception as e:
+            available = ""
+            try:
+                available = ", ".join(sorted(kokoro.get_voices())[:8]) + ", ..."
+            except Exception:
+                pass
+            label = voice if isinstance(voice, str) else "blend"
+            raise TTSError(
+                f"Kokoro failed on voice '{label}': {e}"
+                + (f" Available voices: {available}" if available else "")
+            ) from e
+        for v in visemes_from(timings, 1.0 / ratio):
+            visemes.append({**v, "t": round(v["t"] + offset, 4)})
+        chunks.append(np.asarray(audio, dtype=np.float32))
+        offset += len(audio) / sample_rate
 
     buf = io.BytesIO()
-    sf.write(buf, audio, sample_rate, format="WAV", subtype="PCM_16")
-    return buf.getvalue(), visemes_from(timings, 1.0 / ratio)
+    sf.write(buf, np.concatenate(chunks), sample_rate, format="WAV", subtype="PCM_16")
+    return buf.getvalue(), visemes
 
 
 _VISEME_BY_PHONEME = {
@@ -187,7 +228,7 @@ def _rvc(wav):
     is set. Same length, so the lip sync timings still fit. Anything wrong
     and she just speaks in plain Kokoro."""
     url = str((_tts.get("rvc") or {}).get("url") or "").rstrip("/")
-    if not url:
+    if not url or _preset_tts().get("rvc") is False:
         return wav
     import urllib.request
     try:
