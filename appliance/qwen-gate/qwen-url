@@ -1,5 +1,0 @@
-#!/bin/sh
-# Print the current public URL of the Qwen API (it changes when qwen-tunnel restarts).
-u=$(journalctl -u qwen-tunnel -b --no-pager -o cat 2>/dev/null \
-    | grep -o 'https://[a-z0-9-]*\.trycloudflare\.com' | tail -1)
-[ -n "$u" ] && echo "$u/v1" || { echo "no tunnel URL yet (systemctl status qwen-tunnel)" >&2; exit 1; }
