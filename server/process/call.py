@@ -68,10 +68,41 @@ def pick_up():
     return style() + "\n\n" + str(_setting("pick_up", PICK_UP)).strip()
 
 
-def extra_for(user_text, extra_system):
-    """The extra system text for one reply: the call style is added to what
-    someone says during a call. Unprompted replies (openers, timers) bring
-    their own instruction and are left alone."""
-    if not _state["on"] or user_text is None:
+# How she writes when you're texting her and how she talks when you're
+# talking to her: people text and call differently. A preset can replace
+# either with its own words (style.text / style.voice), or turn one off with "".
+TEXT_STYLE = (
+    "\n\nThey are texting you right now and will read your reply, not hear "
+    "it. Text like a real person on their phone: mostly lowercase, light "
+    "punctuation, short. Often send two or three short messages instead of "
+    "one, each on its own line. Slang like lol, ngl, omg is fine when it fits, "
+    "and sometimes a single emoji. Never describe actions in asterisks."
+)
+
+VOICE_STYLE = (
+    "\n\nThey are talking to you out loud and hear your voice. Talk like a "
+    "person speaking, not writing: contractions, the odd um, like, or wait "
+    "when you're thinking, and it's fine to correct yourself mid-sentence. "
+    "Usually one to three spoken sentences. No lists, headings, markdown, "
+    "links or emoji; to give several points, say them as speech."
+)
+
+
+def channel_style(channel):
+    if channel not in ("text", "voice"):
+        return ""
+    default = TEXT_STYLE if channel == "text" else VOICE_STYLE
+    words = str(cfg.setting("style", channel, default) or "").strip()
+    return "\n\n" + words if words else ""
+
+
+def extra_for(user_text, extra_system, channel=None):
+    """The extra system text for one reply: the call style during a call,
+    else how to write for the channel they're using (texting or talking).
+    Unprompted replies (openers, timers) bring their own instruction and
+    are left alone."""
+    if user_text is None:
         return extra_system
-    return (extra_system or "") + style()
+    if _state["on"]:
+        return (extra_system or "") + style()
+    return ((extra_system or "") + channel_style(channel)) or None

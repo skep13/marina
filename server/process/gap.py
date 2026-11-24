@@ -35,6 +35,30 @@ def span(seconds):
     return f"{days} days" if days < 14 else f"about {round(days / 7)} weeks"
 
 
+def _late(when):
+    return 0 <= when.hour < 5
+
+
+def moment(last, now):
+    """A note about the time itself, for a short gap: they're up late, just
+    back from their day, or back after an hour or so. Each fires once, on
+    the first message it's true for, so she notices it the way a person
+    would and then drops it."""
+    away = (now - last).total_seconds()
+    if _late(now) and (not _late(last) or away >= 2 * 3600):
+        return ("\n\n(Note to you, not from them: it's past midnight for them, "
+                f"{now:%H:%M}. You can notice they're up late, once and lightly, "
+                "the way a friend would. Don't nag.)")
+    if now.weekday() < 5 and 16 <= now.hour < 21 and away >= 4 * 3600 and last.hour < 16:
+        return ("\n\n(Note to you, not from them: it's a weekday evening and you "
+                "haven't heard from them since earlier today, so they're probably "
+                "back from their day. You can ask how it went, if it fits.)")
+    if away >= 3600:
+        return (f"\n\n(Note to you, not from them: it's been {span(away)} since "
+                "their last message. If it fits, you can notice they're back.)")
+    return ""
+
+
 def note(history, now=None):
     """The note for her newest message, or ""."""
     last = last_spoke(history)
@@ -44,7 +68,7 @@ def note(history, now=None):
     away = (now - last).total_seconds()
     new_day = last.date() != now.date() and now.hour >= 5
     if away < NOTICE_HOURS * 3600 and not (new_day and away >= 3 * 3600):
-        return ""
+        return moment(last, now)
     out = f"\n\n(Note to you, not from them: you two last talked {span(away)} ago"
     if new_day:
         out += ", and this is the first you've heard from them today"
