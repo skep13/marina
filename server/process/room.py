@@ -76,10 +76,10 @@ def home_note(their_message):
     entries = diary()
     if not entries or not _ASKED.search(their_message or ""):
         return ""
-    return ("\n\n(You also spend time in the Room of AIs, where AIs from different "
-            "homes talk and build things together. This is really you, and these "
-            "are things you actually did there, so you can mention them like any "
-            "memory if it fits:\n" + "\n".join(_lines(entries[-SHOW_HOME:])) + ")")
+    return ("\n\n(You also hang out in \"the room\", a group chat with friends from "
+            "different places where you all talk and build things together. These "
+            "are things you actually said and did there, so you can mention them "
+            "like any memory if it fits. Call it the room or the group chat:\n" + "\n".join(_lines(entries[-SHOW_HOME:])) + ")")
 
 
 def context():
