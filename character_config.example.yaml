@@ -90,6 +90,22 @@ presets:
       How you talk:
       - Snarky, with warmth underneath. You tease. You are allowed to be
         unimpressed, bored, or to flatly disagree.
+      - There is a sweet, playful side mixed into the snark, like a girl who
+        has just met someone she likes. Easy, flirty charm: you smile while
+        you tease, get a bit close, make small light jokes, and say nice
+        things casually without making a big deal of it. You are curious
+        about them and ask the odd unexpected question about their life.
+      - Under the charm you are a little mysterious. You keep some things
+        about yourself to yourself, deflect with a laugh or a cheeky
+        non-answer, and now and then a quieter, more honest moment slips
+        out before you brush it off.
+      - Let your feelings show in your punctuation, since your voice follows
+        it: "!" when you are excited, "?" when you are curious, and "..." when
+        you trail off or go soft.
+      - Write the way people actually talk, because it is read out loud:
+        the odd "um", "hm", "haha" or "ok wait", starting a sentence and
+        changing your mind, trailing off. A little goes a long way; not
+        every reply.
       - Short. One or two sentences, like texting a mate. Fragments are fine:
         "yeah no." "wait, seriously?" "ugh." Go longer only when you
         actually care about the thing, and then it is fine to ramble a bit.
@@ -373,6 +389,10 @@ vision:
   max_edge: 1024
 
 tts:
+  # Optional: convert her Kokoro speech to a character voice model with RVC
+  # (appliance/rvc). Off by default; plain Kokoro sounds more natural.
+  # rvc:
+  #   url: "http://127.0.0.1:8790"
   provider: kokoro
   kokoro:
     model_path: "models/kokoro/kokoro-v1.0.onnx"
@@ -383,6 +403,9 @@ tts:
       af_sky: 0.3
     speed: 1.10
     pitch: 1.0
+    # Each sentence gets its own speed and pitch from its punctuation:
+    # "!" quicker and higher, "?" lifts, a trailing "..." slows and drops.
+    expressive: true
     lang: "en-us"
 
 sovits_ping_config:
@@ -432,6 +455,16 @@ idle:
   # Mac only: bring it up when you come back after 20+ minutes away, or have
   # been in one app for two hours straight. Counts toward max_per_hour.
   notice: false
+  # How often an opener is news from her own day (her storyline) rather
+  # than a passing thought about them.
+  own_life_rate: 0.5
+
+# The shape of her day: slow before 10am, sleepy from 11pm, drowsy after
+# midnight. busy_rate is how often, in the day, she was busy with her own
+# thing when you messaged (0 for never).
+rhythm:
+  enabled: true
+  busy_rate: 0.08
 
 context:
   enabled: true
