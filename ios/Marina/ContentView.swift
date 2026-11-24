@@ -84,6 +84,12 @@ struct TopBar: View {
             }
             .accessibilityLabel(chat.voiceOn ? "Mute her voice" : "Turn her voice on")
             Menu {
+                if chat.presets.count > 1 {
+                    Picker(selection: Binding(get: { chat.preset }, set: { chat.setPreset($0) })) {
+                        ForEach(chat.presets) { Text($0.label).tag($0.name) }
+                    } label: { Label("Personality", systemImage: "theatermasks") }
+                    .pickerStyle(.menu)
+                }
                 Button("Settings", systemImage: "gearshape") { showSettings = true }
                 Button("Forget this conversation", systemImage: "arrow.counterclockwise", role: .destructive) { chat.forget() }
             } label: { Image(systemName: "ellipsis.circle") }

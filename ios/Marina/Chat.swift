@@ -40,6 +40,9 @@ final class Chat: ObservableObject {
     @Published var steps: [Step] = []
     @Published var workspace: String?          // the machine she works on, e.g. "lab2"
     @Published var ask: Ask?
+    @Published var preset = "default"
+    @Published var presets: [Personality] = []
+    struct Personality: Identifiable { let name: String; let label: String; var id: String { name } }
     @Published var voiceOn = Settings.voiceOn { didSet { Settings.voiceOn = voiceOn } }
 
     let avatar: AvatarController
@@ -96,7 +99,7 @@ final class Chat: ObservableObject {
                 if !busy { handsFree.paused = false }
             }
             do {
-                let stream = try bridge.hear(wav, follow: follow || Settings.noNameNeeded)
+                let stream = try bridge.hear(wav, follow: follow, any: Settings.noNameNeeded)
                 var events = stream.makeAsyncIterator()
                 guard let first = try await events.next() else { handsFree.ready(); return }
                 switch first.type {
@@ -111,6 +114,11 @@ final class Chat: ObservableObject {
                     handsFree.ready()
                 default:
                     interruptIfSpeaking()
+                    // It was for her: an "mm-hm" now, so there's no dead air
+                    // while she thinks.
+                    if voiceOn, let clip = backchannelClips.randomElement() {
+                        Task { await self.voice.play(clip) }
+                    }
                     let rest = AsyncThrowingStream<BridgeEvent, Error> { c in
                         c.yield(first)
                         Task { @MainActor in
@@ -136,6 +144,22 @@ final class Chat: ObservableObject {
         Task { await connect() }
     }
 
+    private var backchannelClips: [String] = []
+
+    func loadPresets() async {
+        guard let p = try? await bridge.presets() else { return }
+        presets = p.all.map { Personality(name: $0.name, label: $0.label) }
+        preset = p.current
+        backchannelClips = (try? await bridge.backchannel()) ?? []
+    }
+
+    func setPreset(_ name: String) {
+        Task {
+            try? await bridge.post("preset", json: ["name": name])
+            await loadPresets()
+        }
+    }
+
     func connect() async {
         do {
             let h = try await bridge.health()
@@ -146,6 +170,7 @@ final class Chat: ObservableObject {
             if messages.isEmpty { await loadHistory() }
             startIdle()
             Task { try? await bridge.post("warmup") }
+            Task { await loadPresets() }
         } catch {
             link = .down(Self.describe(error))
         }
@@ -230,7 +255,11 @@ final class Chat: ObservableObject {
         chunksPlayed = 0
         generation += 1
         let gen = generation
+        // Keeps the app running to the end of her reply if the phone locks
+        // part-way, so iOS doesn't suspend it and cut the bridge off.
+        let bg = UIApplication.shared.beginBackgroundTask(withName: "reply")
         current = Task {
+            defer { UIApplication.shared.endBackgroundTask(bg) }
             await avatar.unlockAudio()
             if voiceOn { await avatar.begin() }
             var started = false
@@ -282,13 +311,50 @@ final class Chat: ObservableObject {
     /// One sentence: add it to her bubble and give it to the avatar.
     private func take(_ ev: BridgeEvent) async {
         let text = ev.string("reply") ?? ev.string("speech") ?? ""
-        if let i = messages.lastIndex(where: { $0.role == .marina && $0.live }) {
+        if !voiceOn && !text.isEmpty {
+            await texted(text)
+        } else if let i = messages.lastIndex(where: { $0.role == .marina && $0.live }) {
             messages[i].text = messages[i].text.isEmpty ? text : messages[i].text + " " + text
         }
         if let err = ev.string("error") { note(err) }
         chunksPlayed += 1
-        if voiceOn && foreground { await avatar.chunk(ev) }
-        else if voiceOn && handsFree.on { await voice.play(ev.string("audio")) }
+        guard voiceOn else { return }
+        if foreground, await avatarChunkUnlessLocked(ev) { return }
+        if handsFree.on || !foreground { await voice.play(ev.string("audio")) }
+    }
+
+    /// With her voice off she texts: each line its own bubble, after the
+    /// "typing" dots for about as long as a person takes to type it.
+    private func texted(_ text: String) async {
+        for line in text.split(separator: "\n").map({ $0.trimmingCharacters(in: .whitespaces) }) where !line.isEmpty {
+            if let i = messages.lastIndex(where: { $0.role == .marina && $0.live }), !messages[i].text.isEmpty {
+                messages[i].live = false
+                messages.append(Message(role: .marina, text: "", live: true))
+            } else if !messages.contains(where: { $0.role == .marina && $0.live }) {
+                messages.append(Message(role: .marina, text: "", live: true))
+            }
+            let typing = min(2.5, 0.4 + Double(line.count) * 0.035)
+            try? await Task.sleep(for: .seconds(typing))
+            if let i = messages.lastIndex(where: { $0.role == .marina && $0.live }) {
+                messages[i].text = line
+            }
+        }
+    }
+
+    /// Plays one sentence on the avatar, unless the phone locks first. A locked
+    /// phone pauses the web view, so its audio never finishes: that left the
+    /// reply stuck, and with nothing of ours playing iOS suspended the app and
+    /// hung up on the bridge. False means it locked: play it here instead.
+    private func avatarChunkUnlessLocked(_ ev: BridgeEvent) async -> Bool {
+        let avatar = self.avatar
+        final class Flag { var on = false }
+        let done = Flag()
+        Task { @MainActor in await avatar.chunk(ev); done.on = true }
+        while !done.on {
+            if !foreground { return false }
+            try? await Task.sleep(for: .milliseconds(150))
+        }
+        return true
     }
 
     private func addStep(_ text: String, _ where_: String) {

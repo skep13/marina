@@ -90,6 +90,30 @@ final class Bridge {
         return data
     }
 
+    /// Her personalities, and which one is on. POST a name to switch.
+    func presets() async throws -> (current: String, all: [(name: String, label: String)]) {
+        var req = try request("preset")
+        req.timeoutInterval = 8
+        let (data, response) = try await session.data(for: req)
+        try check(response)
+        let o = (try JSONSerialization.jsonObject(with: data) as? [String: Any]) ?? [:]
+        let all = (o["presets"] as? [[String: Any]] ?? []).compactMap { p -> (String, String)? in
+            guard let n = p["name"] as? String else { return nil }
+            return (n, p["label"] as? String ?? n)
+        }
+        return (o["preset"] as? String ?? "default", all.map { (name: $0.0, label: $0.1) })
+    }
+
+    /// Little sounds ("mm-hm") in her current voice, as base64 WAVs.
+    func backchannel() async throws -> [String] {
+        var req = try request("backchannel")
+        req.timeoutInterval = 60
+        let (data, response) = try await session.data(for: req)
+        try check(response)
+        let o = (try JSONSerialization.jsonObject(with: data) as? [String: Any]) ?? [:]
+        return o["clips"] as? [String] ?? []
+    }
+
     func post(_ path: String, json: [String: Any] = [:]) async throws {
         var req = try request(path, method: "POST")
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
@@ -125,9 +149,13 @@ final class Bridge {
 
     /// Hands-free: one phrase as a 16-bit WAV. The bridge answers only if it
     /// was said to her (or `follow` is set), else sends {"type": "ignored"}.
-    func hear(_ wav: Data, follow: Bool) throws -> AsyncThrowingStream<BridgeEvent, Error> {
-        var req = try request("hear", method: "POST",
-                              query: follow ? [URLQueryItem(name: "follow", value: "true")] : [])
+    /// `follow`: just after she answered. `any`: the "no need to say her
+    /// name" setting, which a personality like Berri can overrule.
+    func hear(_ wav: Data, follow: Bool, any: Bool = false) throws -> AsyncThrowingStream<BridgeEvent, Error> {
+        var query: [URLQueryItem] = []
+        if follow { query.append(URLQueryItem(name: "follow", value: "true")) }
+        if any { query.append(URLQueryItem(name: "any", value: "true")) }
+        var req = try request("hear", method: "POST", query: query)
         let boundary = "marina-\(UUID().uuidString)"
         req.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
         var body = Data()
