@@ -1,5 +1,11 @@
 # Her RVC voice
 
+**Off since 2026-11-24.** Every character model tried (Marin, Reze, Mai-San,
+Hori) kept Kokoro's delivery and added an accent, so she uses her plain
+Kokoro blend instead. The service is disabled on lab3 and the models stay in
+`/opt/rvc/models/`. To turn it back on: set `tts.rvc.url`, then
+`systemctl enable --now marina-rvc`.
+
 Kokoro speaks, then RVC turns that into her voice model's voice, on lab3's
 CPU (ct110) so it never competes with the model on the GPU. About 0.6 s of
 work per second of speech once warm. If it fails or is down, she just speaks

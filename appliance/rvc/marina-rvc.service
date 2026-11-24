@@ -1,19 +1,21 @@
+# Disabled on lab3 since 2026-11-24 (see README). Last used with Reze.
 [Unit]
 Description=Marina's RVC voice: converts Kokoro speech to her voice model (CPU)
 After=network.target
 
 [Service]
 WorkingDirectory=/opt/rvc
-Environment=RVC_MODEL=/opt/rvc/models/marin/Marin.pth
-Environment=RVC_INDEX=/opt/rvc/models/marin/added_IVF1116_Flat_nprobe_1_Marin_v2.index
-Environment=RVC_PITCH=4
+Environment=RVC_MODEL=/opt/rvc/models/reze/Reze.pth
+Environment=RVC_INDEX=/opt/rvc/models/reze/Reze.index
+Environment=RVC_PITCH=0
 Environment=RVC_INDEX_RATE=0.85
 Environment=RVC_PROTECT=0.5
 Environment=RVC_RMS_MIX=0.25
 ExecStart=/opt/rvc/.venv/bin/python -u /opt/rvc/rvc_server.py
 Environment=RVC_THREADS=4
-# Killed and restarted if it grows, instead of lab3 running out of RAM.
-MemoryMax=2560M
+# Killed and restarted if it grows past this, instead of lab3 running out of RAM.
+# A long sentence peaks near 2.5 GB, so 2.5G killed it mid-reply.
+MemoryMax=4G
 MemorySwapMax=0
 OOMScoreAdjust=500
 Restart=always
