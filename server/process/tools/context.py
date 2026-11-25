@@ -75,7 +75,8 @@ def as_note():
     if not ENABLED:
         return ""
     now = datetime.now()
-    bits = [f"{now:%A} {now.day} {now:%B}, {now:%H:%M}"] if SHOW_TIME else []
+    part = time_of_day(now).split(" ", 1)[1].rsplit(",", 1)[0]   # "afternoon", "late evening", ...
+    bits = [f"{now:%A} {part}, {now.day} {now:%B}, {now:%H:%M}"] if SHOW_TIME else []
     if SHOW_APP:
         app = frontmost_app()
         if app:
