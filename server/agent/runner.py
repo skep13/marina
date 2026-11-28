@@ -1,4 +1,4 @@
-"""A Claude-Code-style agent loop for Marina and Songbird, driving this Mac.
+"""A Claude-Code-style agent loop for Marina and Narwhal, driving this Mac.
 
 It talks straight to lab3's llama-swap (not the chat bridge), runs the
 OpenAI tool-call loop, and gives the model the same Mac toolset Marina's
@@ -6,7 +6,7 @@ bridge has: shell, files, the screen and mouse/keyboard, and the web. Each
 persona's tool policy comes from personas.py.
 
   marina-do "find every TODO in ~/marina and summarise them"
-  songbird-do "check which listening ports are open and what owns them"
+  narwhal-do "check which listening ports are open and what owns them"
   marina-do --steps 20 --dry-run "..."         # show tools, make no changes
 
 Safety that is always on, whatever the persona:
@@ -16,7 +16,7 @@ Safety that is always on, whatever the persona:
 
 The lab3 key is NOT read from the repo. Set it in the environment or in a
 git-ignored keys file (see KEYS_FILE), per persona (MARINA_LAB3_KEY /
-SONGBIRD_LAB3_KEY).
+NARWHAL_LAB3_KEY).
 """
 import argparse
 import json
@@ -463,7 +463,7 @@ def run(persona, task, steps, dry_run, on_event=None):
 
 
 def main():
-    ap = argparse.ArgumentParser(description="Drive this Mac as Marina or Songbird.")
+    ap = argparse.ArgumentParser(description="Drive this Mac as Marina or Narwhal.")
     ap.add_argument("task", nargs="+", help="what to do")
     ap.add_argument("--persona", choices=list(PERSONAS), help="override the default persona")
     ap.add_argument("--steps", type=int, help="max tool rounds (default: the persona's)")

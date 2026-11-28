@@ -53,7 +53,7 @@
   }
   .persona:hover{border-color:var(--faint)}
   .persona.sel{border-color:var(--accent); background:#16241f}
-  .persona.sel.songbird{border-color:#c678dd; background:#201627}
+  .persona.sel.narwhal{border-color:#c678dd; background:#201627}
   .persona .pname{font-weight:700; display:flex; align-items:center; gap:7px}
   .persona .pmodel{font-family:var(--mono); font-size:11px; color:var(--faint)}
   .tags{display:flex; gap:5px; flex-wrap:wrap; margin-top:7px}
@@ -112,9 +112,9 @@
 
   .final{border:1px solid var(--accent); background:#0f1f1d; border-radius:14px; padding:14px 16px; display:none}
   .final.show{display:block}
-  .final.songbird{border-color:#c678dd; background:#1a1322}
+  .final.narwhal{border-color:#c678dd; background:#1a1322}
   .final h3{margin:0 0 8px; font-size:13px; text-transform:uppercase; letter-spacing:.06em; color:var(--accent)}
-  .final.songbird h3{color:#c678dd}
+  .final.narwhal h3{color:#c678dd}
 
   .toast{position:fixed; left:50%; bottom:calc(18px + env(safe-area-inset-bottom)); transform:translateX(-50%);
     background:#2a1212; color:var(--error); border:1px solid #4a2020; padding:10px 15px; border-radius:10px;
@@ -180,7 +180,7 @@ function policyTags(p){
 function renderPersonas(){
   const box = $('#personas'); box.innerHTML='';
   personas.forEach(p=>{
-    const card = el('button','persona'+(p.name==='songbird'?' songbird':''));
+    const card = el('button','persona'+(p.name==='narwhal'?' narwhal':''));
     card.type='button';
     const name = el('div','pname'); name.textContent = p.name[0].toUpperCase()+p.name.slice(1);
     const m = el('span','pmodel'); m.textContent = 'model: '+p.model; name.appendChild(m);
@@ -203,7 +203,7 @@ function select(name){
 function clearTimeline(){
   $('#timeline').innerHTML=''; timelineEmpty=false;
   for(const k in pending) delete pending[k];
-  $('#final').classList.remove('show','songbird'); $('#finaltext').textContent='';
+  $('#final').classList.remove('show','narwhal'); $('#finaltext').textContent='';
 }
 
 function addEvent({cls, icon, name, sub, status, bodyKVs, open=false}){
@@ -272,7 +272,7 @@ function handle(ev){
       break;
     case 'done':{
       const f=$('#final'); $('#finaltext').textContent = ev.text || '(no final message)';
-      f.classList.add('show'); if(selected==='songbird') f.classList.add('songbird');
+      f.classList.add('show'); if(selected==='narwhal') f.classList.add('narwhal');
       finish('done');
       break; }
     case 'step_limit':

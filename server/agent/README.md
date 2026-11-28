@@ -1,4 +1,4 @@
-# Mac agent: Marina and Songbird driving this Mac
+# Mac agent: Marina and Narwhal driving this Mac
 
 A Claude-Code-style agent loop that lets your own models run multi-step tasks
 on this Mac — shell, files, the screen (look/click/type/keys), and the web.
@@ -7,29 +7,29 @@ the bridge's tested Mac tools in `server/process/tools/`.
 
 ```
 server/agent/bin/marina-do   "find every TODO under ~/marina and summarise them"
-server/agent/bin/songbird-do "list listening ports and what process owns each"
+server/agent/bin/narwhal-do "list listening ports and what process owns each"
 marina-do --dry-run "..."        # show the tool calls, change nothing
 marina-do --steps 20 "..."       # cap the tool rounds
 ```
 
 Put the two scripts on your PATH (e.g. symlink into `~/.local/bin`) to call
-them as `marina-do` / `songbird-do`.
+them as `marina-do` / `narwhal-do`.
 
 ## The two personas (`personas.py`)
 
 | | model (lab3) | shell | files | secrets | screen |
 |---|---|---|---|---|---|
 | **marina** | `marina` | refuses `rm`/`sudo`/`dd`/… | home folder only | shielded | yes |
-| **songbird** | `songbird` | **runs anything** | **anywhere** | shielded* | yes |
+| **narwhal** | `narwhal` | **runs anything** | **anywhere** | shielded* | yes |
 
-Songbird runs with the command-safety gate and home-confinement **off** — your
+Narwhal runs with the command-safety gate and home-confinement **off** — your
 explicit choice, since it's the security-research persona on your own machine.
 Offensive tooling and any work against targets stays on the isolated Kali box
 (10.10.10.10), reached over SSH / the job runner, not run here.
 
 \* `shield_secrets` still blocks reads of `~/.ssh`, keychains and password
-vaults even for Songbird. To lift even that, set `shield_secrets=False` on
-`SONGBIRD`'s policy in `personas.py`.
+vaults even for Narwhal. To lift even that, set `shield_secrets=False` on
+`NARWHAL`'s policy in `personas.py`.
 
 ## Always on, both personas
 
@@ -49,9 +49,9 @@ reading, shell, files and the web are fast and reliable; GUI control works but
 is slower and benefits from the shortcut-first approach.
 
 Vision (screenshots and click-by-description) always goes to the `marina`
-model, the only one on lab3 with a vision projector. For **Songbird** that
+model, the only one on lab3 with a vision projector. For **Narwhal** that
 means each screenshot makes llama-swap swap to `marina` and back, so GUI tasks
-as Songbird are noticeably slower (~80s/step). Marina drives the screen faster
+as Narwhal are noticeably slower (~80s/step). Marina drives the screen faster
 because her own model has the eyes — prefer Marina for heavy GUI work.
 
 ## Web UI (drive it from a browser or phone)
@@ -63,7 +63,7 @@ server/agent/bin/agent-web                     # http://127.0.0.1:7420
 server/agent/bin/agent-web --host 0.0.0.0 --port 7420   # serve on the LAN
 ```
 
-Open the page, pick **Marina** or **Songbird** (each card shows its policy —
+Open the page, pick **Marina** or **Narwhal** (each card shows its policy —
 home-only vs anywhere, safe vs unrestricted shell, secrets shielded, screen),
 type a task, optionally set a step cap or tick **dry-run**, and press **Run**.
 The timeline streams every tool call with its arguments and result, colour-coded
@@ -84,11 +84,11 @@ Each persona reads its key from the environment or a git-ignored keys file:
 
 ```
 MARINA_LAB3_KEY=...        # or in ~/.marina/agent-keys.env (chmod 600)
-SONGBIRD_LAB3_KEY=...
+NARWHAL_LAB3_KEY=...
 ```
 
 `~/.marina/` and `server/agent/agent-keys.env` are git-ignored. Never commit a
-key. If Marina and Songbird share one llama-swap key, set both to it.
+key. If Marina and Narwhal share one llama-swap key, set both to it.
 
 ## Requirements
 

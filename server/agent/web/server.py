@@ -1,5 +1,5 @@
 """A small local web UI for the Mac agent, so you can drive Marina and
-Songbird from a browser (a phone included) instead of the terminal.
+Narwhal from a browser (a phone included) instead of the terminal.
 
 It wraps the same `runner.run()` loop the CLI uses — nothing about the loop,
 the personas or their policies changes — and streams each run's structured

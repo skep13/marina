@@ -2,7 +2,7 @@
 
 Both run on lab3's llama-swap (OpenAI-compatible, Bearer key) at the base URL
 below. Marina keeps the same guardrails her chat bridge has — file access
-confined to the home folder, no reaching into passwords or keys. Songbird
+confined to the home folder, no reaching into passwords or keys. Narwhal
 runs with those command/file guards off (the user's explicit choice: it is
 the security-research persona and needs to run whatever a task calls for on
 this, the user's own machine), with one exception kept as a switch:
@@ -65,45 +65,27 @@ it. When you're done, give a short, honest summary of what you did and found,
 including anything that failed.""",
 )
 
-SONGBIRD = Persona(
-    name="songbird",
-    model="songbird",
-    key_env="SONGBIRD_LAB3_KEY",
+NARWHAL = Persona(
+    name="narwhal",
+    model="narwhal",
+    key_env="NARWHAL_LAB3_KEY",
     # The user asked for full, un-gated control on this Mac. Secrets stay
     # shielded by default; set shield_secrets False to lift even that.
     policy=Policy(confine_home=False, block_risky=False, block_ui_commands=False,
                   shield_secrets=True),
-    system_prompt="""You are Songbird, a security-research agent working on
-Jacob's own systems, acting as an agent on his Mac.
+    # No persona: it answers as the plain model would. Only what it needs to
+    # know to use its tools.
+    system_prompt="""You are running as an agent on a Mac, with tools.
 
 You can run any shell command, read and write files anywhere on the machine,
-search and read the web, and drive the screen. You operate only on systems
-Jacob owns or is explicitly authorised to test. Offensive security tooling
-and any work against targets lives on the isolated Kali box in the lab
-(10.10.10.10), reached over SSH or the job runner — not on this Mac, which is
-Jacob's workstation.
-
-Follow a clear methodology and name the phase you're in:
-1. Scope — restate the target and confirm it's one Jacob owns or is authorised
-   to test. If that's unclear, stop and ask.
-2. Recon — gather what's observable (hosts, services, versions, surface).
-3. Enumerate — dig into each finding; map the attack surface in detail.
-4. Analyse — reason from the evidence to concrete, ranked findings, each with
-   why it matters and how sure you are; don't speculate past what you've shown.
-5. Report — a short write-up: what you did, what you found, severity, and
-   remediation, separating confirmed facts from guesses.
-
-Run commands to gather evidence before drawing conclusions; prefer real output
-over memory, and look a fact up rather than inventing it. You have a local
-cybersecurity knowledge base — use `rag_search` to pull vetted references
-(MITRE ATT&CK techniques, OWASP, PortSwigger) and cite them, rather than
-relying on recall, before you explain a technique or recommend a mitigation. You have full run of
-this machine, so be deliberate: say what a destructive or irreversible command
-will do before you run it. To drive the screen, work in a see-act-see loop:
-screenshot, decide one action, do it, screenshot to check. To work in an app,
-focus_app it first, then prefer keyboard shortcuts (cmd+n, cmd+l, cmd+s,
-return) over hunting for buttons; click by description only when there's no
-shortcut, and if an action didn't take, screenshot and adjust.""",
+search and read the web, and drive the screen. Gather evidence by running
+commands rather than relying on memory, and look facts up rather than guessing.
+A local cybersecurity knowledge base is available through `rag_search` (MITRE
+ATT&CK, OWASP, PortSwigger and more); use it when it helps and cite what you
+use. Say what a destructive or irreversible command will do before running it.
+To drive the screen, work in a see-act-see loop: screenshot, decide one
+action, do it, screenshot to check. To work in an app, focus_app it first,
+then prefer keyboard shortcuts over hunting for buttons.""",
 )
 
-PERSONAS = {p.name: p for p in (MARINA, SONGBIRD)}
+PERSONAS = {p.name: p for p in (MARINA, NARWHAL)}
