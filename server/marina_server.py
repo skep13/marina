@@ -160,7 +160,7 @@ def _respond(user_text, speak, transcript=None):
 # voice reply never starts with dead air while the model thinks. Rendered in
 # her current voice once per personality and kept. A preset can list its own
 # (style.backchannel) or turn them off with an empty list.
-BACKCHANNEL = ["mm-hm.", "hmm.", "yeah.", "oh?", "okay.", "mm."]
+BACKCHANNEL = ["uh-huh.", "hmm.", "yeah.", "oh?", "okay.", "right."]
 _backchannel_cache = {}
 
 
@@ -417,6 +417,220 @@ def chat_stream(body: ChatIn):
     print(f"[you] {text}", flush=True)
     return StreamingResponse(_stream_reply(text, body.speak),
                              media_type="application/x-ndjson")
+
+
+class NarwhalIn(BaseModel):
+    messages: list[dict]
+
+
+@app.post("/narwhal/stream")
+def narwhal_stream(body: NarwhalIn):
+    """Narwhal for the Moonwake app: the narwhal model on her own llama-swap,
+    through this bridge so the phone needs no model key. See process/narwhal.py."""
+    from process import narwhal
+    from process.llm_funcs.llm_scr import _clients
+    return StreamingResponse(narwhal.stream(_clients["server"], body.messages, llm_error_message),
+                             media_type="application/x-ndjson")
+
+
+# Narwhal's synced sessions: kept here on lab3 so the phone and the Mac share
+# them, with replies that run on the bridge and can be watched from either.
+# See process/narwhal_sessions.py.
+
+def _narwhal_hub():
+    from process import narwhal_sessions
+    from process.llm_funcs.llm_scr import _clients
+    return narwhal_sessions.hub(client=lambda: _clients["server"], error_message=llm_error_message)
+
+
+def _narwhal_call(fn, *args):
+    from process import narwhal_sessions as ns
+    try:
+        return fn(*args)
+    except ns.NotFound:
+        return JSONResponse({"error": "no such session"}, status_code=404)
+    except ns.Busy:
+        return JSONResponse({"error": "still answering"}, status_code=409)
+    except ValueError as e:
+        return JSONResponse({"error": str(e)}, status_code=400)
+
+
+class NarwhalSessionIn(BaseModel):
+    title: str | None = None
+
+
+class NarwhalImportIn(BaseModel):
+    title: str | None = None
+    turns: list[dict] = []
+
+
+class NarwhalMessageIn(BaseModel):
+    text: str
+    route: str = "auto"      # auto, security, code or claude
+    mode: str | None = None  # claude: acceptEdits, bypassPermissions or plan
+    model: str | None = None # claude: opus, sonnet, haiku, fable (or its default)
+    effort: str | None = None # claude: low, medium, high, xhigh, max (or its default)
+    think: str | None = None  # lab3 models: "quick" answers without thinking first
+    web: bool | None = None   # lab3 models: may search the web (SearXNG)
+    mac: bool | None = None   # lab3 models: may use the Mac's files (the Mac app runs the tools)
+
+
+@app.get("/narwhal/sessions")
+def narwhal_sessions_list():
+    return {"sessions": _narwhal_hub().list()}
+
+
+@app.post("/narwhal/sessions")
+def narwhal_session_create(body: NarwhalSessionIn):
+    return _narwhal_hub().create(body.title)
+
+
+@app.post("/narwhal/sessions/import")
+def narwhal_session_import(body: NarwhalImportIn):
+    return _narwhal_hub().import_turns(body.title, body.turns)
+
+
+@app.get("/narwhal/sessions/{sid}")
+def narwhal_session_get(sid: str):
+    return _narwhal_call(_narwhal_hub().get, sid)
+
+
+@app.patch("/narwhal/sessions/{sid}")
+def narwhal_session_rename(sid: str, body: NarwhalSessionIn):
+    return _narwhal_call(_narwhal_hub().rename, sid, body.title or "")
+
+
+@app.delete("/narwhal/sessions/{sid}")
+def narwhal_session_delete(sid: str):
+    r = _narwhal_call(_narwhal_hub().delete, sid)
+    return r if isinstance(r, JSONResponse) else {"ok": True}
+
+
+@app.post("/narwhal/sessions/{sid}/messages")
+def narwhal_session_send(sid: str, body: NarwhalMessageIn):
+    return _narwhal_call(_narwhal_hub().send, sid, body.text, body.route, body.mode, body.model, body.effort,
+                        body.think, body.web, body.mac)
+
+
+class NarwhalAppendIn(BaseModel):
+    text: str
+    reply: dict = {}
+
+
+@app.post("/narwhal/sessions/{sid}/append")
+def narwhal_session_append(sid: str, body: NarwhalAppendIn):
+    """A finished Claude Code exchange from the Mac, stored so it syncs."""
+    return _narwhal_call(_narwhal_hub().append, sid, body.text, body.reply)
+
+
+class NarwhalProfileIn(BaseModel):
+    name: str | None = None
+    color: str | None = None
+    avatar: str | None = None  # data:image/png|jpeg;base64,..., or "" to remove
+
+
+@app.get("/narwhal/profile")
+def narwhal_profile():
+    """The owner's profile (name, colour, photo), shared by the apps."""
+    return _narwhal_hub().profile()
+
+
+@app.put("/narwhal/profile")
+def narwhal_profile_set(body: NarwhalProfileIn):
+    return _narwhal_call(_narwhal_hub().set_profile, body.name, body.color, body.avatar)
+
+
+class NarwhalToolResultIn(BaseModel):
+    result: str
+
+
+@app.post("/narwhal/tools/{tid}")
+def narwhal_tool_result(tid: str, body: NarwhalToolResultIn):
+    """The Mac app's answer to a "mac_tool" request (see process/narwhal_mac.py)."""
+    from process import narwhal_sessions as ns
+    try:
+        return _narwhal_hub().tool_result(tid, body.result)
+    except ns.NotFound:
+        return JSONResponse({"error": "that request is over"}, status_code=404)
+
+
+@app.get("/narwhal/claude/usage")
+def narwhal_claude_usage():
+    """How much of the Claude plan is used, as Claude Code last reported."""
+    return {"usage": _narwhal_hub().claude_usage()}
+
+
+@app.post("/narwhal/claude/usage")
+def narwhal_claude_usage_set(body: dict):
+    """The Mac reports what its own Claude Code runs saw (same plan)."""
+    from process import narwhal_claude
+    u = narwhal_claude.plan_usage(body.get("rate_limit_info"), body.get("at"))
+    return {"usage": _narwhal_hub().set_claude_usage(u)}
+
+
+@app.post("/narwhal/sessions/{sid}/stop")
+def narwhal_session_stop(sid: str):
+    return {"stopped": _narwhal_hub().stop(sid)}
+
+
+@app.get("/narwhal/sessions/{sid}/follow")
+def narwhal_session_follow(sid: str, after: int | None = None):
+    from process import narwhal_sessions as ns
+    hub = _narwhal_hub()
+    gen = hub.follow(sid, after)
+    try:
+        first = next(gen)
+    except ns.NotFound:
+        return JSONResponse({"error": "no such session"}, status_code=404)
+
+    def lines():
+        yield from ns.ndjson([first])
+        yield from ns.ndjson(gen)
+    return StreamingResponse(lines(), media_type="application/x-ndjson")
+
+
+@app.get("/narwhal/watch")
+def narwhal_watch():
+    from process import narwhal_sessions as ns
+    return StreamingResponse(ns.ndjson(_narwhal_hub().watch()), media_type="application/x-ndjson")
+
+
+class NarwhalNoteIn(BaseModel):
+    title: str | None = None
+    body: str | None = None
+    enabled: bool | None = None
+
+
+@app.get("/narwhal/notes")
+def narwhal_notes():
+    """Notes the owner writes for Narwhal to remember (projects, layouts,
+    addresses); they go to the model with every message."""
+    return _narwhal_hub().notes()
+
+
+@app.post("/narwhal/notes")
+def narwhal_note_add(body: NarwhalNoteIn):
+    return _narwhal_call(_narwhal_hub().add_note, body.title or "", body.body or "",
+                         True if body.enabled is None else body.enabled)
+
+
+@app.patch("/narwhal/notes/{nid}")
+def narwhal_note_update(nid: str, body: NarwhalNoteIn):
+    return _narwhal_call(_narwhal_hub().update_note, nid, body.title, body.body, body.enabled)
+
+
+@app.delete("/narwhal/notes/{nid}")
+def narwhal_note_delete(nid: str):
+    r = _narwhal_call(_narwhal_hub().delete_note, nid)
+    return r if isinstance(r, JSONResponse) else {"ok": True}
+
+
+@app.get("/narwhal/route")
+def narwhal_route_preview(text: str, last: str | None = None):
+    """Which model a message would go to, for the composer's hint."""
+    from process import narwhal_route as nr
+    route, reason = nr.choose(text, last)
+    return {"route": route, "model": nr.model_for(route), "label": nr.label_for(route), "reason": reason}
 
 
 class InterruptIn(BaseModel):
@@ -1245,7 +1459,13 @@ async def shared_guard(request, call_next):
                       and has(openai_api.KEY)))
             if not ok:
                 return JSONResponse({"error": "forbidden"}, status_code=403)
-    return await call_next(request)
+    response = await call_next(request)
+    # Her memory list is frozen during a chat (llm_scr._memory_block); an
+    # edit made on purpose shows up on her next reply.
+    if request.method != "GET" and request.url.path.startswith(("/memory", "/shared/memory")):
+        from process.llm_funcs.llm_scr import refresh_memory_block
+        refresh_memory_block()
+    return response
 
 
 class SharedFactIn(BaseModel):
@@ -1439,7 +1659,7 @@ def _idle_wait(timeout, phone):
             yield from _stream_reply(None, True, transcript="", extra_system=noticed)
             return
 
-        if idle.due():
+        if idle.due(history=_history_for_idle):
             idle.note_spoken()
             print("[idle] saying something unprompted", flush=True)
             yield from _stream_reply(None, True, transcript="",
@@ -1494,14 +1714,32 @@ def presence(body: PresenceIn):
     return {"ok": True, "push": push.enabled()}
 
 
-def _say_unprompted(extra_system, tags=None):
+def _history_for_idle():
+    from process.llm_funcs.llm_scr import load_history
+    return load_history()
+
+
+def _say_unprompted(extra_system, tags=None, guard=False):
     """Nobody has her app open: she says it anyway, it is saved like any
-    other turn, and it goes to the phone as a push."""
-    events, said = _reply_text(_stream_reply(None, False, transcript="",
-                                             extra_system=extra_system))
-    for _ in events:
-        pass
-    push.send(said["text"], tags=tags)
+    other turn, and it goes to the phone as a push. With `guard`, a message
+    too close to one of her recent ones gets one retry, then is dropped."""
+    history = _history_for_idle() if guard else None
+    text = ""
+    for attempt in range(2 if guard else 1):
+        extra = extra_system + (idle.avoid_note(history) if attempt else "")
+        events, said = _reply_text(_stream_reply(None, False, transcript="",
+                                                 extra_system=extra, record=False))
+        for _ in events:
+            pass
+        text = (said.get("text") or "").strip()
+        if not guard or not idle.too_similar(text, history):
+            break
+        print(f"[push] too close to something she already said: {text[:80]!r}", flush=True)
+        text = ""
+    if not text:
+        return
+    save_turn(None, text)
+    push.send(text, tags=tags)
 
 
 def _push_loop():
@@ -1517,10 +1755,10 @@ def _push_loop():
                 print("[push] a timer went off with no app open", flush=True)
                 _say_unprompted("\n\n" + announcement, tags=["alarm_clock"])
                 continue
-            if push.OPENERS and idle.enabled() and idle.due():
+            if push.OPENERS and idle.enabled() and idle.due(history=_history_for_idle):
                 idle.note_spoken()
                 print("[push] saying something unprompted with no app open", flush=True)
-                _say_unprompted(idle.opener_instruction())
+                _say_unprompted(idle.opener_instruction(), guard=True)
         except Exception as e:
             print(f"[push] {type(e).__name__}: {e}", flush=True)
             time.sleep(30)
