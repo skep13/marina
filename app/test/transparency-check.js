@@ -5,6 +5,8 @@ const path = require('path');
 const ROOT = path.join(__dirname, '..');
 const MODELS_DIR = path.join(ROOT, 'models');
 
+ipcMain.handle('load-mocap', async () => null);
+
 ipcMain.handle('load-vrm', async () => {
   const files = fs.readdirSync(MODELS_DIR).filter((f) => f.toLowerCase().endsWith('.vrm'));
   if (!files.length) return { error: 'no vrm' };

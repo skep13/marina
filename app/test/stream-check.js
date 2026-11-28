@@ -5,6 +5,8 @@ const path = require('path');
 const ROOT = path.join(__dirname, '..');
 const PROMPT = process.env.PROMPT || 'tell me about your day, at least three sentences';
 
+ipcMain.handle('load-mocap', async () => null);
+
 ipcMain.handle('load-vrm', async () => {
   const buf = fs.readFileSync(path.join(ROOT, 'models', 'model.vrm'));
   return { name: 'model.vrm', buffer: buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength) };

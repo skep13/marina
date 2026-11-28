@@ -7,6 +7,8 @@ const MODELS_DIR = path.join(ROOT, 'models');
 const OUT = process.env.SHOT_OUT || path.join(__dirname, 'shot.png');
 const BG = process.env.SHOT_BG || '#20242e';
 
+ipcMain.handle('load-mocap', async () => null);
+
 ipcMain.handle('load-vrm', async () => {
   const files = fs.readdirSync(MODELS_DIR).filter((f) => f.toLowerCase().endsWith('.vrm'));
   if (!files.length) return { error: 'no vrm' };

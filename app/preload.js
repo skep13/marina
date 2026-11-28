@@ -2,6 +2,7 @@ const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('marina', {
   loadVRM: () => ipcRenderer.invoke('load-vrm'),
+  loadMocap: () => ipcRenderer.invoke('load-mocap'),
   pickVRM: () => ipcRenderer.invoke('pick-vrm'),
   quit: () => ipcRenderer.send('quit'),
   minimize: () => ipcRenderer.send('minimize'),

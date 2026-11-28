@@ -638,6 +638,13 @@ ipcMain.handle('load-vrm', async () => {
   return { name: found.name, buffer: readAsTransferable(found.file) };
 });
 
+// Her mocap clips, packed by tools/mocap-build.mjs. Missing is fine: the
+// renderer falls back to its procedural clips.
+ipcMain.handle('load-mocap', async () => {
+  const file = path.join(BUNDLED_MODELS_DIR, 'mocap.bin');
+  return fs.existsSync(file) ? readAsTransferable(file) : null;
+});
+
 ipcMain.handle('pick-vrm', async () => {
   const res = await dialog.showOpenDialog(win, {
     title: 'Choose a VRM model',

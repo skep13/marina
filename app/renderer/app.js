@@ -1,4 +1,8 @@
 import { THREE, GLTFLoader, VRMLoaderPlugin, VRMUtils } from './vendor/vrm-bundle.js';
+import { BodyActions, classifyAction, CLIPS, STANCES } from './actions.js';
+import { Mocap } from './mocap.js';
+import { Stance } from './stance.js';
+import { Collide } from './collide.js';
 
 // In a browser the page comes from the bridge itself (see web-shim.js).
 const WEB = !!window.marina?.web;
@@ -49,7 +53,7 @@ function resize() {
   renderer.setSize(w, h, false);
   camera.aspect = w / h;
   camera.updateProjectionMatrix();
-  if (vrm) frameUpperBody(vrm);
+  if (vrm) frameAvatar(vrm);
 }
 window.addEventListener('resize', resize);
 resize();
@@ -61,6 +65,52 @@ let mouthCloseTargets = [];
 
 const loader = new GLTFLoader();
 loader.register((parser) => new VRMLoaderPlugin(parser));
+
+// Whole body (the Linux app, ?full) or head and shoulders (the Mac, the phone).
+const FULL_BODY = window.marina?.framing === 'full' || new URLSearchParams(location.search).has('full');
+
+function frameAvatar(v) {
+  if (FULL_BODY) frameFullBody(v); else frameUpperBody(v);
+  cameraBaseY = camera.position.y;
+  const head = v.humanoid?.getNormalizedBoneNode('head');
+  headRestY = head ? head.getWorldPosition(new THREE.Vector3()).y : 0;
+}
+
+// Feet to raised hands (a cheer or a stretch reaches well over her head),
+// with room under her feet for the message bar.
+function frameFullBody(v) {
+  v.scene.updateWorldMatrix(true, true);
+  const box = new THREE.Box3().setFromObject(v.scene);
+  const height = box.max.y - box.min.y;
+  const bottom = box.min.y - height * 0.14;
+  const top = box.max.y + height * 0.12;
+  const fovRad = (camera.fov * Math.PI) / 180;
+  // The box is the T-pose for skinned meshes, so its width is arm span, not
+  // her: keep about a metre across in view instead.
+  const viewH = Math.max(top - bottom, 1.0 / camera.aspect);
+  const dist = viewH / (2 * Math.tan(fovRad / 2));
+  const cy = (top + bottom) / 2;
+  camera.position.set(0, cy, dist);
+  camera.lookAt(0, cy, 0);
+  camera.updateMatrixWorld(true);
+}
+
+// Close up, the camera follows her head down when she crouches or bows, so
+// her face doesn't leave the frame.
+let cameraBaseY = 0, headRestY = 0, cameraFollow = 0;
+function followHead(dt) {
+  if (FULL_BODY || !vrm) return;
+  let target = 0;
+  if (bodyActive()) {
+    const head = bones.head;
+    if (head) target = Math.max(-0.7, Math.min(0.15, head.getWorldPosition(_followV).y - headRestY)) * 0.85;
+  }
+  cameraFollow += (target - cameraFollow) * Math.min(1, dt * 3.2);
+  if (Math.abs(cameraFollow) < 1e-4 && !target) { if (camera.position.y !== cameraBaseY) camera.position.y = cameraBaseY; return; }
+  camera.position.y = cameraBaseY + cameraFollow;
+  camera.updateMatrixWorld(true);
+}
+const _followV = new THREE.Vector3();
 
 function frameUpperBody(v) {
   const head = v.humanoid?.getNormalizedBoneNode('head');
@@ -75,9 +125,10 @@ function frameUpperBody(v) {
   // A tall, narrow screen (a phone) would show little more than her face, so
   // pull back until at least MIN_WIDTH metres fit across, and lower the aim
   // so her head stays near the top rather than floating in the middle.
-  const MIN_WIDTH = 0.5;
-  const VIEW_HEIGHT = Math.max(0.67, MIN_WIDTH / camera.aspect);
-  const DROP = 0.06 + (VIEW_HEIGHT - 0.67) * 0.3;
+  // The phone shows her down to the hips, so her hands are in view.
+  const MIN_WIDTH = EMBEDDED ? 0.62 : 0.5;
+  const VIEW_HEIGHT = Math.max(EMBEDDED ? 0.86 : 0.67, MIN_WIDTH / camera.aspect);
+  const DROP = EMBEDDED ? VIEW_HEIGHT / 2 - 0.25 : 0.06 + (VIEW_HEIGHT - 0.67) * 0.3;
   const fovRad = (camera.fov * Math.PI) / 180;
   const dist = VIEW_HEIGHT / (2 * Math.tan(fovRad / 2));
 
@@ -117,7 +168,13 @@ async function mountVRM(arrayBuffer, label) {
 
   scene.add(next.scene);
   vrm = next;
-  frameUpperBody(next);
+  body.mount(next);
+  mocap.mount(next);
+  stance.mount(next);
+  // Neither way do actions.js's old resting stances run under her.
+  body.standing = true;
+  collide.mount(next);
+  frameAvatar(next);
 
   const version = next.meta?.metaVersion === '1' ? 'VRM 1.0' : 'VRM 0.x';
   setStatus('ok', `${label ?? 'model'} · ${version}`);
@@ -347,7 +404,19 @@ function collectSprings(v) {
   }
 }
 
+// Her mocap clips (models/mocap.bin). Without them (the phone, the web page)
+// the procedural clips in actions.js stand in.
+async function loadMocap() {
+  try {
+    const buf = window.marina?.loadMocap ? await window.marina.loadMocap() : null;
+    if (buf && buf.byteLength) mocap.load(buf);
+  } catch (e) {
+    console.warn('[mocap] not loaded:', e.message);
+  }
+}
+
 async function loadFromDisk() {
+  loadMocap();
   const res = await window.marina.loadVRM();
   if (res.error) {
     setStatus('bad', 'no model');
@@ -408,6 +477,16 @@ const gazeHeadV = { x: 0, y: 0 };
 
 const headS = { x: 0, y: 0, z: 0 };
 const headV = { x: 0, y: 0, z: 0 };
+// Everything else that moves her head (following her eyes, nods and tilts,
+// how she holds it while talking) goes through one spring too, so it eases
+// in, overshoots a hair and settles like a head with weight, instead of
+// jumping to wherever the numbers say. Beats kick its velocity.
+const headM = { x: 0, y: 0, z: 0 };
+const headMV = { x: 0, y: 0, z: 0 };
+// While she talks she settles her head into a slightly different pose every
+// phrase or so: a tilt, a turn, chin up or down.
+const talkPose = { x: 0, y: 0, z: 0, next: 0 };
+function headKick(x, y, z) { headMV.x += x; headMV.y += y; headMV.z += z; }
 
 const torsoS = { x: 0, y: 0 };
 const torsoV = { x: 0, y: 0 };
@@ -440,7 +519,77 @@ let mouthOpen = 0;
 // (headphones in or out) can play silence from then on, so a fresh one is
 // made before her next sentence, never in the middle of one.
 let audioStale = false;
-navigator.mediaDevices?.addEventListener?.('devicechange', () => { audioStale = true; });
+navigator.mediaDevices?.addEventListener?.('devicechange', () => {
+  if (ROUTE) refreshRoute(); else audioStale = true;
+});
+
+// ── Which mic and speaker ────────────────────────────────────────────────
+// When the shell asks (the Linux app: window.marina.audioRoute), the page
+// picks its own devices and follows them as they come and go: her voice to
+// the first output matching `output.prefer` (AirPods), else `output.fallback`
+// (the laptop speaker); your voice from the first input matching
+// `input.prefer` that isn't in `input.avoid` (a USB wireless mic's receiver,
+// never the AirPods' own mic, which would drop them to call quality), else the
+// built-in one. Patterns are regular expressions as strings, tried on labels.
+const ROUTE = window.marina?.audioRoute || null;
+const route = { mic: null, micLabel: '', out: null, outLabel: '', busy: false, again: false };
+
+const anyOf = (list, label) => (list || []).some((p) => new RegExp(p, 'i').test(label));
+
+async function refreshRoute() {
+  if (!ROUTE || !navigator.mediaDevices?.enumerateDevices) return;
+  if (route.busy) { route.again = true; return; }
+  route.busy = true;
+  try {
+    let devices = await navigator.mediaDevices.enumerateDevices();
+    // Labels only show once the page has been allowed a mic.
+    if (devices.some((d) => d.kind === 'audioinput' && !d.label)) {
+      try {
+        const s = await navigator.mediaDevices.getUserMedia({ audio: true });
+        s.getTracks().forEach((t) => t.stop());
+        devices = await navigator.mediaDevices.enumerateDevices();
+      } catch {}
+    }
+    const real = (d) => d.deviceId && d.deviceId !== 'default' && d.deviceId !== 'communications';
+    const outs = devices.filter((d) => d.kind === 'audiooutput' && real(d));
+    const ins = devices.filter((d) => d.kind === 'audioinput' && real(d) && !anyOf(ROUTE.input?.avoid, d.label));
+    const out = outs.find((d) => anyOf(ROUTE.output?.prefer, d.label))
+      || outs.find((d) => anyOf(ROUTE.output?.fallback, d.label)) || null;
+    const mic = ins.find((d) => anyOf(ROUTE.input?.prefer, d.label) && !anyOf(ROUTE.input?.fallback, d.label))
+      || ins.find((d) => anyOf(ROUTE.input?.fallback, d.label)) || null;
+
+    if ((out?.deviceId || null) !== route.out) {
+      route.out = out?.deviceId || null;
+      route.outLabel = out?.label || 'default';
+      if (audioCtx?.setSinkId) await audioCtx.setSinkId(route.out || '').catch((e) => console.warn('setSinkId', e));
+      console.log(`[audio] her voice → ${route.outLabel}`);
+    }
+    if ((mic?.deviceId || null) !== route.mic) {
+      route.mic = mic?.deviceId || null;
+      route.micLabel = mic?.label || 'default';
+      console.log(`[audio] listening ← ${route.micLabel}`);
+      await swapMic();
+    }
+    window.marina?.routeChanged?.({ mic: route.micLabel, out: route.outLabel });
+  } finally {
+    route.busy = false;
+    if (route.again) { route.again = false; refreshRoute(); }
+  }
+}
+
+// getUserMedia constraints for the chosen mic.
+function micConstraints() {
+  const audio = { echoCancellation: true, noiseSuppression: true, autoGainControl: true };
+  if (ROUTE && route.mic) audio.deviceId = { exact: route.mic };
+  return { audio };
+}
+
+if (ROUTE) {
+  refreshRoute();
+  window.marina?.onDevicesChanged?.(() => refreshRoute());
+  // Bluetooth devices don't always raise devicechange; look now and then too.
+  setInterval(refreshRoute, 5000);
+}
 
 function ensureAudio() {
   if (audioCtx && audioStale && utterance.epoch < 0) {
@@ -463,6 +612,7 @@ function ensureAudio() {
     freqData = new Uint8Array(analyser.frequencyBinCount);
     timeData = new Uint8Array(analyser.fftSize);
     analyser.connect(audioCtx.destination);
+    if (ROUTE && route.out && audioCtx.setSinkId) audioCtx.setSinkId(route.out).catch(() => {});
   }
   if (audioCtx.state === 'suspended') audioCtx.resume();
   return audioCtx;
@@ -681,6 +831,8 @@ function updateMouth(dt) {
   const em = vrm?.expressionManager;
   if (!em) return;
   for (const v of VISEMES) em.setValue(v, viseme[v]);
+  // A yawn or a gasp in an action opens her mouth without any sound.
+  if (cueOut.mouth > viseme.aa) em.setValue('aa', cueOut.mouth);
 }
 
 const TAU = Math.PI * 2;
@@ -768,9 +920,34 @@ function updateBody(t, dtBody) {
   headS.y += headV.y * dtBody;
   headS.z += headV.z * dtBody;
 
-  const x = headS.x + followX + stress * 0.60 + envSlow * 0.012 + cueOut.hx;
-  const y = headS.y + followY + envSlow * 0.06 * fbm(t * 0.9 + 5) + cueOut.hy;
-  const z = headS.z - followY * 0.13 + cueOut.hz;
+  if (speaking()) {
+    talkPose.next -= dtBody;
+    if (talkPose.next <= 0) {
+      talkPose.next = 1.3 + Math.random() * 2.2;
+      talkPose.x = -0.015 + Math.random() * 0.06;
+      talkPose.y = (Math.random() - 0.5) * 0.12;
+      talkPose.z = (Math.random() - 0.5) * 0.10;
+    }
+  } else if (talkPose.next !== 0) {
+    talkPose.x = talkPose.y = talkPose.z = 0;
+    talkPose.next = 0;
+  }
+  const goalX = followX + talkPose.x + envSlow * 0.015 + cueOut.hx;
+  const goalY = followY + talkPose.y + cueOut.hy;
+  const goalZ = -followY * 0.13 + talkPose.z + cueOut.hz;
+  // About 1.2 Hz, a little under critically damped.
+  const MK = 55, MC = 11;
+  const mdt = Math.min(dtBody, 0.05);
+  headMV.x += (MK * (goalX - headM.x) - MC * headMV.x) * mdt;
+  headMV.y += (MK * (goalY - headM.y) - MC * headMV.y) * mdt;
+  headMV.z += (MK * (goalZ - headM.z) - MC * headMV.z) * mdt;
+  headM.x += headMV.x * mdt;
+  headM.y += headMV.y * mdt;
+  headM.z += headMV.z * mdt;
+
+  const x = headS.x + headM.x;
+  const y = headS.y + headM.y;
+  const z = headS.z + headM.z;
 
   poseBone('neck', x * 0.40, y * 0.40, z * 0.5);
   poseBone('head', x * 0.60, y * 0.60, z * 0.5);
@@ -854,6 +1031,50 @@ const CUES = {
 
 const smooth01 = (x) => x * x * (3 - 2 * x);
 
+// Her whole body for what she does in *asterisks*: mocap clips when they're
+// loaded (mocap.js), else the procedural ones (actions.js).
+const body = new BodyActions(THREE);
+const mocap = new Mocap(THREE);
+// How she stands between actions, and her arms kept out of her body.
+const stance = new Stance(THREE);
+// More hand movement while she talks on the phone, where she's framed closer.
+if (EMBEDDED) mocap.talkWeight = 0.45;
+// Only with her whole body on screen (the Linux app, ?full): there her legs
+// and stance show. Framed from the waist up (the Mac, the phone) she keeps
+// the original idle: breathing, arms at rest, small head gestures.
+// The phone stands her up too: without it her arms sit spread in the old
+// rest pose and never move.
+const STANDING = FULL_BODY || EMBEDDED;
+stance.enabled = STANDING;
+const collide = new Collide(THREE);
+stance.clear = (p, margin) => (collide.ready ? collide.push(p, margin) : null);
+const bodyActive = () => (mocap.ready ? mocap.active : body.active);
+
+// Body clips the procedural set doesn't have, played as the nearest it does.
+const PROCEDURAL_STANDIN = { dance: 'cheer' };
+function playBody(name) {
+  if (mocap.ready && mocap.has(name)) return mocap.play(name);
+  if (name === 'wave') { activeCues.push({ run: CUES.wave.run, elapsed: 0, dur: CUES.wave.dur }); return true; }
+  return body.play(name) || body.play(PROCEDURAL_STANDIN[name]);
+}
+
+// One *action*: a body clip for what she does, face cues for how she looks
+// doing it. Without the words (older bridges) the bridge's animation name
+// picks both.
+function startAction(cue, gain = 1) {
+  const plan = classifyAction(cue.action, cue.animation);
+  for (const name of plan.face) {
+    const def = CUES[name];
+    if (def) activeCues.push({ run: def.run, elapsed: 0, dur: def.dur, gain });
+  }
+  if (plan.body) {
+    playBody(plan.body);
+  } else if (!plan.face.length) {
+    activeCues.push({ run: CUES.emote.run, elapsed: 0, dur: CUES.emote.dur, gain });
+  }
+  return plan;
+}
+
 
 // 0 to 1 and back: rises over the first `rise` of the gesture, falls over the last `fall`.
 function raiseLower(p, rise, fall) {
@@ -863,7 +1084,9 @@ function raiseLower(p, rise, fall) {
 
 // Where the arms rest, as offsets from REST_POSE: elbows slightly bent and a
 // little away from her sides, so they don't hang dead straight.
-const ARM_REST = { rux: -0.15, ruz: -0.08, rly: 0.5, lux: -0.15, luz: 0.08, lly: -0.5 };
+// (Upper arms a little further out than they'd hang bare: her cardigan's
+// puffy sleeves otherwise sink into its sides.)
+const ARM_REST = { rux: -0.15, ruz: -0.18, rly: 0.5, lux: -0.15, luz: 0.18, lly: -0.5 };
 
 const CUE_EXPRESSIONS = ['happy', 'sad', 'angry', 'relaxed', 'surprised'];
 
@@ -876,7 +1099,7 @@ let cueEpoch = -1;
 // rArm and lArm say how much a gesture owns that arm, 0 to 1, so the resting
 // pose underneath steps aside instead of adding to it.
 const CUE_CHANNELS = ['hx', 'hy', 'hz', 'shoulder', 'gazeX', 'gazeY', 'rArm', 'lArm',
-  ...ARM_CHANNELS];
+  'mouth', 'blinkBoth', ...ARM_CHANNELS];
 
 function clearCue(o) {
   for (const k of CUE_CHANNELS) o[k] = 0;
@@ -892,6 +1115,7 @@ clearCue(cueScratch);
 function scheduleCues(cues, duration) {
   pendingCues = (cues || []).map((c) => ({
     animation: c.animation,
+    action: c.action,
     at: Math.max(0, (c.fraction ?? 0) * duration - 0.15),
   }));
   activeCues = [];
@@ -902,6 +1126,7 @@ function appendCues(cues, offset, duration) {
   for (const c of cues || []) {
     pendingCues.push({
       animation: c.animation,
+      action: c.action,
       at: Math.max(0, offset + (c.fraction ?? 0) * duration - 0.15),
     });
   }
@@ -914,6 +1139,17 @@ const PRESENTING_GESTURES = ['tilt', 'lean', 'smile', 'nod', 'brow', 'think'];
 
 // Set on <html> while the presentation personality is active.
 const presenting = () => document.documentElement.classList.contains('presenting');
+
+// Only quiet ones: breathing, settling her weight, easing her neck, a small
+// thoughtful nod, a glance down. Not the arm-swinging bored one or the big
+// turns and poses, which look like a performance rather than waiting.
+const IDLE_CLIPS = ['idle_breathing', 'idle_standing', 'idle_weight', 'neckStretch',
+  'nodThoughtful', 'lookDown'];
+let idleClipBag = [];
+function drawIdleClip() {
+  if (!idleClipBag.length) idleClipBag = IDLE_CLIPS.filter((k) => mocap.clips?.[k]).sort(() => Math.random() - 0.5);
+  return idleClipBag.pop();
+}
 
 let gestureBag = [];
 let lastGesture = null;
@@ -937,8 +1173,10 @@ function drawGesture() {
   return lastGesture;
 }
 
+let lastStretch = -Infinity;
+
 function updateIdleGestures(dt) {
-  if (cueClock >= 0 || mouthOpen > 0.05 || busy || recording) {
+  if (cueClock >= 0 || mouthOpen > 0.05 || busy || recording || bodyActive()) {
     gestureTimer = Math.max(gestureTimer, 2.5);
     return;
   }
@@ -946,6 +1184,29 @@ function updateIdleGestures(dt) {
   gestureTimer -= dt;
   if (gestureTimer > 0) return;
   gestureTimer = 7 + Math.random() * 11;
+
+  // Left alone a while, she moves her whole body now and then: shifts her
+  // weight, fixes her hair, and once in a long while has a stretch.
+  if (STANDING && !presenting() && activity.quietFor > 40) {
+    const now = performance.now() / 1000;
+    if (activity.quietFor > 240 && now - lastStretch > 600 && Math.random() < 0.5) {
+      lastStretch = now;
+      playBody('stretch');
+      return;
+    }
+    // Her weight shifts are stance.js's; this is just fixing her hair.
+    if (!mocap.ready && Math.random() < 0.1) {
+      body.play('hair');
+      return;
+    }
+  }
+
+  // On the phone, left alone she does what a person waiting does: breathes,
+  // settles her weight, eases her neck, glances down.
+  if (EMBEDDED && mocap.ready && !presenting() && Math.random() < 0.6) {
+    const key = drawIdleClip();
+    if (key && mocap.idle(key)) return;
+  }
 
   const def = CUES[drawGesture()];
 
@@ -964,13 +1225,16 @@ function updateCues(dt) {
 
   if (cueClock >= 0) {
     while (pendingCues.length && pendingCues[0].at <= cueClock) {
-      const next = pendingCues.shift();
-      const def = CUES[next.animation] || CUES.emote;
-      activeCues.push({ run: def.run, elapsed: 0, dur: def.dur });
+      startAction(pendingCues.shift());
     }
 
-    if (cueEpoch < 0 && !pendingCues.length && !activeCues.length) cueClock = -1;
+    if (cueEpoch < 0 && !pendingCues.length && !activeCues.length && !bodyActive()) cueClock = -1;
   }
+
+  body.polite = presenting();
+  stance.update(dt, { speaking: speaking(), acting: bodyActive() });
+  if (mocap.ready) mocap.update(dt, { speaking: speaking() });
+  else body.update(dt, cueOut);
 
   for (let i = activeCues.length - 1; i >= 0; i--) {
     const c = activeCues[i];
@@ -1026,11 +1290,23 @@ function updateGaze(dt, t) {
 
     if (gazeAway) {
       gazeAway = false;
+      // Sometimes she stays settled on that leg after looking back.
+      stance.unlook();
       gazeTarget.x = (Math.random() - 0.5) * 0.10;
       gazeTarget.y = (Math.random() - 0.5) * 0.07;
 
       gazeTimer = (speaking() ? 2.6 : 1.6) + Math.random() * 3.4;
       browFlash = 1;
+    } else if (STANDING && !recording && !speaking() && !busy && Math.random() < 0.3) {
+      // Left to herself she looks around the room now and then: a proper
+      // glance off to the side, her head following her eyes, then back.
+      gazeAway = true;
+      const side = Math.random() < 0.5 ? -1 : 1;
+      gazeTarget.x = side * (0.35 + Math.random() * 0.45);
+      gazeTarget.y = -0.12 + Math.random() * 0.32;
+      gazeTimer = 1.8 + Math.random() * 2.6;
+      // Her weight goes onto the leg on that side (+x is her left).
+      stance.look(side, Math.min(1, Math.abs(gazeTarget.x) / 0.6));
     } else if (!recording && Math.random() < (speaking() ? 0.16 : 0.45)) {
       gazeAway = true;
       const a = AVERSIONS[(Math.random() * AVERSIONS.length) | 0];
@@ -1097,6 +1373,7 @@ function updateBlink(dt) {
       : Math.pow(1 - (bp - 0.32) / 0.68, 1.7);
   const em = vrm.expressionManager;
   if (!em) return;
+  const shut = Math.max(blink, cueOut.blinkBoth || 0);
 
   if (cueOut.blinkLeft > 0.01) {
     em.setValue('blink', 0);
@@ -1105,7 +1382,7 @@ function updateBlink(dt) {
   } else {
     em.setValue('blinkLeft', 0);
     em.setValue('blinkRight', 0);
-    em.setValue('blink', blink);
+    em.setValue('blink', shut);
   }
 }
 
@@ -1184,12 +1461,20 @@ function updateActivity(dt) {
   cueOut.hz += 0.07 * T * activity.thinkSide;
   cueOut.hx -= 0.03 * T;
 
-  // A small nod on a stressed syllable, at most every 0.9 s.
+  // A beat on a stressed syllable, at most every 0.9 s or so, never the
+  // same twice: mostly a small dip of the chin, sometimes with a bit of turn
+  // or tilt, sometimes a lift instead. Bigger the harder the stress.
   const stress = Math.max(0, envFast - envSlow);
   activity.beatCool -= dt;
   if (talking && stress > 0.16 && activity.beatCool <= 0) {
-    activity.beatCool = 0.9 + Math.random() * 0.8;
-    pushCue('nod', 0.22);
+    activity.beatCool = 0.8 + Math.random() * 1.1;
+    const k = Math.min(1.4, 0.6 + stress * 2);
+    stance.beat(k);
+    const r = Math.random();
+    if (r < 0.6) headKick((0.35 + Math.random() * 0.35) * k, (Math.random() - 0.5) * 0.25 * k, (Math.random() - 0.5) * 0.2 * k);
+    else if (r < 0.8) headKick(0.12 * k, (Math.random() < 0.5 ? -1 : 1) * (0.25 + Math.random() * 0.2) * k, 0);
+    else if (r < 0.92) headKick(0.05 * k, 0, (Math.random() < 0.5 ? -1 : 1) * (0.3 + Math.random() * 0.2) * k);
+    else headKick(-(0.25 + Math.random() * 0.2) * k, 0, 0);
   }
   const lift = talking ? clamp01(stress * 3.2) * 0.8 : 0.3 * L;
   browLift += (lift - browLift) * Math.min(1, dt * (lift > browLift ? 14 : 4));
@@ -1351,7 +1636,7 @@ function frameGap() {
   if (document.hidden) return Infinity;
   let lively = true;
   try {
-    lively = busy || recording || speaking() || waveIK.p >= 0 || cueClock >= 0 || !!cursor;
+    lively = busy || recording || speaking() || waveIK.p >= 0 || cueClock >= 0 || bodyActive() || mocap.layers.length > 0 || stance.moving || !!cursor;
   } catch { /* first frames run before the state below is declared */ }
   return lively ? 1000 / 60 : 1000 / 24;
 }
@@ -1371,7 +1656,13 @@ function tick(now) {
     updateIdleGestures(dt);
     updateGaze(dt, t);
     updateBody(t, dt);
+    // Standing (stance.js) under an action (mocap.js, or the procedural
+    // ones without it), then the wave, then arms pushed out of her body.
+    stance.apply(dt, { 1: 1 - clamp01(cueOut.lArm), [-1]: 1 - clamp01(cueOut.rArm) });
+    if (mocap.ready) mocap.apply(); else body.apply();
     applyWaveIK();
+    collide.apply(dt);
+    followHead(dt);
     updateBlink(dt);
     updateMood(dt);
     updateHair(t);
@@ -1446,7 +1737,10 @@ let recording = false;
 
 // Wake word state, here because setBusy() reads it.
 let wakeOn = false;
-try { wakeOn = localStorage.getItem('marina.wake') === '1'; } catch {}
+try {
+  const saved = localStorage.getItem('marina.wake');
+  wakeOn = saved === null ? !!window.marina?.wakeByDefault : saved === '1';
+} catch {}
 let wakePoll = null;
 let wakeLoopRunning = false;
 
@@ -1862,9 +2156,7 @@ let webRec = null;
 
 async function webStartRecording() {
   if (navigator.audioSession) navigator.audioSession.type = 'play-and-record';
-  const stream = await navigator.mediaDevices.getUserMedia({
-    audio: { echoCancellation: true, noiseSuppression: true },
-  });
+  const stream = await navigator.mediaDevices.getUserMedia(micConstraints());
   const rec = new MediaRecorder(stream);
   const parts = [];
   rec.ondataavailable = (e) => { if (e.data.size) parts.push(e.data); };
@@ -2031,7 +2323,102 @@ async function listenForName() {
   }
 }
 
+// In a page that records itself (the Linux app), listening for her name is
+// the iPhone's hands-free: each phrase the mic picks up goes to /hear as a
+// WAV, and she answers what was said to her. For a few seconds after she
+// answers you can carry on without her name.
+const HANDS_FREE = WEB && !!window.marina?.handsFree;
+const FOLLOW_SECONDS = 8;
+
+async function toWav16k(blob) {
+  const data = await blob.arrayBuffer();
+  const ctx = new OfflineAudioContext(1, 1, 16000);
+  const decoded = await ctx.decodeAudioData(data);
+  const frames = Math.ceil(decoded.duration * 16000);
+  const off = new OfflineAudioContext(1, frames, 16000);
+  const src = off.createBufferSource();
+  src.buffer = decoded;
+  src.connect(off.destination);
+  src.start();
+  const pcm = (await off.startRendering()).getChannelData(0);
+  const out = new DataView(new ArrayBuffer(44 + pcm.length * 2));
+  const str = (o, t) => { for (let i = 0; i < t.length; i++) out.setUint8(o + i, t.charCodeAt(i)); };
+  str(0, 'RIFF'); out.setUint32(4, 36 + pcm.length * 2, true); str(8, 'WAVEfmt ');
+  out.setUint32(16, 16, true); out.setUint16(20, 1, true); out.setUint16(22, 1, true);
+  out.setUint32(24, 16000, true); out.setUint32(28, 32000, true); out.setUint16(32, 2, true);
+  out.setUint16(34, 16, true); str(36, 'data'); out.setUint32(40, pcm.length * 2, true);
+  for (let i = 0; i < pcm.length; i++) out.setInt16(44 + i * 2, Math.max(-1, Math.min(1, pcm[i])) * 0x7fff, true);
+  return new Blob([out.buffer], { type: 'audio/wav' });
+}
+
+let followUntil = 0;
+
+async function hearOnce() {
+  const ctrl = new AbortController();
+  wakePoll = ctrl;
+  ctrl.woke = false;
+  try {
+    await webCallOpen();
+    const clip = await webCallUtterance(ctrl.signal);
+    if (!clip || !wakeOn || callState.on || busy) return;
+    const wav = await toWav16k(clip);
+    const follow = Date.now() < followUntil;
+    const form = new FormData();
+    form.append('audio', wav, 'phrase.wav');
+    const req = { cancelled: false, text: '', chunks: 0, barge: null, voice: true };
+    const res = await fetch(`/hear?${follow ? 'follow=true&' : ''}`, { method: 'POST', body: form });
+    let answered = false;
+    for await (const ev of readEvents(res)) {
+      if (ev.type === 'ignored') return;
+      if (ev.type === 'wake') {
+        // Her name on its own: she looks up and the next thing is for her.
+        pushCue('tilt', 0.8);
+        setStatus('busy', 'listening…');
+        followUntil = Date.now() + FOLLOW_SECONDS * 1000;
+        return;
+      }
+      if (sideEvent(ev)) continue;
+      if (ev.type === 'transcript') {
+        inflight = req;
+        setBusy(true, 'thinking');
+        showHeard(ev.text);
+      } else if (ev.type === 'chunk') {
+        answered = true;
+        await playChunk(ev, req);
+      } else if (ev.type === 'error') {
+        showNotice(ev.message, 'bridge');
+      }
+    }
+    if (answered && !req.cancelled) {
+      await untilSpoken();
+      endUtterance();
+      followUntil = Date.now() + FOLLOW_SECONDS * 1000;
+    }
+    disarmBargeIn(req);
+    if (inflight === req) inflight = null;
+    setBusy(false);
+  } catch (e) {
+    if (!ctrl.signal.aborted) {
+      console.warn('hands-free', e);
+      await sleep(2000);
+    }
+  } finally {
+    if (wakePoll === ctrl) wakePoll = null;
+  }
+}
+
 async function startWakeLoop() {
+  if (HANDS_FREE) {
+    if (wakeLoopRunning) return;
+    wakeLoopRunning = true;
+    while (wakeOn) {
+      if (bridgeReady && !callState.on && !busy && !recording && !playing && utterance.epoch < 0) await hearOnce();
+      else await sleep(300);
+    }
+    if (!callState.on) webCallClose();
+    wakeLoopRunning = false;
+    return;
+  }
   if (WEB || wakeLoopRunning) return;
   wakeLoopRunning = true;
   while (wakeOn) {
@@ -2199,7 +2586,7 @@ function endCall() {
   callState.on = false;
   stopListeningTurn();
   interrupt();
-  if (WEB) webCallClose();
+  if (WEB && !(HANDS_FREE && wakeOn)) webCallClose();
   clearInterval(callState.timer);
   document.body.classList.remove('oncall');
   el('call').classList.add('hidden');
@@ -2220,15 +2607,36 @@ let webCall = null;
 async function webCallOpen() {
   if (webCall) return webCall;
   if (navigator.audioSession) navigator.audioSession.type = 'play-and-record';
-  const stream = await navigator.mediaDevices.getUserMedia({
-    audio: { echoCancellation: true, noiseSuppression: true },
-  });
+  const stream = await navigator.mediaDevices.getUserMedia(micConstraints());
   const ac = new AudioContext();
+  // Only listens: no output stream, so it never holds a speaker open.
+  ac.setSinkId?.({ type: 'none' }).catch(() => {});
   const an = ac.createAnalyser();
   an.fftSize = 1024;
-  ac.createMediaStreamSource(stream).connect(an);
-  webCall = { stream, ac, an, buf: new Float32Array(an.fftSize), noise: 0.01 };
+  const src = ac.createMediaStreamSource(stream);
+  src.connect(an);
+  webCall = { stream, ac, an, src, buf: new Float32Array(an.fftSize), noise: 0.01, users: 0 };
   return webCall;
+}
+
+// The mic changed (the wireless one plugged in or out) while one is open:
+// carry on with the new one. A phrase being recorded at that moment is lost.
+async function swapMic() {
+  const w = webCall;
+  if (!w) return;
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia(micConstraints());
+    if (webCall !== w) { stream.getTracks().forEach((t) => t.stop()); return; }
+    w.stream.getTracks().forEach((t) => t.stop());
+    try { w.src.disconnect(); } catch {}
+    w.stream = stream;
+    w.src = w.ac.createMediaStreamSource(stream);
+    w.src.connect(w.an);
+    w.noise = 0.01;
+    w.swapped = (w.swapped || 0) + 1;
+  } catch (e) {
+    console.warn('mic swap failed', e);
+  }
 }
 
 function webCallClose() {
@@ -2414,6 +2822,24 @@ window.marina.onSetStage?.((on) => {
 if (new URLSearchParams(location.search).has('debug')) {
   window.marinaDebug = {
     cue: (name, gain) => pushCue(name, gain),
+    act: (action) => startAction({ action }),
+    pose: (name, seconds) => body.hold(name, seconds),
+    mocap: (key, seconds) => { mocap.hold = key ? { key, t: seconds || 0 } : null; },
+    mocapClips: () => Object.keys(mocap.clips || {}),
+    // Play a base64 WAV as if it were a sentence of hers (tests).
+    speakWav: (audio, cues) => playChunk({ type: 'chunk', audio, cues }, newRequest()),
+    // stand('look', 1) / stand("unlook") / stand("fidget") / stand("off")
+    stand: (what, ...args) => {
+      if (what === 'off' || what === 'on') { stance.enabled = what === 'on'; return stance.enabled; }
+      if (what) stance[what]?.(...args);
+      return { w: stance.w, turn: stance.turn, feet: stance.feet, queue: stance.queue.length };
+    },
+    collide: (on) => { if (on != null) collide.enabled = !!on; return { enabled: collide.enabled, slices: collide.slices.length, hits: collide.hits }; },
+    play: (name) => playBody(name),
+    stance: (name) => { body.holdStance = name; },
+    stances: () => Object.keys(STANCES),
+    clips: () => Object.keys(CLIPS),
+    classify: (action) => classifyAction(action),
     heard: (text) => showHeard(text),
     say: (text) => say(text),
     hold: (offsets) => { debugHold = offsets; },
@@ -2649,6 +3075,13 @@ window.__marina = {
   get springs() { return springs; },
   get mouthCloseTargets() { return mouthCloseTargets; },
   get cueOut() { return cueOut; },
+  get headParts() { return { idle: { ...headS }, motion: { ...headM }, talkPose: { ...talkPose }, gazeHead: { ...gazeHead }, torso: { ...torsoS }, turn: stance.turn, w: stance.w }; },
+  body,
+  mocap,
+  stance,
+  collide,
+  clips: CLIPS,
+  classifyAction,
   get activeCues() { return activeCues.length; },
   drawGesture: () => drawGesture(),
   hitTest: (x, y) => overUI(x, y) || overAvatar(x, y),
@@ -2702,7 +3135,8 @@ async function pollForBridge({ quietFor = 16000 } = {}) {
         hideNotice('bridge');
 
         post('/warmup').catch(() => {});
-        bargeEnabled = info.barge_in !== false;
+        // Barge-in listens through the bridge machine's own mic, not this one's.
+        bargeEnabled = info.barge_in !== false && !ROUTE;
         if (info.idle) idleMuted = !!info.idle.muted || info.idle.enabled === false;
         startOpenerPoll();
         return;
@@ -2764,6 +3198,17 @@ if (EMBEDDED) {
       return audioCtx ? audioCtx.resume().then(() => audioCtx.state) : 'none';
     },
     speaking: () => playing > 0,
+    // A sentence shown as text (her voice off): its *actions* and mood
+    // still play, from now.
+    act(ev) {
+      const dur = Math.max(1.5, (ev.speech || ev.reply || '').length / 14);
+      if (ev.cues?.length) {
+        appendCues(ev.cues, cueClock >= 0 ? cueClock : 0, dur);
+        if (cueEpoch < 0 && cueClock < 0) cueClock = 0;
+      }
+      ensureAudio();
+      if (audioCtx) holdMood(ev.mood, audioCtx.currentTime, dur);
+    },
   };
 } else {
   pollForBridge();

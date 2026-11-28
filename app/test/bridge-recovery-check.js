@@ -2,6 +2,7 @@ const { app, BrowserWindow, ipcMain } = require('electron');
 const http = require('http');
 const fs = require('fs'); const path = require('path');
 const ROOT = path.join(__dirname, '..');
+ipcMain.handle('load-mocap', async () => null);
 ipcMain.handle('load-vrm', async () => {
   const buf = fs.readFileSync(path.join(ROOT, 'models', 'model.vrm'));
   return { name: 'model.vrm', buffer: buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength) };
