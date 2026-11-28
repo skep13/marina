@@ -31,6 +31,9 @@ targets:
         buildPhase: resources
       - path: ../app/models/model.vrm
         buildPhase: resources
+      # Her motion-capture clips (Mixamo, private use), the same file the Mac app loads.
+      - path: ../app/models/mocap.bin
+        buildPhase: resources
       # The bridge token, if there is one: kept out of git (see .gitignore)
       # and used until a token is typed in Settings.
       - path: bridge.token

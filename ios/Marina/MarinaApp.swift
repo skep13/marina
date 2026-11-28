@@ -3,6 +3,7 @@ import SwiftUI
 @main
 struct MarinaApp: App {
     @StateObject private var chat = Chat(avatar: AvatarController())
+    @StateObject private var narwhal = NarwhalChat()
     @Environment(\.scenePhase) private var phase
 
     init() {
@@ -12,8 +13,9 @@ struct MarinaApp: App {
 
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            RootView()
                 .environmentObject(chat)
+                .environmentObject(narwhal)
                 .environmentObject(chat.avatar)
                 .environmentObject(chat.recorder)
                 .environmentObject(chat.handsFree)
@@ -21,7 +23,9 @@ struct MarinaApp: App {
                 .task {
                     #if DEBUG
                     if CommandLine.arguments.contains("-demoWork") { chat.demoWork(); return }
+                    if CommandLine.arguments.contains("-demoNarwhal") { narwhal.demo(); return }
                     #endif
+                    narwhal.connect()
                     await chat.connect()
                     if Settings.handsFree && !chat.handsFree.on { chat.toggleHandsFree() }
                 }
@@ -31,9 +35,10 @@ struct MarinaApp: App {
             chat.foreground = now == .active
             // Hands-free keeps her able to speak with the screen locked, so
             // she can keep talking to you here instead of pushing.
-            if now == .background { chat.presence(chat.handsFree.on) }
+            if now == .background { chat.presence(chat.handsFree.on); narwhal.disconnect() }
             if now == .active {
                 UNUserNotificationCenter.current().setBadgeCount(0)
+                narwhal.connect()
                 Task { await chat.connect() }
             }
         }

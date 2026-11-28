@@ -7,6 +7,7 @@
 
   window.marina = {
     embedded: true,
+    loadMocap: async () => { const r = await fetch('mocap.bin'); return r.ok ? r.arrayBuffer() : null; },
     loadVRM: async () => {
       const res = await fetch('model.vrm');
       if (!res.ok) return { error: 'The avatar is missing from the app.' };
@@ -35,11 +36,10 @@
   document.documentElement.classList.add('embedded');
 
   // The app draws the chat, buttons and status natively; only the canvas
-  // stays. The background matches the phone page so she sits in the same
-  // light as on the Mac.
+  // stays, on a clear background: the app draws her sky behind it.
   const css = `
     html.embedded, .embedded body {
-      background: radial-gradient(ellipse at 50% 35%, #262b38 0%, #14161c 70%);
+      background: transparent;
       -webkit-user-select: none; -webkit-touch-callout: none;
     }
     .embedded #drag-strip, .embedded #chrome, .embedded #picker,

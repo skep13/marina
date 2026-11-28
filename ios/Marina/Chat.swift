@@ -117,7 +117,7 @@ final class Chat: ObservableObject {
                     // It was for her: an "mm-hm" now, so there's no dead air
                     // while she thinks.
                     if voiceOn, let clip = backchannelClips.randomElement() {
-                        Task { await self.voice.play(clip) }
+                        backchannel = Task { await self.voice.play(clip) }
                     }
                     let rest = AsyncThrowingStream<BridgeEvent, Error> { c in
                         c.yield(first)
@@ -145,6 +145,11 @@ final class Chat: ObservableObject {
     }
 
     private var backchannelClips: [String] = []
+    /// The "mm-hm" playing natively; her reply waits for it, because starting
+    /// the page's audio over our own player left the page silent.
+    private var backchannel: Task<Void, Never>?
+    /// False when the page's audio wouldn't start: her sentences play natively.
+    private var avatarAudio = true
 
     func loadPresets() async {
         guard let p = try? await bridge.presets() else { return }
@@ -260,7 +265,9 @@ final class Chat: ObservableObject {
         let bg = UIApplication.shared.beginBackgroundTask(withName: "reply")
         current = Task {
             defer { UIApplication.shared.endBackgroundTask(bg) }
-            await avatar.unlockAudio()
+            await backchannel?.value
+            backchannel = nil
+            avatarAudio = await avatar.unlockAudio()
             if voiceOn { await avatar.begin() }
             var started = false
             do {
@@ -318,9 +325,11 @@ final class Chat: ObservableObject {
         }
         if let err = ev.string("error") { note(err) }
         chunksPlayed += 1
-        guard voiceOn else { return }
-        if foreground, await avatarChunkUnlessLocked(ev) { return }
-        if handsFree.on || !foreground { await voice.play(ev.string("audio")) }
+        // Her *actions* animate her even when she isn't speaking them.
+        guard voiceOn else { if foreground { await avatar.act(ev) }; return }
+        if foreground, avatarAudio, await avatarChunkUnlessLocked(ev) { return }
+        if foreground { await avatar.act(ev) }
+        await voice.play(ev.string("audio"))   // locked, backgrounded, or the page audio is stuck
     }
 
     /// With her voice off she texts: each line its own bubble, after the

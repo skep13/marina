@@ -24,6 +24,12 @@ enum BridgeError: LocalizedError {
     }
 }
 
+struct NarwhalError: LocalizedError {
+    let status: Int
+    let message: String
+    var errorDescription: String? { message }
+}
+
 struct HistoryMessage: Decodable {
     let role: String
     let content: String
@@ -165,6 +171,44 @@ final class Bridge {
         body.append(wav)
         body.append("\r\n--\(boundary)--\r\n".data(using: .utf8)!)
         req.httpBody = body
+        return stream(req)
+    }
+
+    /// Narwhal: the whole conversation each time (the bridge keeps none of
+    /// it); streams start / think / text / done / error.
+    func narwhal(_ messages: [[String: String]]) throws -> AsyncThrowingStream<BridgeEvent, Error> {
+        var req = try request("narwhal/stream", method: "POST")
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.httpBody = try JSONSerialization.data(withJSONObject: ["messages": messages])
+        req.timeoutInterval = 300      // the model may need loading in first
+        return stream(req)
+    }
+
+    /// Narwhal's synced sessions (kept on lab3, shared with the Mac): a plain
+    /// JSON call. Errors carry the bridge's own message when it sends one.
+    func narwhalCall(_ path: String, method: String = "GET", body: [String: Any]? = nil) async throws -> Any {
+        var req = try request(path, method: method)
+        if let body {
+            req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            req.httpBody = try JSONSerialization.data(withJSONObject: body)
+        }
+        req.timeoutInterval = 30
+        let (data, response) = try await session.data(for: req)
+        if let http = response as? HTTPURLResponse, http.statusCode >= 400 {
+            if http.statusCode == 403 { throw BridgeError.forbidden }
+            let msg = (try? JSONSerialization.jsonObject(with: data) as? [String: Any])?["error"] as? String
+            throw NarwhalError(status: http.statusCode, message: msg ?? "The bridge answered \(http.statusCode).")
+        }
+        return try JSONSerialization.jsonObject(with: data)
+    }
+
+    /// A long-lived NDJSON stream from the bridge: a session's events
+    /// (`narwhal/sessions/{id}/follow`) or every session's changes
+    /// (`narwhal/watch`). The bridge pings every 15 s, so a quiet minute
+    /// means the line is dead.
+    func narwhalStream(_ path: String, query: [URLQueryItem] = []) throws -> AsyncThrowingStream<BridgeEvent, Error> {
+        var req = try request(path, query: query)
+        req.timeoutInterval = 60
         return stream(req)
     }
 

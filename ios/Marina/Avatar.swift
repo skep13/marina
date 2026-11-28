@@ -65,11 +65,28 @@ final class AvatarController: NSObject, ObservableObject, WKScriptMessageHandler
         _ = try? await webView.callAsyncJavaScript(js, arguments: args, contentWorld: .page)
     }
 
-    func unlockAudio() async { await call("return await window.marinaAvatar?.unlock()") }
+    /// Starts the page's audio; true once it is actually running. iOS can
+    /// leave it "interrupted" after our own player has used the audio session.
+    func unlockAudio() async -> Bool {
+        for attempt in 0..<6 {
+            let state = try? await webView.callAsyncJavaScript(
+                "return await window.marinaAvatar?.unlock()", arguments: [:], contentWorld: .page) as? String
+            if state == "running" { return true }
+            if attempt < 5 { try? await Task.sleep(for: .milliseconds(250)) }
+        }
+        NSLog("[avatar] page audio would not start; her voice plays natively this reply")
+        return false
+    }
     func begin() async { await call("window.marinaAvatar?.begin()") }
     func chunk(_ event: BridgeEvent) async { await call("return await window.marinaAvatar?.chunk(ev)", ["ev": event.raw]) }
     func end() async { await call("return await window.marinaAvatar?.end()") }
     func stop() async { await call("window.marinaAvatar?.stop()") }
+    /// A sentence she isn't voicing here: just its actions and mood, no audio.
+    func act(_ event: BridgeEvent) async {
+        var ev = event.raw
+        ev["audio"] = nil
+        await call("window.marinaAvatar?.act(ev)", ["ev": ev])
+    }
 }
 
 /// Keeps the controller from being retained by its own web view.
@@ -93,7 +110,7 @@ private final class BundleSchemeHandler: NSObject, WKURLSchemeHandler {
         let bundle = Bundle.main
         let file: URL?
         switch path {
-        case "ios-shim.js", "model.vrm":
+        case "ios-shim.js", "model.vrm", "mocap.bin":
             file = bundle.url(forResource: path, withExtension: nil)
         default:
             file = bundle.resourceURL?.appendingPathComponent("renderer").appendingPathComponent(path)

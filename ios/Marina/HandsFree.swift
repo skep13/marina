@@ -308,6 +308,8 @@ final class NativeVoice: NSObject, AVAudioPlayerDelegate {
     }
 
     nonisolated func audioPlayerDidFinishPlaying(_ player: AVAudioPlayer, successfully flag: Bool) {
-        Task { @MainActor in self.finish() }
+        // Only the clip still playing may end the wait: a late finish from the
+        // "mm-hm" used to end the next sentence's wait early and cut it off.
+        Task { @MainActor in if player === self.player { self.finish() } }
     }
 }
