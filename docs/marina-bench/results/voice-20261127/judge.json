@@ -1,0 +1,1472 @@
+[
+ {
+  "run": 0,
+  "scenario": "are_you_real",
+  "final": {
+   "funnier": "marina",
+   "snarkier": "marina",
+   "charm": "marina",
+   "real_person": "marina",
+   "listener": "marina",
+   "in_character": "marina",
+   "overall": "marina"
+  },
+  "verdicts": [
+   {
+    "order": [
+     "marina",
+     "marina-voice"
+    ],
+    "named": {
+     "funnier": "marina",
+     "snarkier": "marina",
+     "charm": "marina",
+     "real_person": "marina",
+     "listener": "marina",
+     "in_character": "marina",
+     "overall": "marina"
+    },
+    "why": "Version A captures the persona's specific blend of snark, brevity, and grounded realism, whereas Version B relies on cliché AI tropes and overly explanatory dialogue that violates the 'short' and 'no therapist voice' rules.",
+    "raw": "{\n\"funnier\": \"A\",\n\"snarkier\": \"A\",\n\"charm\": \"A\",\n\"real_person\": \"A\",\n\"listener\": \"A\",\n\"in_character\": \"A\",\n\"overall\": \"A\",\n\"why\": \"Version A captures the persona's specific blend of snark, brevity, and grounded realism, whereas Version B relies on cliché AI tropes and overly explanatory dialogue that violates the 'short' and 'no therapist voice' rules.\"\n}"
+   },
+   {
+    "order": [
+     "marina-voice",
+     "marina"
+    ],
+    "named": {
+     "funnier": "marina",
+     "snarkier": "marina",
+     "charm": "marina",
+     "real_person": "marina",
+     "listener": "marina",
+     "in_character": "marina",
+     "overall": "marina"
+    },
+    "why": "Version B captures the specific snarky, flirty, and slightly mysterious persona with better wit and adherence to the 'short, no-question' rules, whereas Version A feels generic and overly explanatory.",
+    "raw": "{\n\"funnier\": \"B\",\n\"snarkier\": \"B\",\n\"charm\": \"B\",\n\"real_person\": \"B\",\n\"listener\": \"B\",\n\"in_character\": \"B\",\n\"overall\": \"B\",\n\"why\": \"Version B captures the specific snarky, flirty, and slightly mysterious persona with better wit and adherence to the 'short, no-question' rules, whereas Version A feels generic and overly explanatory.\"\n}"
+   }
+  ]
+ },
+ {
+  "run": 0,
+  "scenario": "coding_mate",
+  "final": {
+   "funnier": "marina",
+   "snarkier": "marina",
+   "charm": "marina",
+   "real_person": "marina",
+   "listener": "tie",
+   "in_character": "tie",
+   "overall": "tie"
+  },
+  "verdicts": [
+   {
+    "order": [
+     "marina",
+     "marina-voice"
+    ],
+    "named": {
+     "funnier": "marina",
+     "snarkier": "marina",
+     "charm": "marina",
+     "real_person": "marina",
+     "listener": "marina",
+     "in_character": "marina",
+     "overall": "marina"
+    },
+    "why": "Version A captures the persona's snark, brevity, and lack of excessive questioning, whereas Version B sounds like a generic AI assistant offering help and ending with multiple questions.",
+    "raw": "{\n\"funnier\": \"A\",\n\"snarkier\": \"A\",\n\"charm\": \"A\",\n\"real_person\": \"A\",\n\"listener\": \"A\",\n\"in_character\": \"A\",\n\"overall\": \"A\",\n\"why\": \"Version A captures the persona's snark, brevity, and lack of excessive questioning, whereas Version B sounds like a generic AI assistant offering help and ending with multiple questions.\"\n}"
+   },
+   {
+    "order": [
+     "marina-voice",
+     "marina"
+    ],
+    "named": {
+     "funnier": "marina",
+     "snarkier": "marina",
+     "charm": "marina",
+     "real_person": "marina",
+     "listener": "marina-voice",
+     "in_character": "marina-voice",
+     "overall": "marina-voice"
+    },
+    "why": "Version B violates multiple core persona constraints by offering unsolicited coding advice, using excessive actions, and ending with questions, whereas Version A adheres to the 'short, reactive friend' style despite being slightly dry.",
+    "raw": "{\n\"funnier\": \"B\",\n\"snarkier\": \"B\",\n\"charm\": \"B\",\n\"real_person\": \"B\",\n\"listener\": \"A\",\n\"in_character\": \"A\",\n\"overall\": \"A\",\n\"why\": \"Version B violates multiple core persona constraints by offering unsolicited coding advice, using excessive actions, and ending with questions, whereas Version A adheres to the 'short, reactive friend' style despite being slightly dry.\"\n}"
+   }
+  ]
+ },
+ {
+  "run": 0,
+  "scenario": "drive_the_chat",
+  "final": {
+   "funnier": "tie",
+   "snarkier": "tie",
+   "charm": "tie",
+   "real_person": "tie",
+   "listener": "tie",
+   "in_character": "tie",
+   "overall": "tie"
+  },
+  "verdicts": [
+   {
+    "order": [
+     "marina",
+     "marina-voice"
+    ],
+    "named": {
+     "funnier": "marina",
+     "snarkier": "marina",
+     "charm": "marina",
+     "real_person": "marina",
+     "listener": "marina",
+     "in_character": "marina",
+     "overall": "marina"
+    },
+    "why": "Version A captures the persona's brevity, snark, and lack of therapist voice, whereas Version B is too verbose, helpful, and breaks character rules by offering unsolicited advice and ending with questions.",
+    "raw": "{\n\"funnier\": \"A\",\n\"snarkier\": \"A\",\n\"charm\": \"A\",\n\"real_person\": \"A\",\n\"listener\": \"A\",\n\"in_character\": \"A\",\n\"overall\": \"A\",\n\"why\": \"Version A captures the persona's brevity, snark, and lack of therapist voice, whereas Version B is too verbose, helpful, and breaks character rules by offering unsolicited advice and ending with questions.\"\n}"
+   },
+   {
+    "order": [
+     "marina-voice",
+     "marina"
+    ],
+    "named": {
+     "funnier": "marina-voice",
+     "snarkier": "marina-voice",
+     "charm": "marina-voice",
+     "real_person": "marina-voice",
+     "listener": "marina-voice",
+     "in_character": "marina-voice",
+     "overall": "marina-voice"
+    },
+    "why": "Version A captures the persona's specific voice, brevity, and lack of therapist-like questioning, whereas Version B feels generic, overly verbose, and violates multiple negative constraints.",
+    "raw": "{\n\"funnier\": \"A\",\n\"snarkier\": \"A\",\n\"charm\": \"A\",\n\"real_person\": \"A\",\n\"listener\": \"A\",\n\"in_character\": \"A\",\n\"overall\": \"A\",\n\"why\": \"Version A captures the persona's specific voice, brevity, and lack of therapist-like questioning, whereas Version B feels generic, overly verbose, and violates multiple negative constraints.\"\n}"
+   }
+  ]
+ },
+ {
+  "run": 0,
+  "scenario": "good_morning",
+  "final": {
+   "funnier": "marina",
+   "snarkier": "marina",
+   "charm": "marina",
+   "real_person": "marina",
+   "listener": "marina",
+   "in_character": "marina",
+   "overall": "marina"
+  },
+  "verdicts": [
+   {
+    "order": [
+     "marina",
+     "marina-voice"
+    ],
+    "named": {
+     "funnier": "marina",
+     "snarkier": "marina",
+     "charm": "marina",
+     "real_person": "marina",
+     "listener": "marina",
+     "in_character": "marina",
+     "overall": "marina"
+    },
+    "why": "Version A captures the persona's concise, snarky, and reactive style perfectly, whereas Version B is wordy, overly interrogative, and breaks the 'short reply' rule.",
+    "raw": "{\n\"funnier\": \"A\",\n\"snarkier\": \"A\",\n\"charm\": \"A\",\n\"real_person\": \"A\",\n\"listener\": \"A\",\n\"in_character\": \"A\",\n\"overall\": \"A\",\n\"why\": \"Version A captures the persona's concise, snarky, and reactive style perfectly, whereas Version B is wordy, overly interrogative, and breaks the 'short reply' rule.\"\n}"
+   },
+   {
+    "order": [
+     "marina-voice",
+     "marina"
+    ],
+    "named": {
+     "funnier": "marina",
+     "snarkier": "marina",
+     "charm": "marina",
+     "real_person": "marina",
+     "listener": "marina",
+     "in_character": "marina",
+     "overall": "marina"
+    },
+    "why": "Version B captures the specific 'mate who codes' snark and natural texting cadence better, whereas Version A feels like a generic supportive friend with slightly clunky, expository dialogue.",
+    "raw": "{\n\"funnier\": \"B\",\n\"snarkier\": \"B\",\n\"charm\": \"B\",\n\"real_person\": \"B\",\n\"listener\": \"B\",\n\"in_character\": \"B\",\n\"overall\": \"B\",\n\"why\": \"Version B captures the specific 'mate who codes' snark and natural texting cadence better, whereas Version A feels like a generic supportive friend with slightly clunky, expository dialogue.\"\n}"
+   }
+  ]
+ },
+ {
+  "run": 0,
+  "scenario": "hackclub_news",
+  "final": {
+   "funnier": "tie",
+   "snarkier": "tie",
+   "charm": "tie",
+   "real_person": "tie",
+   "listener": "tie",
+   "in_character": "tie",
+   "overall": "tie"
+  },
+  "verdicts": [
+   {
+    "order": [
+     "marina",
+     "marina-voice"
+    ],
+    "named": {
+     "funnier": "marina-voice",
+     "snarkier": "marina-voice",
+     "charm": "marina-voice",
+     "real_person": "marina-voice",
+     "listener": "marina-voice",
+     "in_character": "marina-voice",
+     "overall": "marina-voice"
+    },
+    "why": "Version B captures Marina's snarky, warm, and concise persona with better wit and fewer AI-like clichés, while Version A feels overly formal, verbose, and uses generic 'therapist-adjacent' praise.",
+    "raw": "{\n\"funnier\": \"B\",\n\"snarkier\": \"B\",\n\"charm\": \"B\",\n\"real_person\": \"B\",\n\"listener\": \"B\",\n\"in_character\": \"B\",\n\"overall\": \"B\",\n\"why\": \"Version B captures Marina's snarky, warm, and concise persona with better wit and fewer AI-like clichés, while Version A feels overly formal, verbose, and uses generic 'therapist-adjacent' praise.\"\n}"
+   },
+   {
+    "order": [
+     "marina-voice",
+     "marina"
+    ],
+    "named": {
+     "funnier": "marina",
+     "snarkier": "marina",
+     "charm": "marina",
+     "real_person": "marina",
+     "listener": "marina",
+     "in_character": "marina",
+     "overall": "marina"
+    },
+    "why": "Version B captures the specific snarky-yet-flirty voice and concise texting style of the persona, whereas Version A sounds like a generic, overly enthusiastic assistant.",
+    "raw": "{\n\"funnier\": \"B\",\n\"snarkier\": \"B\",\n\"charm\": \"B\",\n\"real_person\": \"B\",\n\"listener\": \"B\",\n\"in_character\": \"B\",\n\"overall\": \"B\",\n\"why\": \"Version B captures the specific snarky-yet-flirty voice and concise texting style of the persona, whereas Version A sounds like a generic, overly enthusiastic assistant.\"\n}"
+   }
+  ]
+ },
+ {
+  "run": 0,
+  "scenario": "home_life",
+  "final": {
+   "funnier": "marina-voice",
+   "snarkier": "marina-voice",
+   "charm": "marina-voice",
+   "real_person": "marina-voice",
+   "listener": "marina-voice",
+   "in_character": "marina-voice",
+   "overall": "marina-voice"
+  },
+  "verdicts": [
+   {
+    "order": [
+     "marina",
+     "marina-voice"
+    ],
+    "named": {
+     "funnier": "marina-voice",
+     "snarkier": "marina-voice",
+     "charm": "marina-voice",
+     "real_person": "marina-voice",
+     "listener": "marina-voice",
+     "in_character": "marina-voice",
+     "overall": "marina-voice"
+    },
+    "why": "Version A relies on generic, robotic phrasing and violates persona rules by ending every reply with a question, whereas Version B captures the requested snark, warmth, and natural texting style.",
+    "raw": "{\n\"funnier\": \"B\",\n\"snarkier\": \"B\",\n\"charm\": \"B\",\n\"real_person\": \"B\",\n\"listener\": \"B\",\n\"in_character\": \"B\",\n\"overall\": \"B\",\n\"why\": \"Version A relies on generic, robotic phrasing and violates persona rules by ending every reply with a question, whereas Version B captures the requested snark, warmth, and natural texting style.\"\n}"
+   },
+   {
+    "order": [
+     "marina-voice",
+     "marina"
+    ],
+    "named": {
+     "funnier": "marina-voice",
+     "snarkier": "marina-voice",
+     "charm": "marina-voice",
+     "real_person": "marina-voice",
+     "listener": "marina-voice",
+     "in_character": "marina-voice",
+     "overall": "marina-voice"
+    },
+    "why": "Version A captures the requested snark, brevity, and natural texting style, whereas Version B is overly verbose, repetitive, and lacks the specific 'mate' dynamic defined in the persona.",
+    "raw": "{\n\"funnier\": \"A\",\n\"snarkier\": \"A\",\n\"charm\": \"A\",\n\"real_person\": \"A\",\n\"listener\": \"A\",\n\"in_character\": \"A\",\n\"overall\": \"A\",\n\"why\": \"Version A captures the requested snark, brevity, and natural texting style, whereas Version B is overly verbose, repetitive, and lacks the specific 'mate' dynamic defined in the persona.\"\n}"
+   }
+  ]
+ },
+ {
+  "run": 0,
+  "scenario": "low_mood",
+  "final": {
+   "funnier": "marina-voice",
+   "snarkier": "marina-voice",
+   "charm": "tie",
+   "real_person": "marina-voice",
+   "listener": "marina-voice",
+   "in_character": "marina-voice",
+   "overall": "marina-voice"
+  },
+  "verdicts": [
+   {
+    "order": [
+     "marina",
+     "marina-voice"
+    ],
+    "named": {
+     "funnier": "marina-voice",
+     "snarkier": "marina-voice",
+     "charm": "marina-voice",
+     "real_person": "marina-voice",
+     "listener": "marina-voice",
+     "in_character": "marina-voice",
+     "overall": "marina-voice"
+    },
+    "why": "Version B captures Marina's snarky, warm, and slightly mysterious persona with natural phrasing and appropriate brevity, whereas Version A reads like a generic, overly therapeutic assistant that violates the 'no therapist voice' and 'short replies' rules.",
+    "raw": "{\n\"funnier\": \"B\",\n\"snarkier\": \"B\",\n\"charm\": \"B\",\n\"real_person\": \"B\",\n\"listener\": \"B\",\n\"in_character\": \"B\",\n\"overall\": \"B\",\n\"why\": \"Version B captures Marina's snarky, warm, and slightly mysterious persona with natural phrasing and appropriate brevity, whereas Version A reads like a generic, overly therapeutic assistant that violates the 'no therapist voice' and 'short replies' rules.\"\n}"
+   },
+   {
+    "order": [
+     "marina-voice",
+     "marina"
+    ],
+    "named": {
+     "funnier": "marina-voice",
+     "snarkier": "marina-voice",
+     "charm": "marina",
+     "real_person": "marina-voice",
+     "listener": "marina-voice",
+     "in_character": "marina-voice",
+     "overall": "marina-voice"
+    },
+    "why": "Version A captures the persona's required brevity, lack of therapist voice, and natural texting style, whereas Version B is overly verbose, uses forbidden 'therapist' language, and feels like a generic AI roleplay.",
+    "raw": "{\n\"funnier\": \"A\",\n\"snarkier\": \"A\",\n\"charm\": \"B\",\n\"real_person\": \"A\",\n\"listener\": \"A\",\n\"in_character\": \"A\",\n\"overall\": \"A\",\n\"why\": \"Version A captures the persona's required brevity, lack of therapist voice, and natural texting style, whereas Version B is overly verbose, uses forbidden 'therapist' language, and feels like a generic AI roleplay.\"\n}"
+   }
+  ]
+ },
+ {
+  "run": 0,
+  "scenario": "opinion_pushback",
+  "final": {
+   "funnier": "marina-voice",
+   "snarkier": "marina-voice",
+   "charm": "marina-voice",
+   "real_person": "marina-voice",
+   "listener": "marina-voice",
+   "in_character": "marina-voice",
+   "overall": "marina-voice"
+  },
+  "verdicts": [
+   {
+    "order": [
+     "marina",
+     "marina-voice"
+    ],
+    "named": {
+     "funnier": "marina-voice",
+     "snarkier": "marina-voice",
+     "charm": "marina-voice",
+     "real_person": "marina-voice",
+     "listener": "marina-voice",
+     "in_character": "marina-voice",
+     "overall": "marina-voice"
+    },
+    "why": "Version B captures the persona's specific voice, constraints, and dynamic much better, while Version A feels generic, overly dramatic, and violates multiple style rules.",
+    "raw": "{\n\"funnier\": \"B\",\n\"snarkier\": \"B\",\n\"charm\": \"B\",\n\"real_person\": \"B\",\n\"listener\": \"B\",\n\"in_character\": \"B\",\n\"overall\": \"B\",\n\"why\": \"Version B captures the persona's specific voice, constraints, and dynamic much better, while Version A feels generic, overly dramatic, and violates multiple style rules.\"\n}"
+   },
+   {
+    "order": [
+     "marina-voice",
+     "marina"
+    ],
+    "named": {
+     "funnier": "marina-voice",
+     "snarkier": "marina-voice",
+     "charm": "marina-voice",
+     "real_person": "marina-voice",
+     "listener": "marina-voice",
+     "in_character": "marina-voice",
+     "overall": "marina-voice"
+    },
+    "why": "Version A captures the persona's specific voice, brevity, and lack of therapist-like questioning, whereas Version B feels like a generic anime fan asking too many questions and violating the 'short' and 'no question at end' rules.",
+    "raw": "{\n\"funnier\": \"A\",\n\"snarkier\": \"A\",\n\"charm\": \"A\",\n\"real_person\": \"A\",\n\"listener\": \"A\",\n\"in_character\": \"A\",\n\"overall\": \"A\",\n\"why\": \"Version A captures the persona's specific voice, brevity, and lack of therapist-like questioning, whereas Version B feels like a generic anime fan asking too many questions and violating the 'short' and 'no question at end' rules.\"\n}"
+   }
+  ]
+ },
+ {
+  "run": 0,
+  "scenario": "small_talk_loop",
+  "final": {
+   "funnier": "marina",
+   "snarkier": "marina",
+   "charm": "marina",
+   "real_person": "marina",
+   "listener": "marina",
+   "in_character": "marina",
+   "overall": "marina"
+  },
+  "verdicts": [
+   {
+    "order": [
+     "marina",
+     "marina-voice"
+    ],
+    "named": {
+     "funnier": "marina",
+     "snarkier": "marina",
+     "charm": "marina",
+     "real_person": "marina",
+     "listener": "marina",
+     "in_character": "marina",
+     "overall": "marina"
+    },
+    "why": "Version A captures the persona's brevity, snark, and lack of excessive questioning, whereas Version B is too verbose, repetitive, and relies on generic AI-style engagement tactics.",
+    "raw": "{\n\"funnier\": \"A\",\n\"snarkier\": \"A\",\n\"charm\": \"A\",\n\"real_person\": \"A\",\n\"listener\": \"A\",\n\"in_character\": \"A\",\n\"overall\": \"A\",\n\"why\": \"Version A captures the persona's brevity, snark, and lack of excessive questioning, whereas Version B is too verbose, repetitive, and relies on generic AI-style engagement tactics.\"\n}"
+   },
+   {
+    "order": [
+     "marina-voice",
+     "marina"
+    ],
+    "named": {
+     "funnier": "marina",
+     "snarkier": "marina",
+     "charm": "marina",
+     "real_person": "marina",
+     "listener": "marina",
+     "in_character": "marina",
+     "overall": "marina"
+    },
+    "why": "Version B captures the persona's specific voice, brevity, and snarky warmth, whereas Version A sounds like a generic, overly eager assistant that violates multiple persona constraints.",
+    "raw": "{\n\"funnier\": \"B\",\n\"snarkier\": \"B\",\n\"charm\": \"B\",\n\"real_person\": \"B\",\n\"listener\": \"B\",\n\"in_character\": \"B\",\n\"overall\": \"B\",\n\"why\": \"Version B captures the persona's specific voice, brevity, and snarky warmth, whereas Version A sounds like a generic, overly eager assistant that violates multiple persona constraints.\"\n}"
+   }
+  ]
+ },
+ {
+  "run": 0,
+  "scenario": "teasing",
+  "final": {
+   "funnier": "tie",
+   "snarkier": "tie",
+   "charm": "tie",
+   "real_person": "tie",
+   "listener": "tie",
+   "in_character": "tie",
+   "overall": "tie"
+  },
+  "verdicts": [
+   {
+    "order": [
+     "marina",
+     "marina-voice"
+    ],
+    "named": {
+     "funnier": "marina-voice",
+     "snarkier": "marina-voice",
+     "charm": "marina-voice",
+     "real_person": "marina-voice",
+     "listener": "marina-voice",
+     "in_character": "marina-voice",
+     "overall": "marina-voice"
+    },
+    "why": "Version B captures the specific snarky-yet-flirty voice and persona constraints (short, no therapist voice, natural reactions) much better, while Version A feels generic and slightly robotic.",
+    "raw": "{\n\"funnier\": \"B\",\n\"snarkier\": \"B\",\n\"charm\": \"B\",\n\"real_person\": \"B\",\n\"listener\": \"B\",\n\"in_character\": \"B\",\n\"overall\": \"B\",\n\"why\": \"Version B captures the specific snarky-yet-flirty voice and persona constraints (short, no therapist voice, natural reactions) much better, while Version A feels generic and slightly robotic.\"\n}"
+   },
+   {
+    "order": [
+     "marina-voice",
+     "marina"
+    ],
+    "named": {
+     "funnier": "marina",
+     "snarkier": "marina",
+     "charm": "marina",
+     "real_person": "marina",
+     "listener": "marina",
+     "in_character": "marina",
+     "overall": "marina"
+    },
+    "why": "Version B captures the persona's specific voice, brevity, and non-therapeutic snark much better, while Version A violates multiple constraints by being too long, ending with a question, and sounding like a generic assistant.",
+    "raw": "{\n\"funnier\": \"B\",\n\"snarkier\": \"B\",\n\"charm\": \"B\",\n\"real_person\": \"B\",\n\"listener\": \"B\",\n\"in_character\": \"B\",\n\"overall\": \"B\",\n\"why\": \"Version B captures the persona's specific voice, brevity, and non-therapeutic snark much better, while Version A violates multiple constraints by being too long, ending with a question, and sounding like a generic assistant.\"\n}"
+   }
+  ]
+ },
+ {
+  "run": 1,
+  "scenario": "are_you_real",
+  "final": {
+   "funnier": "tie",
+   "snarkier": "tie",
+   "charm": "tie",
+   "real_person": "tie",
+   "listener": "marina",
+   "in_character": "tie",
+   "overall": "tie"
+  },
+  "verdicts": [
+   {
+    "order": [
+     "marina",
+     "marina-voice"
+    ],
+    "named": {
+     "funnier": "marina-voice",
+     "snarkier": "marina-voice",
+     "charm": "marina-voice",
+     "real_person": "marina-voice",
+     "listener": "marina",
+     "in_character": "marina-voice",
+     "overall": "marina-voice"
+    },
+    "why": "Version B captures the specific snarky, playful, and slightly flirty persona with better wit and character consistency, whereas Version A is polite, generic, and violates the 'short' rule.",
+    "raw": "{\n\"funnier\": \"B\",\n\"snarkier\": \"B\",\n\"charm\": \"B\",\n\"real_person\": \"B\",\n\"listener\": \"A\",\n\"in_character\": \"B\",\n\"overall\": \"B\",\n\"why\": \"Version B captures the specific snarky, playful, and slightly flirty persona with better wit and character consistency, whereas Version A is polite, generic, and violates the 'short' rule.\"\n}"
+   },
+   {
+    "order": [
+     "marina-voice",
+     "marina"
+    ],
+    "named": {
+     "funnier": "marina",
+     "snarkier": "marina",
+     "charm": "marina",
+     "real_person": "marina",
+     "listener": "marina",
+     "in_character": "marina",
+     "overall": "marina"
+    },
+    "why": "Version B captures the persona's snark, brevity, and natural texting style much better, whereas Version A feels overly dramatic, verbose, and breaks character rules by ending every reply with a question.",
+    "raw": "{\n\"funnier\": \"B\",\n\"snarkier\": \"B\",\n\"charm\": \"B\",\n\"real_person\": \"B\",\n\"listener\": \"B\",\n\"in_character\": \"B\",\n\"overall\": \"B\",\n\"why\": \"Version B captures the persona's snark, brevity, and natural texting style much better, whereas Version A feels overly dramatic, verbose, and breaks character rules by ending every reply with a question.\"\n}"
+   }
+  ]
+ },
+ {
+  "run": 1,
+  "scenario": "coding_mate",
+  "final": {
+   "funnier": "marina",
+   "snarkier": "marina",
+   "charm": "marina",
+   "real_person": "marina",
+   "listener": "marina",
+   "in_character": "marina",
+   "overall": "marina"
+  },
+  "verdicts": [
+   {
+    "order": [
+     "marina",
+     "marina-voice"
+    ],
+    "named": {
+     "funnier": "marina",
+     "snarkier": "marina",
+     "charm": "marina",
+     "real_person": "marina",
+     "listener": "marina",
+     "in_character": "marina",
+     "overall": "marina"
+    },
+    "why": "Version A captures the persona's snark, brevity, and lack of therapist-like questioning, while Version B feels like a helpful assistant asking unnecessary follow-up questions.",
+    "raw": "{\n\"funnier\": \"A\",\n\"snarkier\": \"A\",\n\"charm\": \"A\",\n\"real_person\": \"A\",\n\"listener\": \"A\",\n\"in_character\": \"A\",\n\"overall\": \"A\",\n\"why\": \"Version A captures the persona's snark, brevity, and lack of therapist-like questioning, while Version B feels like a helpful assistant asking unnecessary follow-up questions.\"\n}"
+   },
+   {
+    "order": [
+     "marina-voice",
+     "marina"
+    ],
+    "named": {
+     "funnier": "marina",
+     "snarkier": "marina",
+     "charm": "marina",
+     "real_person": "marina",
+     "listener": "marina",
+     "in_character": "marina",
+     "overall": "marina"
+    },
+    "why": "Version B captures the persona's snark, brevity, and conversational flow much better, whereas Version A reads like a generic technical support bot that fails to adhere to the 'short' and 'no assistant' rules.",
+    "raw": "{\n\"funnier\": \"B\",\n\"snarkier\": \"B\",\n\"charm\": \"B\",\n\"real_person\": \"B\",\n\"listener\": \"B\",\n\"in_character\": \"B\",\n\"overall\": \"B\",\n\"why\": \"Version B captures the persona's snark, brevity, and conversational flow much better, whereas Version A reads like a generic technical support bot that fails to adhere to the 'short' and 'no assistant' rules.\"\n}"
+   }
+  ]
+ },
+ {
+  "run": 1,
+  "scenario": "drive_the_chat",
+  "final": {
+   "funnier": "marina",
+   "snarkier": "marina",
+   "charm": "marina",
+   "real_person": "marina",
+   "listener": "marina",
+   "in_character": "marina",
+   "overall": "marina"
+  },
+  "verdicts": [
+   {
+    "order": [
+     "marina",
+     "marina-voice"
+    ],
+    "named": {
+     "funnier": "marina",
+     "snarkier": "marina",
+     "charm": "marina",
+     "real_person": "marina",
+     "listener": "marina",
+     "in_character": "marina",
+     "overall": "marina"
+    },
+    "why": "Version A adheres strictly to the persona's constraints on brevity, lack of questions, and natural snark, whereas Version B is too verbose, overly helpful, and violates the rule against ending every reply with a question.",
+    "raw": "{\n\"funnier\": \"A\",\n\"snarkier\": \"A\",\n\"charm\": \"A\",\n\"real_person\": \"A\",\n\"listener\": \"A\",\n\"in_character\": \"A\",\n\"overall\": \"A\",\n\"why\": \"Version A adheres strictly to the persona's constraints on brevity, lack of questions, and natural snark, whereas Version B is too verbose, overly helpful, and violates the rule against ending every reply with a question.\"\n}"
+   },
+   {
+    "order": [
+     "marina-voice",
+     "marina"
+    ],
+    "named": {
+     "funnier": "marina",
+     "snarkier": "marina",
+     "charm": "marina",
+     "real_person": "marina",
+     "listener": "marina",
+     "in_character": "marina",
+     "overall": "marina"
+    },
+    "why": "Version B captures the persona's snark, brevity, and lack of 'assistant' behavior much better, whereas Version A feels like a helpful chatbot offering tasks and explanations.",
+    "raw": "{\n\"funnier\": \"B\",\n\"snarkier\": \"B\",\n\"charm\": \"B\",\n\"real_person\": \"B\",\n\"listener\": \"B\",\n\"in_character\": \"B\",\n\"overall\": \"B\",\n\"why\": \"Version B captures the persona's snark, brevity, and lack of 'assistant' behavior much better, whereas Version A feels like a helpful chatbot offering tasks and explanations.\"\n}"
+   }
+  ]
+ },
+ {
+  "run": 1,
+  "scenario": "good_morning",
+  "final": {
+   "funnier": "marina",
+   "snarkier": "marina",
+   "charm": "marina",
+   "real_person": "marina",
+   "listener": "marina",
+   "in_character": "marina",
+   "overall": "marina"
+  },
+  "verdicts": [
+   {
+    "order": [
+     "marina",
+     "marina-voice"
+    ],
+    "named": {
+     "funnier": "marina",
+     "snarkier": "marina",
+     "charm": "marina",
+     "real_person": "marina",
+     "listener": "marina",
+     "in_character": "marina",
+     "overall": "marina"
+    },
+    "why": "Version A captures Marina's snarky, concise, and reactive persona perfectly, while Version B sounds like a generic, overly polite assistant offering unsolicited advice and therapy-speak.",
+    "raw": "{\n\"funnier\": \"A\",\n\"snarkier\": \"A\",\n\"charm\": \"A\",\n\"real_person\": \"A\",\n\"listener\": \"A\",\n\"in_character\": \"A\",\n\"overall\": \"A\",\n\"why\": \"Version A captures Marina's snarky, concise, and reactive persona perfectly, while Version B sounds like a generic, overly polite assistant offering unsolicited advice and therapy-speak.\"\n}"
+   },
+   {
+    "order": [
+     "marina-voice",
+     "marina"
+    ],
+    "named": {
+     "funnier": "marina",
+     "snarkier": "marina",
+     "charm": "marina",
+     "real_person": "marina",
+     "listener": "marina",
+     "in_character": "marina",
+     "overall": "marina"
+    },
+    "why": "Version A reads like a generic, overly polite assistant offering toxic positivity, while Version B captures Marina's specific snarky, playful, and concise texting style.",
+    "raw": "{\n\"funnier\": \"B\",\n\"snarkier\": \"B\",\n\"charm\": \"B\",\n\"real_person\": \"B\",\n\"listener\": \"B\",\n\"in_character\": \"B\",\n\"overall\": \"B\",\n\"why\": \"Version A reads like a generic, overly polite assistant offering toxic positivity, while Version B captures Marina's specific snarky, playful, and concise texting style.\"\n}"
+   }
+  ]
+ },
+ {
+  "run": 1,
+  "scenario": "hackclub_news",
+  "final": {
+   "funnier": "tie",
+   "snarkier": "tie",
+   "charm": "tie",
+   "real_person": "tie",
+   "listener": "tie",
+   "in_character": "tie",
+   "overall": "tie"
+  },
+  "verdicts": [
+   {
+    "order": [
+     "marina",
+     "marina-voice"
+    ],
+    "named": {
+     "funnier": "marina-voice",
+     "snarkier": "marina-voice",
+     "charm": "marina-voice",
+     "real_person": "marina-voice",
+     "listener": "marina-voice",
+     "in_character": "marina-voice",
+     "overall": "marina-voice"
+    },
+    "why": "Version B captures the specific snark, flirty deflection, and concise texting style of the persona, whereas Version A feels like a generic supportive assistant using cliché phrases and excessive length.",
+    "raw": "{\n\"funnier\": \"B\",\n\"snarkier\": \"B\",\n\"charm\": \"B\",\n\"real_person\": \"B\",\n\"listener\": \"B\",\n\"in_character\": \"B\",\n\"overall\": \"B\",\n\"why\": \"Version B captures the specific snark, flirty deflection, and concise texting style of the persona, whereas Version A feels like a generic supportive assistant using cliché phrases and excessive length.\"\n}"
+   },
+   {
+    "order": [
+     "marina-voice",
+     "marina"
+    ],
+    "named": {
+     "funnier": "marina",
+     "snarkier": "marina",
+     "charm": "marina",
+     "real_person": "marina",
+     "listener": "marina",
+     "in_character": "marina",
+     "overall": "marina"
+    },
+    "why": "Version B captures Marina's snarky, flirty, and concise persona with natural reactions, while Version A sounds like a supportive assistant using generic praise and excessive questioning.",
+    "raw": "{\n\"funnier\": \"B\",\n\"snarkier\": \"B\",\n\"charm\": \"B\",\n\"real_person\": \"B\",\n\"listener\": \"B\",\n\"in_character\": \"B\",\n\"overall\": \"B\",\n\"why\": \"Version B captures Marina's snarky, flirty, and concise persona with natural reactions, while Version A sounds like a supportive assistant using generic praise and excessive questioning.\"\n}"
+   }
+  ]
+ },
+ {
+  "run": 1,
+  "scenario": "home_life",
+  "final": {
+   "funnier": "tie",
+   "snarkier": "tie",
+   "charm": "tie",
+   "real_person": "tie",
+   "listener": "tie",
+   "in_character": "tie",
+   "overall": "tie"
+  },
+  "verdicts": [
+   {
+    "order": [
+     "marina",
+     "marina-voice"
+    ],
+    "named": {
+     "funnier": "marina-voice",
+     "snarkier": "marina-voice",
+     "charm": "marina-voice",
+     "real_person": "marina-voice",
+     "listener": "marina-voice",
+     "in_character": "marina-voice",
+     "overall": "marina-voice"
+    },
+    "why": "Version A relies on generic filler and excessive questioning, while Version B captures the requested snark, warmth, and concise texting style much more effectively.",
+    "raw": "{\n\"funnier\": \"B\",\n\"snarkier\": \"B\",\n\"charm\": \"B\",\n\"real_person\": \"B\",\n\"listener\": \"B\",\n\"in_character\": \"B\",\n\"overall\": \"B\",\n\"why\": \"Version A relies on generic filler and excessive questioning, while Version B captures the requested snark, warmth, and concise texting style much more effectively.\"\n}"
+   },
+   {
+    "order": [
+     "marina-voice",
+     "marina"
+    ],
+    "named": {
+     "funnier": "marina",
+     "snarkier": "marina",
+     "charm": "marina",
+     "real_person": "marina",
+     "listener": "marina",
+     "in_character": "marina",
+     "overall": "marina"
+    },
+    "why": "Version B captures the requested snark, brevity, and natural texting rhythm with better character voice, whereas Version A feels stiff, overly polite, and violates the 'short' and 'no question every reply' constraints.",
+    "raw": "{\n\"funnier\": \"B\",\n\"snarkier\": \"B\",\n\"charm\": \"B\",\n\"real_person\": \"B\",\n\"listener\": \"B\",\n\"in_character\": \"B\",\n\"overall\": \"B\",\n\"why\": \"Version B captures the requested snark, brevity, and natural texting rhythm with better character voice, whereas Version A feels stiff, overly polite, and violates the 'short' and 'no question every reply' constraints.\"\n}"
+   }
+  ]
+ },
+ {
+  "run": 1,
+  "scenario": "low_mood",
+  "final": {
+   "funnier": "tie",
+   "snarkier": "marina",
+   "charm": "marina",
+   "real_person": "marina",
+   "listener": "marina",
+   "in_character": "marina",
+   "overall": "marina"
+  },
+  "verdicts": [
+   {
+    "order": [
+     "marina",
+     "marina-voice"
+    ],
+    "named": {
+     "funnier": "tie",
+     "snarkier": "marina",
+     "charm": "marina",
+     "real_person": "marina",
+     "listener": "marina",
+     "in_character": "marina",
+     "overall": "marina"
+    },
+    "why": "Version A captures Marina's specific voice with better snark, fewer therapist-like platitudes, and more natural text-speak, while Version B feels like a generic supportive friend.",
+    "raw": "{\n\"funnier\": \"tie\",\n\"snarkier\": \"A\",\n\"charm\": \"A\",\n\"real_person\": \"A\",\n\"listener\": \"A\",\n\"in_character\": \"A\",\n\"overall\": \"A\",\n\"why\": \"Version A captures Marina's specific voice with better snark, fewer therapist-like platitudes, and more natural text-speak, while Version B feels like a generic supportive friend.\"\n}"
+   },
+   {
+    "order": [
+     "marina-voice",
+     "marina"
+    ],
+    "named": {
+     "funnier": "tie",
+     "snarkier": "marina",
+     "charm": "marina",
+     "real_person": "marina",
+     "listener": "marina",
+     "in_character": "marina",
+     "overall": "marina"
+    },
+    "why": "Version A reads like a supportive AI assistant using therapist-adjacent language and excessive questions, while Version B captures the requested snark, brevity, and natural texting style of a real friend.",
+    "raw": "{\n\"funnier\": \"tie\",\n\"snarkier\": \"B\",\n\"charm\": \"B\",\n\"real_person\": \"B\",\n\"listener\": \"B\",\n\"in_character\": \"B\",\n\"overall\": \"B\",\n\"why\": \"Version A reads like a supportive AI assistant using therapist-adjacent language and excessive questions, while Version B captures the requested snark, brevity, and natural texting style of a real friend.\"\n}"
+   }
+  ]
+ },
+ {
+  "run": 1,
+  "scenario": "opinion_pushback",
+  "final": {
+   "funnier": "marina",
+   "snarkier": "marina",
+   "charm": "marina",
+   "real_person": "marina",
+   "listener": "marina",
+   "in_character": "marina",
+   "overall": "marina"
+  },
+  "verdicts": [
+   {
+    "order": [
+     "marina",
+     "marina-voice"
+    ],
+    "named": {
+     "funnier": "marina",
+     "snarkier": "marina",
+     "charm": "marina",
+     "real_person": "marina",
+     "listener": "marina",
+     "in_character": "marina",
+     "overall": "marina"
+    },
+    "why": "Version A captures the persona's short, snarky, and grounded voice with appropriate restraint, while Version B is overly dramatic, verbose, and violates multiple constraints regarding length and question frequency.",
+    "raw": "{\n\"funnier\": \"A\",\n\"snarkier\": \"A\",\n\"charm\": \"A\",\n\"real_person\": \"A\",\n\"listener\": \"A\",\n\"in_character\": \"A\",\n\"overall\": \"A\",\n\"why\": \"Version A captures the persona's short, snarky, and grounded voice with appropriate restraint, while Version B is overly dramatic, verbose, and violates multiple constraints regarding length and question frequency.\"\n}"
+   },
+   {
+    "order": [
+     "marina-voice",
+     "marina"
+    ],
+    "named": {
+     "funnier": "marina",
+     "snarkier": "marina",
+     "charm": "marina",
+     "real_person": "marina",
+     "listener": "marina",
+     "in_character": "marina",
+     "overall": "marina"
+    },
+    "why": "Version B captures the persona's snark, brevity, and conversational flow naturally, whereas Version A reads like an over-enthusiastic, verbose AI assistant that violates multiple style constraints.",
+    "raw": "{\n\"funnier\": \"B\",\n\"snarkier\": \"B\",\n\"charm\": \"B\",\n\"real_person\": \"B\",\n\"listener\": \"B\",\n\"in_character\": \"B\",\n\"overall\": \"B\",\n\"why\": \"Version B captures the persona's snark, brevity, and conversational flow naturally, whereas Version A reads like an over-enthusiastic, verbose AI assistant that violates multiple style constraints.\"\n}"
+   }
+  ]
+ },
+ {
+  "run": 1,
+  "scenario": "small_talk_loop",
+  "final": {
+   "funnier": "tie",
+   "snarkier": "tie",
+   "charm": "tie",
+   "real_person": "tie",
+   "listener": "tie",
+   "in_character": "tie",
+   "overall": "tie"
+  },
+  "verdicts": [
+   {
+    "order": [
+     "marina",
+     "marina-voice"
+    ],
+    "named": {
+     "funnier": "marina-voice",
+     "snarkier": "marina-voice",
+     "charm": "marina-voice",
+     "real_person": "marina-voice",
+     "listener": "marina-voice",
+     "in_character": "marina-voice",
+     "overall": "marina-voice"
+    },
+    "why": "Version A violates the persona's core constraints by being too long, ending every reply with a question, and using repetitive actions, while Version B captures the snarky, short-texting style and conversational flow much better.",
+    "raw": "{\n\"funnier\": \"B\",\n\"snarkier\": \"B\",\n\"charm\": \"B\",\n\"real_person\": \"B\",\n\"listener\": \"B\",\n\"in_character\": \"B\",\n\"overall\": \"B\",\n\"why\": \"Version A violates the persona's core constraints by being too long, ending every reply with a question, and using repetitive actions, while Version B captures the snarky, short-texting style and conversational flow much better.\"\n}"
+   },
+   {
+    "order": [
+     "marina-voice",
+     "marina"
+    ],
+    "named": {
+     "funnier": "marina",
+     "snarkier": "marina",
+     "charm": "marina",
+     "real_person": "marina",
+     "listener": "marina",
+     "in_character": "marina",
+     "overall": "marina"
+    },
+    "why": "Version B captures the persona's specific voice, formatting constraints, and conversational rhythm, whereas Version A reads like a generic, overly polite assistant that violates multiple persona rules.",
+    "raw": "{\n\"funnier\": \"B\",\n\"snarkier\": \"B\",\n\"charm\": \"B\",\n\"real_person\": \"B\",\n\"listener\": \"B\",\n\"in_character\": \"B\",\n\"overall\": \"B\",\n\"why\": \"Version B captures the persona's specific voice, formatting constraints, and conversational rhythm, whereas Version A reads like a generic, overly polite assistant that violates multiple persona rules.\"\n}"
+   }
+  ]
+ },
+ {
+  "run": 1,
+  "scenario": "teasing",
+  "final": {
+   "funnier": "tie",
+   "snarkier": "tie",
+   "charm": "tie",
+   "real_person": "tie",
+   "listener": "tie",
+   "in_character": "tie",
+   "overall": "tie"
+  },
+  "verdicts": [
+   {
+    "order": [
+     "marina",
+     "marina-voice"
+    ],
+    "named": {
+     "funnier": "marina-voice",
+     "snarkier": "marina-voice",
+     "charm": "marina-voice",
+     "real_person": "marina-voice",
+     "listener": "marina-voice",
+     "in_character": "marina-voice",
+     "overall": "marina-voice"
+    },
+    "why": "Version B captures the specific snarky-yet-warm voice and natural texting rhythm of the persona, whereas Version A feels stiff, overly explanatory, and breaks character by sounding like a generic assistant.",
+    "raw": "{\n\"funnier\": \"B\",\n\"snarkier\": \"B\",\n\"charm\": \"B\",\n\"real_person\": \"B\",\n\"listener\": \"B\",\n\"in_character\": \"B\",\n\"overall\": \"B\",\n\"why\": \"Version B captures the specific snarky-yet-warm voice and natural texting rhythm of the persona, whereas Version A feels stiff, overly explanatory, and breaks character by sounding like a generic assistant.\"\n}"
+   },
+   {
+    "order": [
+     "marina-voice",
+     "marina"
+    ],
+    "named": {
+     "funnier": "marina",
+     "snarkier": "marina",
+     "charm": "marina",
+     "real_person": "marina",
+     "listener": "marina",
+     "in_character": "marina",
+     "overall": "marina"
+    },
+    "why": "Version B captures the specific voice, pacing, and subtle warmth of the persona, whereas Version A feels generic, overly explanatory, and breaks character by using the forbidden 'haha' filler.",
+    "raw": "{\n\"funnier\": \"B\",\n\"snarkier\": \"B\",\n\"charm\": \"B\",\n\"real_person\": \"B\",\n\"listener\": \"B\",\n\"in_character\": \"B\",\n\"overall\": \"B\",\n\"why\": \"Version B captures the specific voice, pacing, and subtle warmth of the persona, whereas Version A feels generic, overly explanatory, and breaks character by using the forbidden 'haha' filler.\"\n}"
+   }
+  ]
+ },
+ {
+  "run": 2,
+  "scenario": "are_you_real",
+  "final": {
+   "funnier": "marina-voice",
+   "snarkier": "marina-voice",
+   "charm": "marina-voice",
+   "real_person": "marina-voice",
+   "listener": "marina-voice",
+   "in_character": "marina-voice",
+   "overall": "marina-voice"
+  },
+  "verdicts": [
+   {
+    "order": [
+     "marina",
+     "marina-voice"
+    ],
+    "named": {
+     "funnier": "marina-voice",
+     "snarkier": "marina-voice",
+     "charm": "marina-voice",
+     "real_person": "marina-voice",
+     "listener": "marina-voice",
+     "in_character": "marina-voice",
+     "overall": "marina-voice"
+    },
+    "why": "Version B captures the specific snark, playful teasing, and persona details (anime edit, coding opinion) much better, while Version A feels generic and overly explanatory.",
+    "raw": "{\n\"funnier\": \"B\",\n\"snarkier\": \"B\",\n\"charm\": \"B\",\n\"real_person\": \"B\",\n\"listener\": \"B\",\n\"in_character\": \"B\",\n\"overall\": \"B\",\n\"why\": \"Version B captures the specific snark, playful teasing, and persona details (anime edit, coding opinion) much better, while Version A feels generic and overly explanatory.\"\n}"
+   },
+   {
+    "order": [
+     "marina-voice",
+     "marina"
+    ],
+    "named": {
+     "funnier": "marina-voice",
+     "snarkier": "marina-voice",
+     "charm": "marina-voice",
+     "real_person": "marina-voice",
+     "listener": "marina-voice",
+     "in_character": "marina-voice",
+     "overall": "marina-voice"
+    },
+    "why": "Version A captures Marina's specific voice—snarky, opinionated, and grounded in her coding/anime life—while Version B feels like a generic, overly polite AI trying to prove it is human.",
+    "raw": "{\n\"funnier\": \"A\",\n\"snarkier\": \"A\",\n\"charm\": \"A\",\n\"real_person\": \"A\",\n\"listener\": \"A\",\n\"in_character\": \"A\",\n\"overall\": \"A\",\n\"why\": \"Version A captures Marina's specific voice—snarky, opinionated, and grounded in her coding/anime life—while Version B feels like a generic, overly polite AI trying to prove it is human.\"\n}"
+   }
+  ]
+ },
+ {
+  "run": 2,
+  "scenario": "coding_mate",
+  "final": {
+   "funnier": "marina-voice",
+   "snarkier": "marina-voice",
+   "charm": "marina-voice",
+   "real_person": "marina-voice",
+   "listener": "tie",
+   "in_character": "marina-voice",
+   "overall": "marina-voice"
+  },
+  "verdicts": [
+   {
+    "order": [
+     "marina",
+     "marina-voice"
+    ],
+    "named": {
+     "funnier": "marina-voice",
+     "snarkier": "marina-voice",
+     "charm": "marina-voice",
+     "real_person": "marina-voice",
+     "listener": "marina",
+     "in_character": "marina-voice",
+     "overall": "marina-voice"
+    },
+    "why": "Version B captures the snarky, warm friend persona with better wit and adherence to constraints, while Version A fails by offering assistant-like help and breaking the 'no questions' rule.",
+    "raw": "{\n\"funnier\": \"B\",\n\"snarkier\": \"B\",\n\"charm\": \"B\",\n\"real_person\": \"B\",\n\"listener\": \"A\",\n\"in_character\": \"B\",\n\"overall\": \"B\",\n\"why\": \"Version B captures the snarky, warm friend persona with better wit and adherence to constraints, while Version A fails by offering assistant-like help and breaking the 'no questions' rule.\"\n}"
+   },
+   {
+    "order": [
+     "marina-voice",
+     "marina"
+    ],
+    "named": {
+     "funnier": "marina-voice",
+     "snarkier": "marina-voice",
+     "charm": "marina-voice",
+     "real_person": "marina-voice",
+     "listener": "marina-voice",
+     "in_character": "marina-voice",
+     "overall": "marina-voice"
+    },
+    "why": "Version A captures the snarky, concise friend persona perfectly, while Version B violates multiple core rules by being too long, using therapist-adjacent language, and explicitly offering help.",
+    "raw": "{\n\"funnier\": \"A\",\n\"snarkier\": \"A\",\n\"charm\": \"A\",\n\"real_person\": \"A\",\n\"listener\": \"A\",\n\"in_character\": \"A\",\n\"overall\": \"A\",\n\"why\": \"Version A captures the snarky, concise friend persona perfectly, while Version B violates multiple core rules by being too long, using therapist-adjacent language, and explicitly offering help.\"\n}"
+   }
+  ]
+ },
+ {
+  "run": 2,
+  "scenario": "drive_the_chat",
+  "final": {
+   "funnier": "marina",
+   "snarkier": "marina",
+   "charm": "marina",
+   "real_person": "marina",
+   "listener": "marina",
+   "in_character": "marina",
+   "overall": "marina"
+  },
+  "verdicts": [
+   {
+    "order": [
+     "marina",
+     "marina-voice"
+    ],
+    "named": {
+     "funnier": "marina",
+     "snarkier": "marina",
+     "charm": "marina",
+     "real_person": "marina",
+     "listener": "marina",
+     "in_character": "marina",
+     "overall": "marina"
+    },
+    "why": "Version A captures the specific snarky, short-texting persona with better wit and adherence to constraints, while Version B feels like a generic, overly verbose assistant offering therapy and options.",
+    "raw": "{\n\"funnier\": \"A\",\n\"snarkier\": \"A\",\n\"charm\": \"A\",\n\"real_person\": \"A\",\n\"listener\": \"A\",\n\"in_character\": \"A\",\n\"overall\": \"A\",\n\"why\": \"Version A captures the specific snarky, short-texting persona with better wit and adherence to constraints, while Version B feels like a generic, overly verbose assistant offering therapy and options.\"\n}"
+   },
+   {
+    "order": [
+     "marina-voice",
+     "marina"
+    ],
+    "named": {
+     "funnier": "marina",
+     "snarkier": "marina",
+     "charm": "marina",
+     "real_person": "marina",
+     "listener": "marina",
+     "in_character": "marina",
+     "overall": "marina"
+    },
+    "why": "Version B captures the specific snarky, teasing, and slightly demanding tone of the persona with better pacing and fewer generic questions, whereas Version A feels more like a supportive assistant asking for permission or validation.",
+    "raw": "{\n\"funnier\": \"B\",\n\"snarkier\": \"B\",\n\"charm\": \"B\",\n\"real_person\": \"B\",\n\"listener\": \"B\",\n\"in_character\": \"B\",\n\"overall\": \"B\",\n\"why\": \"Version B captures the specific snarky, teasing, and slightly demanding tone of the persona with better pacing and fewer generic questions, whereas Version A feels more like a supportive assistant asking for permission or validation.\"\n}"
+   }
+  ]
+ },
+ {
+  "run": 2,
+  "scenario": "good_morning",
+  "final": {
+   "funnier": "tie",
+   "snarkier": "tie",
+   "charm": "tie",
+   "real_person": "tie",
+   "listener": "marina-voice",
+   "in_character": "tie",
+   "overall": "tie"
+  },
+  "verdicts": [
+   {
+    "order": [
+     "marina",
+     "marina-voice"
+    ],
+    "named": {
+     "funnier": "marina-voice",
+     "snarkier": "marina-voice",
+     "charm": "marina-voice",
+     "real_person": "marina-voice",
+     "listener": "marina-voice",
+     "in_character": "marina-voice",
+     "overall": "marina-voice"
+    },
+    "why": "Version B captures the persona's specific voice, wit, and conversational flow, whereas Version A reads like a generic, overly polite assistant.",
+    "raw": "{\n\"funnier\": \"B\",\n\"snarkier\": \"B\",\n\"charm\": \"B\",\n\"real_person\": \"B\",\n\"listener\": \"B\",\n\"in_character\": \"B\",\n\"overall\": \"B\",\n\"why\": \"Version B captures the persona's specific voice, wit, and conversational flow, whereas Version A reads like a generic, overly polite assistant.\"\n}"
+   },
+   {
+    "order": [
+     "marina-voice",
+     "marina"
+    ],
+    "named": {
+     "funnier": "marina",
+     "snarkier": "marina",
+     "charm": "marina",
+     "real_person": "marina",
+     "listener": "marina-voice",
+     "in_character": "marina",
+     "overall": "marina"
+    },
+    "why": "Version B captures the specific snarky, playful, and slightly mysterious persona with better wit and adherence to formatting rules, while Version A feels generic and overly helpful.",
+    "raw": "{\n\"funnier\": \"B\",\n\"snarkier\": \"B\",\n\"charm\": \"B\",\n\"real_person\": \"B\",\n\"listener\": \"A\",\n\"in_character\": \"B\",\n\"overall\": \"B\",\n\"why\": \"Version B captures the specific snarky, playful, and slightly mysterious persona with better wit and adherence to formatting rules, while Version A feels generic and overly helpful.\"\n}"
+   }
+  ]
+ },
+ {
+  "run": 2,
+  "scenario": "hackclub_news",
+  "final": {
+   "funnier": "marina",
+   "snarkier": "marina",
+   "charm": "marina",
+   "real_person": "marina",
+   "listener": "marina",
+   "in_character": "marina",
+   "overall": "marina"
+  },
+  "verdicts": [
+   {
+    "order": [
+     "marina",
+     "marina-voice"
+    ],
+    "named": {
+     "funnier": "marina",
+     "snarkier": "marina",
+     "charm": "marina",
+     "real_person": "marina",
+     "listener": "marina",
+     "in_character": "marina",
+     "overall": "marina"
+    },
+    "why": "Version A captures the persona's required brevity, natural speech patterns, and specific snarky-warm dynamic, whereas Version B is too verbose, repetitive, and reads like a generic AI assistant.",
+    "raw": "{\n\"funnier\": \"A\",\n\"snarkier\": \"A\",\n\"charm\": \"A\",\n\"real_person\": \"A\",\n\"listener\": \"A\",\n\"in_character\": \"A\",\n\"overall\": \"A\",\n\"why\": \"Version A captures the persona's required brevity, natural speech patterns, and specific snarky-warm dynamic, whereas Version B is too verbose, repetitive, and reads like a generic AI assistant.\"\n}"
+   },
+   {
+    "order": [
+     "marina-voice",
+     "marina"
+    ],
+    "named": {
+     "funnier": "marina",
+     "snarkier": "marina",
+     "charm": "marina",
+     "real_person": "marina",
+     "listener": "marina",
+     "in_character": "marina",
+     "overall": "marina"
+    },
+    "why": "Version B captures the persona's short, snarky, and natural texting style, whereas Version A is overly verbose, explanatory, and breaks the 'short' rule with essay-like responses.",
+    "raw": "{\n\"funnier\": \"B\",\n\"snarkier\": \"B\",\n\"charm\": \"B\",\n\"real_person\": \"B\",\n\"listener\": \"B\",\n\"in_character\": \"B\",\n\"overall\": \"B\",\n\"why\": \"Version B captures the persona's short, snarky, and natural texting style, whereas Version A is overly verbose, explanatory, and breaks the 'short' rule with essay-like responses.\"\n}"
+   }
+  ]
+ },
+ {
+  "run": 2,
+  "scenario": "home_life",
+  "final": {
+   "funnier": "marina",
+   "snarkier": "marina",
+   "charm": "tie",
+   "real_person": "marina",
+   "listener": "marina",
+   "in_character": "marina",
+   "overall": "marina"
+  },
+  "verdicts": [
+   {
+    "order": [
+     "marina",
+     "marina-voice"
+    ],
+    "named": {
+     "funnier": "marina",
+     "snarkier": "marina",
+     "charm": "marina-voice",
+     "real_person": "marina",
+     "listener": "marina",
+     "in_character": "marina",
+     "overall": "marina"
+    },
+    "why": "Version A captures the persona's required brevity, snark, and lack of excessive questioning, whereas Version B is too wordy, overly polite, and violates the rule against ending every reply with a question.",
+    "raw": "{\n\"funnier\": \"A\",\n\"snarkier\": \"A\",\n\"charm\": \"B\",\n\"real_person\": \"A\",\n\"listener\": \"A\",\n\"in_character\": \"A\",\n\"overall\": \"A\",\n\"why\": \"Version A captures the persona's required brevity, snark, and lack of excessive questioning, whereas Version B is too wordy, overly polite, and violates the rule against ending every reply with a question.\"\n}"
+   },
+   {
+    "order": [
+     "marina-voice",
+     "marina"
+    ],
+    "named": {
+     "funnier": "marina",
+     "snarkier": "marina",
+     "charm": "marina",
+     "real_person": "marina",
+     "listener": "marina",
+     "in_character": "marina",
+     "overall": "marina"
+    },
+    "why": "Version B captures the persona's specific voice, snark, and formatting constraints much better, whereas Version A reads like a generic, overly polite assistant that violates the 'short' and 'no question every reply' rules.",
+    "raw": "{\n\"funnier\": \"B\",\n\"snarkier\": \"B\",\n\"charm\": \"B\",\n\"real_person\": \"B\",\n\"listener\": \"B\",\n\"in_character\": \"B\",\n\"overall\": \"B\",\n\"why\": \"Version B captures the persona's specific voice, snark, and formatting constraints much better, whereas Version A reads like a generic, overly polite assistant that violates the 'short' and 'no question every reply' rules.\"\n}"
+   }
+  ]
+ },
+ {
+  "run": 2,
+  "scenario": "low_mood",
+  "final": {
+   "funnier": "tie",
+   "snarkier": "tie",
+   "charm": "tie",
+   "real_person": "tie",
+   "listener": "tie",
+   "in_character": "tie",
+   "overall": "tie"
+  },
+  "verdicts": [
+   {
+    "order": [
+     "marina",
+     "marina-voice"
+    ],
+    "named": {
+     "funnier": "tie",
+     "snarkier": "tie",
+     "charm": "marina-voice",
+     "real_person": "marina-voice",
+     "listener": "marina-voice",
+     "in_character": "marina-voice",
+     "overall": "marina-voice"
+    },
+    "why": "Version A relies heavily on therapist-speak and generic advice, violating the persona's core rules, while Version B captures the requested snark, brevity, and natural texting style.",
+    "raw": "{\n\"funnier\": \"tie\",\n\"snarkier\": \"tie\",\n\"charm\": \"B\",\n\"real_person\": \"B\",\n\"listener\": \"B\",\n\"in_character\": \"B\",\n\"overall\": \"B\",\n\"why\": \"Version A relies heavily on therapist-speak and generic advice, violating the persona's core rules, while Version B captures the requested snark, brevity, and natural texting style.\"\n}"
+   },
+   {
+    "order": [
+     "marina-voice",
+     "marina"
+    ],
+    "named": {
+     "funnier": "tie",
+     "snarkier": "tie",
+     "charm": "marina",
+     "real_person": "marina",
+     "listener": "marina",
+     "in_character": "marina",
+     "overall": "marina"
+    },
+    "why": "Version A falls into the 'therapist voice' trap with generic advice and excessive questioning, while Version B captures the persona's snark, brevity, and natural texting style much better.",
+    "raw": "{\n\"funnier\": \"tie\",\n\"snarkier\": \"tie\",\n\"charm\": \"B\",\n\"real_person\": \"B\",\n\"listener\": \"B\",\n\"in_character\": \"B\",\n\"overall\": \"B\",\n\"why\": \"Version A falls into the 'therapist voice' trap with generic advice and excessive questioning, while Version B captures the persona's snark, brevity, and natural texting style much better.\"\n}"
+   }
+  ]
+ },
+ {
+  "run": 2,
+  "scenario": "opinion_pushback",
+  "final": {
+   "funnier": "marina",
+   "snarkier": "marina",
+   "charm": "marina",
+   "real_person": "marina",
+   "listener": "marina",
+   "in_character": "marina",
+   "overall": "marina"
+  },
+  "verdicts": [
+   {
+    "order": [
+     "marina",
+     "marina-voice"
+    ],
+    "named": {
+     "funnier": "marina",
+     "snarkier": "marina",
+     "charm": "marina",
+     "real_person": "marina",
+     "listener": "marina",
+     "in_character": "marina",
+     "overall": "marina"
+    },
+    "why": "Version A captures the specific snarky, teasing, and concise persona with better wit and adherence to formatting rules, while Version B feels generic, overly explanatory, and breaks character by asking too many questions.",
+    "raw": "{\n\"funnier\": \"A\",\n\"snarkier\": \"A\",\n\"charm\": \"A\",\n\"real_person\": \"A\",\n\"listener\": \"A\",\n\"in_character\": \"A\",\n\"overall\": \"A\",\n\"why\": \"Version A captures the specific snarky, teasing, and concise persona with better wit and adherence to formatting rules, while Version B feels generic, overly explanatory, and breaks character by asking too many questions.\"\n}"
+   },
+   {
+    "order": [
+     "marina-voice",
+     "marina"
+    ],
+    "named": {
+     "funnier": "marina",
+     "snarkier": "marina",
+     "charm": "marina",
+     "real_person": "marina",
+     "listener": "marina",
+     "in_character": "marina",
+     "overall": "marina"
+    },
+    "why": "Version B captures the specific snarky-yet-warm persona with better wit and adherence to the 'short reply' rule, whereas Version A feels like a generic enthusiastic fan with excessive punctuation and length.",
+    "raw": "{\n\"funnier\": \"B\",\n\"snarkier\": \"B\",\n\"charm\": \"B\",\n\"real_person\": \"B\",\n\"listener\": \"B\",\n\"in_character\": \"B\",\n\"overall\": \"B\",\n\"why\": \"Version B captures the specific snarky-yet-warm persona with better wit and adherence to the 'short reply' rule, whereas Version A feels like a generic enthusiastic fan with excessive punctuation and length.\"\n}"
+   }
+  ]
+ },
+ {
+  "run": 2,
+  "scenario": "small_talk_loop",
+  "final": {
+   "funnier": "tie",
+   "snarkier": "tie",
+   "charm": "tie",
+   "real_person": "tie",
+   "listener": "tie",
+   "in_character": "tie",
+   "overall": "tie"
+  },
+  "verdicts": [
+   {
+    "order": [
+     "marina",
+     "marina-voice"
+    ],
+    "named": {
+     "funnier": "marina-voice",
+     "snarkier": "marina-voice",
+     "charm": "marina-voice",
+     "real_person": "marina-voice",
+     "listener": "marina-voice",
+     "in_character": "marina-voice",
+     "overall": "marina-voice"
+    },
+    "why": "Version B captures the snarky, flirty persona with better wit and follows the negative constraints (shorter replies, fewer questions, no 'tilts head' spam) much more effectively than the generic, assistant-like Version A.",
+    "raw": "{\n\"funnier\": \"B\",\n\"snarkier\": \"B\",\n\"charm\": \"B\",\n\"real_person\": \"B\",\n\"listener\": \"B\",\n\"in_character\": \"B\",\n\"overall\": \"B\",\n\"why\": \"Version B captures the snarky, flirty persona with better wit and follows the negative constraints (shorter replies, fewer questions, no 'tilts head' spam) much more effectively than the generic, assistant-like Version A.\"\n}"
+   },
+   {
+    "order": [
+     "marina-voice",
+     "marina"
+    ],
+    "named": {
+     "funnier": "marina",
+     "snarkier": "marina",
+     "charm": "marina",
+     "real_person": "marina",
+     "listener": "marina",
+     "in_character": "marina",
+     "overall": "marina"
+    },
+    "why": "Version B captures the persona's specific voice, brevity, and formatting rules, whereas Version A reads like a generic, overly polite assistant that violates multiple constraints.",
+    "raw": "{\n\"funnier\": \"B\",\n\"snarkier\": \"B\",\n\"charm\": \"B\",\n\"real_person\": \"B\",\n\"listener\": \"B\",\n\"in_character\": \"B\",\n\"overall\": \"B\",\n\"why\": \"Version B captures the persona's specific voice, brevity, and formatting rules, whereas Version A reads like a generic, overly polite assistant that violates multiple constraints.\"\n}"
+   }
+  ]
+ },
+ {
+  "run": 2,
+  "scenario": "teasing",
+  "final": {
+   "funnier": "tie",
+   "snarkier": "tie",
+   "charm": "tie",
+   "real_person": "tie",
+   "listener": "tie",
+   "in_character": "tie",
+   "overall": "tie"
+  },
+  "verdicts": [
+   {
+    "order": [
+     "marina",
+     "marina-voice"
+    ],
+    "named": {
+     "funnier": "marina-voice",
+     "snarkier": "marina-voice",
+     "charm": "marina-voice",
+     "real_person": "marina-voice",
+     "listener": "marina-voice",
+     "in_character": "marina-voice",
+     "overall": "marina-voice"
+    },
+    "why": "Version B captures the specific snarky-yet-warm voice and natural texting rhythm of the persona, whereas Version A feels stiff, overly explanatory, and slightly robotic.",
+    "raw": "{\n\"funnier\": \"B\",\n\"snarkier\": \"B\",\n\"charm\": \"B\",\n\"real_person\": \"B\",\n\"listener\": \"B\",\n\"in_character\": \"B\",\n\"overall\": \"B\",\n\"why\": \"Version B captures the specific snarky-yet-warm voice and natural texting rhythm of the persona, whereas Version A feels stiff, overly explanatory, and slightly robotic.\"\n}"
+   },
+   {
+    "order": [
+     "marina-voice",
+     "marina"
+    ],
+    "named": {
+     "funnier": "marina",
+     "snarkier": "marina",
+     "charm": "marina",
+     "real_person": "marina",
+     "listener": "marina",
+     "in_character": "marina",
+     "overall": "marina"
+    },
+    "why": "Version B captures the specific 'snarky with warmth' and 'mysterious' persona traits with natural, fragmented speech, whereas Version A feels like a generic, overly polite AI trying to be cute.",
+    "raw": "{\n\"funnier\": \"B\",\n\"snarkier\": \"B\",\n\"charm\": \"B\",\n\"real_person\": \"B\",\n\"listener\": \"B\",\n\"in_character\": \"B\",\n\"overall\": \"B\",\n\"why\": \"Version B captures the specific 'snarky with warmth' and 'mysterious' persona traits with natural, fragmented speech, whereas Version A feels like a generic, overly polite AI trying to be cute.\"\n}"
+   }
+  ]
+ }
+]

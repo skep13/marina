@@ -12,6 +12,12 @@ RUNS = int(sys.argv[2]) if len(sys.argv) > 2 else 2
 THINK = os.environ.get("THINK") == "1"
 LABEL = MODEL + ("-think" if THINK else "")
 KEY = os.environ["KEY"]
+
+# SAMPLERS='{"temperature":0.2,...}' replaces the chat samplers below (and the
+# tool test's temperature), for models whose card asks for other settings.
+# The label gets SUFFIX (e.g. "-rec") so runs don't overwrite each other.
+SAMPLERS = json.loads(os.environ.get("SAMPLERS") or "null")
+LABEL += os.environ.get("SUFFIX", "")
 URL = "http://127.0.0.1:8080/v1/chat/completions"
 
 # CURRENT=1: her real system prompt as the bridge builds it today (saved by
@@ -112,6 +118,8 @@ def tool_call(text, seed):
                          {"role": "user", "content": text}],
             "tools": TOOLS, "tool_choice": "auto",
             "chat_template_kwargs": {"enable_thinking": THINK}}
+    if SAMPLERS:
+        body.update(SAMPLERS)
     req = urllib.request.Request(URL, json.dumps(body).encode(), {
         "Content-Type": "application/json", "Authorization": "Bearer " + KEY})
     t = time.time()
@@ -137,6 +145,9 @@ def call(messages, seed):
         "temperature": 1.0, "frequency_penalty": 0.35, "repeat_penalty": 1.12,
         "seed": seed, "chat_template_kwargs": {"enable_thinking": THINK},
     }
+    if SAMPLERS:
+        body.pop("frequency_penalty")
+        body.update(SAMPLERS)
     if "gpt-oss" in MODEL:
         body["reasoning_effort"] = "low"
     req = urllib.request.Request(URL, json.dumps(body).encode(), {

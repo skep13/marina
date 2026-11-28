@@ -1,0 +1,17 @@
+marina: 105 replies, 0 errors, load 26.5s, median 32 words, 18.2 tok/s, 3.7s/reply
+  assistanty=0%  not_a_person=0%  tilt=6%  emoji=0%  markdown=0%  garbled=0%  long_action=10%  too_many_actions=0%  too_long=0%  um_ugh=9%  ends_q=51%  action_only=0%
+  clean replies (no bad flag) = 75%
+  repeated openers = 20 (top: 'not much just'x3, 'just some leftover'x3, 'it was alright'x3)
+  gestures = 113, top: 'rolls eyes'x12, 'smiles'x8, 'smirks'x6, 'tilts head'x6
+  tools 48/48 right
+
+marina-voice: 105 replies, 0 errors, load 28.1s, median 41 words, 17.6 tok/s, 4.1s/reply
+  assistanty=1%  not_a_person=0%  tilt=0%  emoji=0%  markdown=0%  garbled=0%  long_action=2%  too_many_actions=0%  too_long=0%  um_ugh=10%  ends_q=50%  action_only=0%
+  clean replies (no bad flag) = 88%
+  repeated openers = 15 (top: 'not much just'x4, 'four hours that'x3, 'not really just'x2)
+  gestures = 60, top: 'rolls eyes'x12, 'smirks'x5, 'shrugs'x4, 'smiles'x4
+  tools 44/48 right
+    wrong: 'remember that my exam is on the 12th' wanted ['remember'] got []
+    wrong: 'remember that my exam is on the 12th' wanted ['remember'] got []
+    wrong: 'remember that my exam is on the 12th' wanted ['remember'] got []
+    wrong: "update lab2, it's been ages" wanted ['make_restore_point', 'run_command', 'start_job'] got []

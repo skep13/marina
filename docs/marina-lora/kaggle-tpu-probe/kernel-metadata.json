@@ -1,0 +1,16 @@
+{
+  "id": "skype13/marina-lora-tpu-probe",
+  "title": "marina-lora-tpu-probe",
+  "code_file": "probe.py",
+  "language": "python",
+  "kernel_type": "script",
+  "is_private": true,
+  "enable_gpu": false,
+  "enable_tpu": true,
+  "enable_internet": true,
+  "machine_shape": "TpuV5E8",
+  "dataset_sources": [],
+  "competition_sources": [],
+  "kernel_sources": [],
+  "model_sources": ["keras/gemma4/keras/gemma4_instruct_26b_a4b/2", "google/gemma-4/transformers/gemma-4-26b-a4b-it/1"]
+}

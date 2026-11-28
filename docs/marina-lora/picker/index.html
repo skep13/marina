@@ -1,0 +1,196 @@
+<title>Marina Reply Picker</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Outfit:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500&display=swap">
+<style>
+/* Layout: the chat so far as a narrow thread, then the two candidate replies side by side, pick bar pinned at the bottom. */
+:root {
+  --bg: #f3f6f9; --panel: #ffffff; --fg: #1d2430; --muted: #5d6878; --line: #dbe2ea;
+  --ice: #3f7fb4; --ice-soft: #e3eef7; --user: #e9edf2; --win: #2f8a5b; --win-soft: #e2f3ea; --warn: #a3622a;
+  --display: "Outfit", "Avenir Next", system-ui, sans-serif;
+  --body: "Inter", system-ui, -apple-system, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #12161d; --panel: #1a2029; --fg: #e6ebf2; --muted: #95a1b2; --line: #2b3441;
+  --ice: #7fb6e2; --ice-soft: #1f3142; --user: #242c37; --win: #5cc893; --win-soft: #1b3428; --warn: #e0a06a; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #12161d; --panel: #1a2029; --fg: #e6ebf2; --muted: #95a1b2; --line: #2b3441;
+  --ice: #7fb6e2; --ice-soft: #1f3142; --user: #242c37; --win: #5cc893; --win-soft: #1b3428; --warn: #e0a06a; color-scheme: dark }
+body { background: var(--bg); color: var(--fg); font-family: var(--body); font-size: 15px; line-height: 1.55 }
+.wrap { max-width: 1040px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 24px 150px; display: grid; gap: 18px }
+header { display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: 12px }
+h1 { font-family: var(--display); font-weight: 700; font-size: 1.8rem; margin: 0; letter-spacing: -0.01em }
+.sub { color: var(--muted); margin: 4px 0 0; max-width: 62ch }
+.progress { display: grid; gap: 6px; min-width: 220px }
+.bar { height: 6px; border-radius: 3px; background: var(--line); overflow: hidden }
+.bar i { display: block; height: 100%; background: var(--ice); width: 0; transition: width .2s }
+.meta { font-family: var(--mono); font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums }
+.status { font-family: var(--mono); font-size: 12px; color: var(--warn) }
+.thread { display: grid; gap: 8px; max-width: 680px; width: 100%; justify-self: center }
+.msg { max-width: 85%; padding: 8px 13px; border-radius: 14px; white-space: pre-wrap; overflow-wrap: anywhere }
+.msg.u { justify-self: end; background: var(--user); border-radius: 14px 14px 4px 14px }
+.msg.m { justify-self: start; background: var(--panel); border: 1px solid var(--line); border-radius: 4px 14px 14px 14px; color: var(--muted) }
+.msg.u.last { outline: 2px solid var(--ice-soft) }
+.msg em { color: var(--muted) }
+.label { font: 500 11px var(--mono); text-transform: uppercase; letter-spacing: .08em; color: var(--muted) }
+.pair { display: grid; grid-template-columns: 1fr 1fr; gap: 12px }
+.cand { background: var(--panel); border: 1.5px solid var(--line); border-radius: 4px 14px 14px 14px; padding: 12px 15px; min-width: 0; white-space: pre-wrap; overflow-wrap: anywhere; cursor: pointer; text-align: left; font: inherit; color: inherit; transition: border-color .15s, background .15s }
+.cand:hover { border-color: var(--ice) }
+.cand.on { border-color: var(--win); background: var(--win-soft) }
+.cand em { color: var(--muted) }
+.cand .tag { display: block; font: 600 12px var(--display); letter-spacing: .06em; text-transform: uppercase; color: var(--ice); margin-bottom: 6px }
+.cand .wc { display: block; margin-top: 8px; font: 500 11px var(--mono); color: var(--muted) }
+.pickbar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 5; background: var(--panel); border-top: 1px solid var(--line); padding-bottom: env(safe-area-inset-bottom, 0px) }
+.pickbar .in { max-width: 1040px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 12px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center }
+.btn { font: 600 14px var(--body); border: 1px solid var(--line); background: var(--bg); color: var(--fg); padding: 9px 14px; border-radius: 10px; cursor: pointer }
+.btn:hover { border-color: var(--ice) }
+.btn.primary { background: var(--ice); color: var(--panel); border-color: var(--ice) }
+.btn kbd { font: 500 11px var(--mono); opacity: .7; margin-left: 6px }
+.btn:focus-visible, .cand:focus-visible { outline: 2px solid var(--ice); outline-offset: 2px }
+.spacer { flex: 1 }
+.empty { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 20px }
+@media (max-width: 700px) { .pair { grid-template-columns: 1fr } .spacer { display: none } }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important } }
+</style>
+
+<div class="wrap">
+  <header>
+    <div>
+      <h1>Marina Reply Picker</h1>
+      <p class="sub">Chats with Marina where your side is simulated in your texting style, with two possible replies from her at each turn. Pick the one you'd rather get. Your picks train her voice adapter, so go with your gut. More pairs are added as lab3 makes them.</p>
+    </div>
+    <div class="progress">
+      <div class="meta" id="count">Loading…</div>
+      <div class="bar"><i id="fill"></i></div>
+      <div class="status" id="status"></div>
+    </div>
+  </header>
+  <div class="label" id="where"></div>
+  <div class="thread" id="thread"></div>
+  <div class="label">Her reply</div>
+  <div class="pair" id="pair">
+    <button class="cand" id="L" type="button"></button>
+    <button class="cand" id="R" type="button"></button>
+  </div>
+  <div class="empty" id="done" hidden></div>
+</div>
+
+<div class="pickbar"><div class="in">
+  <button class="btn" id="bL" type="button">Left<kbd>1</kbd></button>
+  <button class="btn" id="bC" type="button">Too close<kbd>2</kbd></button>
+  <button class="btn" id="bR" type="button">Right<kbd>3</kbd></button>
+  <button class="btn" id="bX" type="button">Both bad<kbd>0</kbd></button>
+  <span class="spacer"></span>
+  <button class="btn" id="back" type="button">← Back</button>
+  <button class="btn" id="skip" type="button">Skip →</button>
+</div></div>
+
+<script>
+const LOCAL = 'marina-picker-v1';
+const GOAL = 150;
+let pairs = [], picks = {}, at = 0, db = null, hist = [];
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const fmt = (s) => esc(s.trim()).replace(/\*([^*\n]+)\*/g, '<em>*$1*</em>');
+const words = (s) => (s.trim().match(/\S+/g) || []).length;
+// Which candidate goes left: fixed per pair, so a reload shows the same layout.
+const flip = (id) => ((id * 2654435761) >>> 0) % 2 === 1;
+const key = (p) => 'p' + p.id;
+
+function loadLocal() { try { return JSON.parse(localStorage.getItem(LOCAL)) || {}; } catch (e) { return {}; } }
+function saveLocal() { try { localStorage.setItem(LOCAL, JSON.stringify(picks)); } catch (e) {} }
+
+function nextOpen(from) {
+  for (let k = 0; k < pairs.length; k++) { const i = (from + k) % pairs.length; if (!picks[key(pairs[i])]) return i; }
+  return -1;
+}
+
+function render() {
+  const n = pairs.filter((p) => picks[key(p)]).length;
+  // Goal: 150 left/right picks in all (every round counts; "too close" and "both bad" don't).
+  const decided = Object.values(picks).filter((v) => v && (v.pick === 'a' || v.pick === 'b')).length;
+  const left = Math.max(0, GOAL - decided);
+  $('count').textContent = left
+    ? `${left} left to go · ${decided} of ${GOAL} picked · ${pairs.length - n} ready now`
+    : `Goal reached: ${decided} picked · more still help`;
+  $('fill').style.width = Math.min(100, 100 * decided / GOAL) + '%';
+  const p = pairs[at];
+  if (!p) { $('thread').innerHTML = ''; $('pair').hidden = true; return; }
+  $('pair').hidden = false;
+  $('where').textContent = `Pair ${at + 1} · ${p.seed.topic}, ${p.seed.mood}`;
+  const ctx = p.context;
+  $('thread').innerHTML = ctx.map((m, i) => `<div class="msg ${m.role === 'user' ? 'u' : 'm'}${i === ctx.length - 1 ? ' last' : ''}">${fmt(m.content)}</div>`).join('');
+  const [l, r] = flip(p.id) ? ['b', 'a'] : ['a', 'b'];
+  const pick = picks[key(p)];
+  $('L').innerHTML = `<span class="tag">Left</span>${fmt(p[l])}<span class="wc">${words(p[l])} words</span>`;
+  $('R').innerHTML = `<span class="tag">Right</span>${fmt(p[r])}<span class="wc">${words(p[r])} words</span>`;
+  $('L').classList.toggle('on', pick && pick.pick === l);
+  $('R').classList.toggle('on', pick && pick.pick === r);
+  $('done').hidden = nextOpen(0) !== -1;
+  if (!$('done').hidden) $('done').innerHTML = '<b>All picked for now.</b> lab3 is still making pairs; new ones show up here by themselves within a few minutes. Leave the page open.';
+}
+
+async function choose(side) {
+  const p = pairs[at]; if (!p) return;
+  const [l, r] = flip(p.id) ? ['b', 'a'] : ['a', 'b'];
+  const pick = side === 'L' ? l : side === 'R' ? r : side;   // 'a' | 'b' | 'close' | 'bad'
+  const rec = { id: p.id, pick, left: l, at: Date.now() };
+  picks[key(p)] = rec; saveLocal();
+  hist.push(at);
+  if (db) {
+    db.collection('picks').doc(key(p)).set(rec).then(() => { $('status').textContent = ''; })
+      .catch((e) => { $('status').textContent = 'Not saved to the shared store (' + (e && e.code || 'error') + '); kept in this browser.'; });
+  }
+  const nx = nextOpen(at + 1);
+  render();
+  if (nx !== -1) setTimeout(() => { at = nx; render(); scrollTo(0, 0); }, 250);
+}
+
+$('bL').onclick = $('L').onclick = () => choose('L');
+$('bR').onclick = $('R').onclick = () => choose('R');
+$('bC').onclick = () => choose('close');
+$('bX').onclick = () => choose('bad');
+$('back').onclick = () => { if (hist.length) { at = hist.pop(); render(); scrollTo(0, 0); } else if (at > 0) { at--; render(); } };
+$('skip').onclick = () => { at = (at + 1) % Math.max(1, pairs.length); render(); scrollTo(0, 0); };
+document.addEventListener('keydown', (e) => {
+  if (e.metaKey || e.ctrlKey || e.altKey) return;
+  if (e.key === '1') choose('L'); else if (e.key === '3') choose('R');
+  else if (e.key === '2') choose('close'); else if (e.key === '0') choose('bad');
+  else if (e.key === 'ArrowLeft') $('back').click(); else if (e.key === 'ArrowRight') $('skip').click();
+});
+
+fetch('pairs.json').then((r) => r.json()).then((d) => {
+  pairs = d; picks = Object.assign(loadLocal(), picks);
+  at = Math.max(0, nextOpen(0)); render();
+}).catch(() => { $('count').textContent = 'Could not load the pairs. Reload to try again.'; });
+
+// New pairs arrive as new versions of this page. Check every minute and add
+// any new ones in place, so a long picking session never needs a reload.
+setInterval(() => {
+  fetch('pairs.json?t=' + Date.now(), { cache: 'no-store' }).then((r) => r.json()).then((d) => {
+    if (!Array.isArray(d) || d.length <= pairs.length) return;
+    const wasDone = nextOpen(0) === -1;
+    const have = new Set(pairs.map((p) => p.id));
+    pairs = pairs.concat(d.filter((p) => !have.has(p.id)));
+    if (wasDone) { at = Math.max(0, nextOpen(0)); scrollTo(0, 0); }
+    render();
+  }).catch(() => {});
+}, 60000);
+
+// The shared store: picks saved here are what Claude reads back.
+(async () => {
+  const timer = setTimeout(() => { if (!db) $('status').textContent = 'Saving in this browser only (shared store not reachable).'; }, 10000);
+  const store = await claude.use('db');
+  clearTimeout(timer);
+  if (!store) { $('status').textContent = 'Saving in this browser only (shared store not available here).'; return; }
+  db = store; $('status').textContent = '';
+  db.collection('picks').onSnapshot((snap) => {
+    let changed = false;
+    snap.docs.forEach((d) => { const v = d.data(); if (v && v.pick) { if (!picks['p' + v.id] || picks['p' + v.id].at < v.at) { picks['p' + v.id] = v; changed = true; } } });
+    // Push picks made earlier in this browser that the store doesn't have yet.
+    const have = new Set(snap.docs.map((d) => d.id));
+    Object.entries(picks).forEach(([k, v]) => { if (!have.has(k)) db.collection('picks').doc(k).set(v).catch(() => {}); });
+    if (changed) { saveLocal(); if (pairs.length && picks[key(pairs[at])]) at = Math.max(0, nextOpen(at)); render(); }
+  }, (e) => { $('status').textContent = 'Shared store error (' + (e && e.code || 'error') + '); picks kept in this browser.'; });
+})();
+</script>

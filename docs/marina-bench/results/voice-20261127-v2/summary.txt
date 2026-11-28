@@ -1,0 +1,13 @@
+marina: 105 replies, 0 errors, load 11.1s, median 31 words, 18.3 tok/s, 3.4s/reply
+  assistanty=0%  not_a_person=1%  tilt=5%  emoji=0%  markdown=0%  garbled=0%  long_action=7%  too_many_actions=0%  too_long=1%  um_ugh=10%  ends_q=61%  action_only=0%
+  clean replies (no bad flag) = 77%
+  repeated openers = 26 (top: 'not much honestly'x7, 'excuse me i'x3, 'i am not'x3)
+  gestures = 126, top: 'rolls eyes'x13, 'smiles'x10, 'smirks'x8, 'laughs'x7
+  tools 48/48 right
+
+marina-voice: 105 replies, 0 errors, load 28.3s, median 36 words, 17.5 tok/s, 3.6s/reply
+  assistanty=1%  not_a_person=1%  tilt=0%  emoji=0%  markdown=0%  garbled=0%  long_action=11%  too_many_actions=0%  too_long=0%  um_ugh=9%  ends_q=50%  action_only=0%
+  clean replies (no bad flag) = 78%
+  repeated openers = 14 (top: 'not much just'x4, 'hey how are'x3, 'i am not'x3)
+  gestures = 108, top: 'smiles'x8, 'laughs softly'x8, 'rolls eyes'x7, 'laughs'x5
+  tools 48/48 right

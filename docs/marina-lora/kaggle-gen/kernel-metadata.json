@@ -1,0 +1,16 @@
+{
+  "id": "skype13/marina-lora-gen-t4",
+  "title": "marina-lora-gen-t4",
+  "code_file": "gen_kaggle.py",
+  "language": "python",
+  "kernel_type": "script",
+  "is_private": true,
+  "enable_gpu": true,
+  "enable_tpu": false,
+  "enable_internet": true,
+  "machine_shape": "NvidiaTeslaT4",
+  "dataset_sources": ["skype13/marina-lora-gen"],
+  "competition_sources": [],
+  "kernel_sources": [],
+  "model_sources": []
+}

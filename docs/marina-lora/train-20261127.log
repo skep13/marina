@@ -1,0 +1,503 @@
+Note that running a local entrypoint in detached mode only keeps the last triggered Modal function alive after the parent process has been killed or disconnected.
+✓ Initialized. View run at 
+https://modal.com/apps/jacobmatthews3478/main/ap-2fonPFw8lpqXLTiF9VOxXp
+✓ Created objects.
+├── ✓ Uploaded /Users/jacobmatthews/marina/docs/marina-lora/modal_train.py
+├── ✓ Created Function train.
+├── ✓ Created Function prep.
+├── ✓ Created Function download.
+├── ✓ Created Function backup_sft.
+├── ✓ Created Function convert.
+├── ✓ Created Function dpo.
+└── ✓ Created Function restore_sft.
+/usr/local/lib/python3.12/site-packages/huggingface_hub/constants.py:302: FutureWarning: The `HF_HUB_ENABLE_HF_TRANSFER` environment variable is deprecated as 'hf_transfer' is not used anymore. Please use `HF_XET_HIGH_PERFORMANCE` instead to enable high performance transfer with Xet. Visit https://huggingface.co/docs/huggingface_hub/package_reference/environment_variables#hfxethighperformance for more details.
+  warnings.warn(
+2346 sequences, skipped Counter(); tokens: median 7474, max 8412, total 17604632; trainable 330344
+"|>,<|"|>acer<|"|>],type:<|"|>STRING<|"|>}},type:<|"|>OBJECT<|"|>}}<tool|><|tool>declaration:make_restore_point{description:<|"|>Take a Timeshift restore point of lab2's system before something risky, so it can be rolled back. One is taken for you automatically before upgrades, removals and system config edits; call this for anything else that could break the system. Takes a few minutes.<|"|>,parameters:{properties:{comment:{type:<|"|>STRING<|"|>}},type:<|"|>OBJECT<|"|>}}<tool|><|tool>declaration:restore_points{description:<|"|>List lab2's Timeshift restore points.<|"|>,parameters:{type:<|"|>OBJECT<|"|>}}<tool|><turn|>
+<|turn>user
+morninggg<turn|>
+<|turn>model
+<|channel>thought
+<channel|>*smiles widely*
+
+Morning! You actually made it out of bed today? I'm impressed.<turn|>
+<|turn>user
+barely. i'm still half asleep actually<turn|>
+<|turn>model
+<|channel>thought
+<channel|>*laughs softly*
+
+Fair enough. Don't blame you, honestly... I feel like that every time my alarm goes off. Do you have to suffer through any lectures today or can you just coast?<turn|>
+<|turn>user
+one lecture. unfortunately. come wake me up?<turn|>
+<|turn>model
+<|channel>thought
+<channel|>*rolls eyes playfully*
+
+Nice try! If I came over there, we'd both just end up falling back asleep and then you'd definitely be late for your suffering... plus, I don't think a video call is much of a wake-up call.
+
+Go grab some coffee or something first. Or are you planning on just staring at the wall until it starts?<turn|>
+
+/usr/local/lib/python3.12/site-packages/huggingface_hub/constants.py:302: FutureWarning: The `HF_HUB_ENABLE_HF_TRANSFER` environment variable is deprecated as 'hf_transfer' is not used anymore. Please use `HF_XET_HIGH_PERFORMANCE` instead to enable high performance transfer with Xet. Visit https://huggingface.co/docs/huggingface_hub/package_reference/environment_variables#hfxethighperformance for more details.
+  warnings.warn(
+
+[1ALoading weights:   0%|          | 0/1013 [00:00<?, ?it/s]
+[1ALoading weights:   0%|          | 2/1013 [00:00<03:48,  4.43it/s]
+[1ALoading weights:   0%|          | 3/1013 [00:01<06:35,  2.55it/s]
+[1ALoading weights:   2%|▏         | 23/1013 [00:01<00:42, 23.46it/s]
+[1ALoading weights:   3%|▎         | 27/1013 [00:01<00:55, 17.90it/s]
+[1ALoading weights:   5%|▍         | 47/1013 [00:02<00:42, 22.87it/s]
+[1ALoading weights:   7%|▋         | 69/1013 [00:03<00:35, 26.53it/s]
+[1ALoading weights:   9%|▉         | 91/1013 [00:03<00:24, 36.90it/s]
+[1ALoading weights:   9%|▉         | 96/1013 [00:03<00:31, 29.38it/s]
+[1ALoading weights:  11%|█         | 113/1013 [00:04<00:24, 36.24it/s]
+[1ALoading weights:  12%|█▏        | 118/1013 [00:04<00:31, 28.52it/s]
+[1ALoading weights:  13%|█▎        | 134/1013 [00:05<00:33, 25.92it/s]
+[1ALoading weights:  15%|█▌        | 156/1013 [00:05<00:23, 36.82it/s]
+[1ALoading weights:  16%|█▌        | 161/1013 [00:05<00:29, 29.26it/s]
+[1ALoading weights:  17%|█▋        | 177/1013 [00:06<00:31, 26.71it/s]
+[1ALoading weights:  20%|█▉        | 200/1013 [00:06<00:21, 37.49it/s]
+[1ALoading weights:  20%|██        | 205/1013 [00:07<00:27, 29.86it/s]
+[1ALoading weights:  22%|██▏       | 221/1013 [00:07<00:21, 37.03it/s]
+[1ALoading weights:  22%|██▏       | 226/1013 [00:08<00:27, 28.67it/s]
+[1ALoading weights:  24%|██▍       | 244/1013 [00:08<00:20, 37.56it/s]
+[1ALoading weights:  25%|██▍       | 249/1013 [00:08<00:26, 28.52it/s]
+[1ALoading weights:  26%|██▌       | 265/1013 [00:09<00:28, 26.26it/s]
+[1ALoading weights:  28%|██▊       | 287/1013 [00:09<00:19, 37.45it/s]
+[1ALoading weights:  29%|██▉       | 292/1013 [00:10<00:24, 29.51it/s]
+[1ALoading weights:  31%|███       | 309/1013 [00:10<00:18, 37.17it/s]
+[1ALoading weights:  31%|███       | 314/1013 [00:10<00:24, 28.44it/s]
+[1ALoading weights:  33%|███▎      | 330/1013 [00:11<00:18, 36.14it/s]
+[1ALoading weights:  33%|███▎      | 335/1013 [00:11<00:24, 27.93it/s]
+[1ALoading weights:  35%|███▍      | 353/1013 [00:11<00:17, 37.55it/s]
+[1ALoading weights:  35%|███▌      | 358/1013 [00:12<00:22, 28.65it/s]
+[1ALoading weights:  37%|███▋      | 375/1013 [00:12<00:17, 37.41it/s]
+[1ALoading weights:  38%|███▊      | 380/1013 [00:12<00:22, 27.73it/s]
+[1ALoading weights:  39%|███▉      | 396/1013 [00:13<00:23, 26.48it/s]
+[1ALoading weights:  41%|████▏     | 418/1013 [00:13<00:15, 38.51it/s]
+[1ALoading weights:  42%|████▏     | 423/1013 [00:14<00:19, 30.45it/s]
+[1ALoading weights:  43%|████▎     | 440/1013 [00:14<00:14, 39.00it/s]
+[1ALoading weights:  44%|████▍     | 445/1013 [00:14<00:19, 29.49it/s]
+[1ALoading weights:  46%|████▌     | 461/1013 [00:15<00:20, 26.37it/s]
+[1ALoading weights:  48%|████▊     | 483/1013 [00:15<00:14, 37.50it/s]
+[1ALoading weights:  48%|████▊     | 488/1013 [00:16<00:17, 29.41it/s]
+[1ALoading weights:  50%|████▉     | 506/1013 [00:16<00:13, 38.40it/s]
+[1ALoading weights:  50%|█████     | 511/1013 [00:16<00:16, 29.56it/s]
+[1ALoading weights:  52%|█████▏    | 525/1013 [00:17<00:13, 35.61it/s]
+[1ALoading weights:  52%|█████▏    | 530/1013 [00:17<00:17, 26.97it/s]
+[1ALoading weights:  54%|█████▍    | 548/1013 [00:17<00:12, 37.30it/s]
+[1ALoading weights:  55%|█████▍    | 553/1013 [00:18<00:16, 27.92it/s]
+[1ALoading weights:  56%|█████▋    | 571/1013 [00:18<00:11, 37.11it/s]
+[1ALoading weights:  57%|█████▋    | 576/1013 [00:18<00:15, 27.90it/s]
+[1ALoading weights:  58%|█████▊    | 592/1013 [00:19<00:11, 36.02it/s]
+[1ALoading weights:  59%|█████▉    | 597/1013 [00:19<00:14, 27.79it/s]
+[1ALoading weights:  60%|██████    | 611/1013 [00:19<00:11, 34.01it/s]
+[1ALoading weights:  61%|██████    | 616/1013 [00:20<00:15, 25.88it/s]
+[1ALoading weights:  63%|██████▎   | 637/1013 [00:20<00:09, 38.86it/s]
+[1ALoading weights:  63%|██████▎   | 642/1013 [00:20<00:12, 29.19it/s]
+[1ALoading weights:  68%|██████▊   | 692/1013 [00:21<00:04, 77.84it/s]
+[1ALoading weights:  76%|███████▌  | 765/1013 [00:21<00:01, 160.94it/s]
+[1ALoading weights:  83%|████████▎ | 843/1013 [00:21<00:00, 257.06it/s]
+[1ALoading weights:  92%|█████████▏| 929/1013 [00:21<00:00, 366.48it/s]
+[1ALoading weights: 100%|██████████| 1013/1013 [00:21<00:00, 47.14it/s]
+loaded in 25s; GPU 48.1 GiB
+/usr/local/lib/python3.12/site-packages/transformers/modeling_utils.py:3204: FutureWarning: `gradient_checkpointing_enable` is deprecated and will be removed in v6. Use `activation_checkpointing_enable` instead.
+  warnings.warn(
+trainable params: 11,489,280 || all params: 25,817,423,152 || trainable%: 0.0445
+step 5/294 loss nan lr 6.00e-05 20.9s/step peak 55 GiB
+step 10/294 loss 0.854 lr 9.97e-05 20.2s/step peak 55 GiB
+step 15/294 loss 0.706 lr 9.94e-05 19.8s/step peak 55 GiB
+step 20/294 loss nan lr 9.89e-05 19.7s/step peak 55 GiB
+step 25/294 loss nan lr 9.82e-05 19.5s/step peak 55 GiB
+step 30/294 loss nan lr 9.75e-05 19.6s/step peak 55 GiB
+step 35/294 loss nan lr 9.65e-05 19.5s/step peak 55 GiB
+step 40/294 loss nan lr 9.55e-05 19.5s/step peak 55 GiB
+step 45/294 loss 0.615 lr 9.43e-05 19.5s/step peak 55 GiB
+step 50/294 loss 0.643 lr 9.30e-05 19.4s/step peak 55 GiB
+step 55/294 loss 0.598 lr 9.16e-05 19.5s/step peak 55 GiB
+step 60/294 loss 0.661 lr 9.01e-05 19.4s/step peak 55 GiB
+step 65/294 loss nan lr 8.84e-05 19.3s/step peak 55 GiB
+step 70/294 loss nan lr 8.67e-05 19.3s/step peak 55 GiB
+step 75/294 loss nan lr 8.48e-05 19.3s/step peak 55 GiB
+step 80/294 loss 0.591 lr 8.28e-05 19.3s/step peak 55 GiB
+step 85/294 loss nan lr 8.08e-05 19.3s/step peak 55 GiB
+step 90/294 loss 0.600 lr 7.86e-05 19.2s/step peak 55 GiB
+step 95/294 loss 0.617 lr 7.64e-05 19.2s/step peak 55 GiB
+step 100/294 loss 0.647 lr 7.41e-05 19.2s/step peak 55 GiB
+step 105/294 loss 0.586 lr 7.17e-05 19.2s/step peak 55 GiB
+step 110/294 loss nan lr 6.93e-05 19.2s/step peak 55 GiB
+step 115/294 loss nan lr 6.68e-05 19.2s/step peak 55 GiB
+step 120/294 loss 0.602 lr 6.42e-05 19.1s/step peak 55 GiB
+step 125/294 loss 0.599 lr 6.16e-05 19.1s/step peak 55 GiB
+step 130/294 loss nan lr 5.90e-05 19.1s/step peak 55 GiB
+step 135/294 loss nan lr 5.64e-05 19.1s/step peak 55 GiB
+step 140/294 loss nan lr 5.37e-05 19.1s/step peak 55 GiB
+step 145/294 loss 0.619 lr 5.11e-05 19.1s/step peak 55 GiB
+step 150/294 loss nan lr 4.84e-05 19.0s/step peak 55 GiB
+step 155/294 loss nan lr 4.57e-05 19.1s/step peak 55 GiB
+step 160/294 loss nan lr 4.31e-05 19.1s/step peak 55 GiB
+step 165/294 loss nan lr 4.04e-05 19.0s/step peak 55 GiB
+step 170/294 loss nan lr 3.78e-05 19.0s/step peak 55 GiB
+step 175/294 loss nan lr 3.53e-05 19.0s/step peak 55 GiB
+step 180/294 loss nan lr 3.27e-05 19.0s/step peak 55 GiB
+step 185/294 loss nan lr 3.03e-05 19.0s/step peak 55 GiB
+step 190/294 loss nan lr 2.78e-05 19.0s/step peak 55 GiB
+step 195/294 loss 0.603 lr 2.55e-05 19.0s/step peak 55 GiB
+step 200/294 loss nan lr 2.32e-05 18.9s/step peak 55 GiB
+step 205/294 loss 0.591 lr 2.10e-05 19.0s/step peak 55 GiB
+step 210/294 loss 0.573 lr 1.88e-05 19.0s/step peak 55 GiB
+step 215/294 loss 0.645 lr 1.68e-05 18.9s/step peak 55 GiB
+step 220/294 loss 0.632 lr 1.48e-05 18.9s/step peak 55 GiB
+step 225/294 loss 0.591 lr 1.30e-05 18.9s/step peak 55 GiB
+step 230/294 loss nan lr 1.12e-05 18.9s/step peak 55 GiB
+step 235/294 loss 0.582 lr 9.61e-06 18.9s/step peak 55 GiB
+step 240/294 loss nan lr 8.10e-06 18.9s/step peak 55 GiB
+step 245/294 loss nan lr 6.70e-06 18.9s/step peak 55 GiB
+step 250/294 loss 0.539 lr 5.43e-06 18.9s/step peak 55 GiB
+step 255/294 loss nan lr 4.28e-06 18.9s/step peak 55 GiB
+step 260/294 loss nan lr 3.26e-06 18.9s/step peak 55 GiB
+step 265/294 loss 0.600 lr 2.38e-06 18.9s/step peak 55 GiB
+step 270/294 loss nan lr 1.64e-06 18.9s/step peak 55 GiB
+step 275/294 loss nan lr 1.03e-06 18.8s/step peak 55 GiB
+step 280/294 loss 0.586 lr 5.58e-07 18.8s/step peak 55 GiB
+step 285/294 loss nan lr 2.31e-07 18.8s/step peak 55 GiB
+step 290/294 loss nan lr 4.57e-08 18.8s/step peak 55 GiB
+step 294/294 loss nan lr 0.00e+00 18.8s/step peak 55 GiB
+saved adapter ['README.md', 'adapter_config.json', 'adapter_model.safetensors']
+/usr/local/lib/python3.12/site-packages/huggingface_hub/constants.py:302: FutureWarning: The `HF_HUB_ENABLE_HF_TRANSFER` environment variable is deprecated as 'hf_transfer' is not used anymore. Please use `HF_XET_HIGH_PERFORMANCE` instead to enable high performance transfer with Xet. Visit https://huggingface.co/docs/huggingface_hub/package_reference/environment_variables#hfxethighperformance for more details.
+  warnings.warn(
+151 preference pairs
+
+[1ALoading weights:   0%|          | 0/1013 [00:00<?, ?it/s]
+[1ALoading weights:   0%|          | 1/1013 [00:00<09:27,  1.78it/s]
+[1ALoading weights:   0%|          | 3/1013 [00:00<04:03,  4.15it/s]
+[1ALoading weights:   0%|          | 4/1013 [00:01<05:38,  2.98it/s]
+[1ALoading weights:   2%|▏         | 25/1013 [00:01<00:42, 23.38it/s]
+[1ALoading weights:   3%|▎         | 28/1013 [00:02<01:05, 14.96it/s]
+[1ALoading weights:   5%|▍         | 46/1013 [00:03<00:57, 16.69it/s]
+[1ALoading weights:   7%|▋         | 68/1013 [00:04<00:46, 20.42it/s]
+[1ALoading weights:   9%|▉         | 91/1013 [00:04<00:30, 30.25it/s]
+[1ALoading weights:   9%|▉         | 96/1013 [00:04<00:36, 24.83it/s]
+[1ALoading weights:  11%|█         | 109/1013 [00:04<00:28, 32.23it/s]
+[1ALoading weights:  11%|█▏        | 115/1013 [00:05<00:41, 21.46it/s]
+[1ALoading weights:  13%|█▎        | 134/1013 [00:06<00:39, 22.09it/s]
+[1ALoading weights:  15%|█▌        | 156/1013 [00:07<00:36, 23.42it/s]
+[1ALoading weights:  17%|█▋        | 173/1013 [00:07<00:26, 31.30it/s]
+[1ALoading weights:  18%|█▊        | 179/1013 [00:08<00:37, 22.43it/s]
+[1ALoading weights:  19%|█▉        | 193/1013 [00:08<00:27, 29.90it/s]
+[1ALoading weights:  20%|█▉        | 200/1013 [00:08<00:27, 29.97it/s]
+[1ALoading weights:  20%|██        | 206/1013 [00:09<00:36, 21.96it/s]
+[1ALoading weights:  22%|██▏       | 222/1013 [00:09<00:27, 29.26it/s]
+[1ALoading weights:  22%|██▏       | 227/1013 [00:09<00:33, 23.17it/s]
+[1ALoading weights:  24%|██▍       | 244/1013 [00:10<00:26, 29.25it/s]
+[1ALoading weights:  24%|██▍       | 248/1013 [00:10<00:36, 20.84it/s]
+[1ALoading weights:  26%|██▌       | 265/1013 [00:11<00:26, 27.96it/s]
+[1ALoading weights:  27%|██▋       | 269/1013 [00:11<00:34, 21.73it/s]
+[1ALoading weights:  28%|██▊       | 287/1013 [00:11<00:23, 30.66it/s]
+[1ALoading weights:  29%|██▊       | 291/1013 [00:12<00:31, 23.03it/s]
+[1ALoading weights:  31%|███       | 309/1013 [00:12<00:21, 32.79it/s]
+[1ALoading weights:  31%|███       | 314/1013 [00:13<00:27, 25.24it/s]
+[1ALoading weights:  33%|███▎      | 331/1013 [00:13<00:20, 34.02it/s]
+[1ALoading weights:  33%|███▎      | 336/1013 [00:13<00:26, 25.54it/s]
+[1ALoading weights:  35%|███▍      | 353/1013 [00:14<00:26, 24.75it/s]
+[1ALoading weights:  37%|███▋      | 375/1013 [00:14<00:17, 35.51it/s]
+[1ALoading weights:  38%|███▊      | 380/1013 [00:15<00:22, 27.89it/s]
+[1ALoading weights:  39%|███▉      | 396/1013 [00:16<00:24, 25.38it/s]
+[1ALoading weights:  41%|████▏     | 418/1013 [00:16<00:16, 35.70it/s]
+[1ALoading weights:  42%|████▏     | 423/1013 [00:16<00:20, 28.24it/s]
+[1ALoading weights:  43%|████▎     | 440/1013 [00:17<00:15, 36.00it/s]
+[1ALoading weights:  44%|████▍     | 445/1013 [00:17<00:20, 27.61it/s]
+[1ALoading weights:  46%|████▌     | 461/1013 [00:18<00:21, 25.33it/s]
+[1ALoading weights:  48%|████▊     | 483/1013 [00:18<00:14, 35.70it/s]
+[1ALoading weights:  48%|████▊     | 488/1013 [00:18<00:18, 28.18it/s]
+[1ALoading weights:  50%|████▉     | 506/1013 [00:19<00:18, 27.10it/s]
+[1ALoading weights:  52%|█████▏    | 527/1013 [00:20<00:17, 27.79it/s]
+[1ALoading weights:  54%|█████▍    | 549/1013 [00:20<00:12, 37.17it/s]
+[1ALoading weights:  55%|█████▍    | 554/1013 [00:21<00:15, 29.71it/s]
+[1ALoading weights:  56%|█████▋    | 571/1013 [00:21<00:12, 36.44it/s]
+[1ALoading weights:  57%|█████▋    | 576/1013 [00:21<00:15, 28.20it/s]
+[1ALoading weights:  58%|█████▊    | 592/1013 [00:22<00:12, 34.59it/s]
+[1ALoading weights:  59%|█████▉    | 597/1013 [00:22<00:15, 26.44it/s]
+[1ALoading weights:  61%|██████    | 615/1013 [00:23<00:15, 25.52it/s]
+[1ALoading weights:  63%|██████▎   | 637/1013 [00:23<00:10, 35.85it/s]
+[1ALoading weights:  63%|██████▎   | 642/1013 [00:24<00:13, 28.20it/s]
+[1ALoading weights:  68%|██████▊   | 685/1013 [00:24<00:05, 63.68it/s]
+[1ALoading weights:  74%|███████▎  | 745/1013 [00:24<00:02, 123.81it/s]
+[1ALoading weights:  81%|████████  | 816/1013 [00:24<00:00, 203.64it/s]
+[1ALoading weights:  88%|████████▊ | 888/1013 [00:24<00:00, 288.29it/s]
+[1ALoading weights:  95%|█████████▍| 960/1013 [00:24<00:00, 365.82it/s]Loading weights: 100%|██████████| 1013/1013 [00:24<00:00, 41.22it/s]
+/usr/local/lib/python3.12/site-packages/transformers/modeling_utils.py:3204: FutureWarning: `gradient_checkpointing_enable` is deprecated and will be removed in v6. Use `activation_checkpointing_enable` instead.
+  warnings.warn(
+reference log-probs done
+dpo step 5/76 epoch 1 picked-reply preferred 35% margin -0.006 18.0s/step
+dpo step 10/76 epoch 1 picked-reply preferred 50% margin -0.012 17.2s/step
+dpo step 15/76 epoch 1 picked-reply preferred 50% margin 0.014 17.1s/step
+dpo step 20/76 epoch 1 picked-reply preferred 55% margin 0.021 16.9s/step
+dpo step 25/76 epoch 1 picked-reply preferred 65% margin 0.032 16.8s/step
+dpo step 30/76 epoch 1 picked-reply preferred 65% margin 0.029 16.7s/step
+dpo step 35/76 epoch 1 picked-reply preferred 50% margin 0.001 16.6s/step
+dpo step 40/76 epoch 2 picked-reply preferred 70% margin 0.083 16.5s/step
+dpo step 45/76 epoch 2 picked-reply preferred 90% margin 0.211 16.4s/step
+dpo step 50/76 epoch 2 picked-reply preferred 95% margin 0.284 16.4s/step
+dpo step 55/76 epoch 2 picked-reply preferred 90% margin 0.233 16.3s/step
+dpo step 60/76 epoch 2 picked-reply preferred 90% margin 0.265 16.2s/step
+dpo step 65/76 epoch 2 picked-reply preferred 85% margin 0.209 16.2s/step
+dpo step 70/76 epoch 2 picked-reply preferred 90% margin 0.267 16.2s/step
+dpo step 75/76 epoch 2 picked-reply preferred 85% margin 0.197 16.2s/step
+saved DPO adapter
+/usr/local/lib/python3.12/site-packages/huggingface_hub/constants.py:302: FutureWarning: The `HF_HUB_ENABLE_HF_TRANSFER` environment variable is deprecated as 'hf_transfer' is not used anymore. Please use `HF_XET_HIGH_PERFORMANCE` instead to enable high performance transfer with Xet. Visit https://huggingface.co/docs/huggingface_hub/package_reference/environment_variables#hfxethighperformance for more details.
+  warnings.warn(
+INFO:lora-to-gguf:Loading base model: base
+INFO:lora-to-gguf:Using model architecture: Gemma4ForConditionalGeneration
+INFO:hf-to-gguf:gguf: loading model weight map from 'model.safetensors.index.json'
+INFO:hf-to-gguf:gguf: indexing model part 'model-00001-of-00002.safetensors'
+INFO:hf-to-gguf:gguf: indexing model part 'model-00002-of-00002.safetensors'
+INFO:gguf.gguf_writer:gguf: This GGUF file is for Little Endian only
+INFO:lora-to-gguf:Exporting model...
+INFO:hf-to-gguf:blk.0.attn_k.weight.lora_a,        torch.float32 --> F16, shape = {2816, 16}
+INFO:hf-to-gguf:blk.0.attn_k.weight.lora_b,        torch.float32 --> F16, shape = {16, 2048}
+INFO:hf-to-gguf:blk.0.attn_output.weight.lora_a,   torch.float32 --> F16, shape = {4096, 16}
+INFO:hf-to-gguf:blk.0.attn_output.weight.lora_b,   torch.float32 --> F16, shape = {16, 2816}
+INFO:hf-to-gguf:blk.0.attn_q.weight.lora_a,        torch.float32 --> F16, shape = {2816, 16}
+INFO:hf-to-gguf:blk.0.attn_q.weight.lora_b,        torch.float32 --> F16, shape = {16, 4096}
+INFO:hf-to-gguf:blk.0.attn_v.weight.lora_a,        torch.float32 --> F16, shape = {2816, 16}
+INFO:hf-to-gguf:blk.0.attn_v.weight.lora_b,        torch.float32 --> F16, shape = {16, 2048}
+INFO:hf-to-gguf:blk.1.attn_k.weight.lora_a,        torch.float32 --> F16, shape = {2816, 16}
+INFO:hf-to-gguf:blk.1.attn_k.weight.lora_b,        torch.float32 --> F16, shape = {16, 2048}
+INFO:hf-to-gguf:blk.1.attn_output.weight.lora_a,   torch.float32 --> F16, shape = {4096, 16}
+INFO:hf-to-gguf:blk.1.attn_output.weight.lora_b,   torch.float32 --> F16, shape = {16, 2816}
+INFO:hf-to-gguf:blk.1.attn_q.weight.lora_a,        torch.float32 --> F16, shape = {2816, 16}
+INFO:hf-to-gguf:blk.1.attn_q.weight.lora_b,        torch.float32 --> F16, shape = {16, 4096}
+INFO:hf-to-gguf:blk.1.attn_v.weight.lora_a,        torch.float32 --> F16, shape = {2816, 16}
+INFO:hf-to-gguf:blk.1.attn_v.weight.lora_b,        torch.float32 --> F16, shape = {16, 2048}
+INFO:hf-to-gguf:blk.10.attn_k.weight.lora_a,       torch.float32 --> F16, shape = {2816, 16}
+INFO:hf-to-gguf:blk.10.attn_k.weight.lora_b,       torch.float32 --> F16, shape = {16, 2048}
+INFO:hf-to-gguf:blk.10.attn_output.weight.lora_a,  torch.float32 --> F16, shape = {4096, 16}
+INFO:hf-to-gguf:blk.10.attn_output.weight.lora_b,  torch.float32 --> F16, shape = {16, 2816}
+INFO:hf-to-gguf:blk.10.attn_q.weight.lora_a,       torch.float32 --> F16, shape = {2816, 16}
+INFO:hf-to-gguf:blk.10.attn_q.weight.lora_b,       torch.float32 --> F16, shape = {16, 4096}
+INFO:hf-to-gguf:blk.10.attn_v.weight.lora_a,       torch.float32 --> F16, shape = {2816, 16}
+INFO:hf-to-gguf:blk.10.attn_v.weight.lora_b,       torch.float32 --> F16, shape = {16, 2048}
+INFO:hf-to-gguf:blk.11.attn_k.weight.lora_a,       torch.float32 --> F16, shape = {2816, 16}
+INFO:hf-to-gguf:blk.11.attn_k.weight.lora_b,       torch.float32 --> F16, shape = {16, 1024}
+INFO:hf-to-gguf:blk.11.attn_output.weight.lora_a,  torch.float32 --> F16, shape = {8192, 16}
+INFO:hf-to-gguf:blk.11.attn_output.weight.lora_b,  torch.float32 --> F16, shape = {16, 2816}
+INFO:hf-to-gguf:blk.11.attn_q.weight.lora_a,       torch.float32 --> F16, shape = {2816, 16}
+INFO:hf-to-gguf:blk.11.attn_q.weight.lora_b,       torch.float32 --> F16, shape = {16, 8192}
+INFO:hf-to-gguf:blk.12.attn_k.weight.lora_a,       torch.float32 --> F16, shape = {2816, 16}
+INFO:hf-to-gguf:blk.12.attn_k.weight.lora_b,       torch.float32 --> F16, shape = {16, 2048}
+INFO:hf-to-gguf:blk.12.attn_output.weight.lora_a,  torch.float32 --> F16, shape = {4096, 16}
+INFO:hf-to-gguf:blk.12.attn_output.weight.lora_b,  torch.float32 --> F16, shape = {16, 2816}
+INFO:hf-to-gguf:blk.12.attn_q.weight.lora_a,       torch.float32 --> F16, shape = {2816, 16}
+INFO:hf-to-gguf:blk.12.attn_q.weight.lora_b,       torch.float32 --> F16, shape = {16, 4096}
+INFO:hf-to-gguf:blk.12.attn_v.weight.lora_a,       torch.float32 --> F16, shape = {2816, 16}
+INFO:hf-to-gguf:blk.12.attn_v.weight.lora_b,       torch.float32 --> F16, shape = {16, 2048}
+INFO:hf-to-gguf:blk.13.attn_k.weight.lora_a,       torch.float32 --> F16, shape = {2816, 16}
+INFO:hf-to-gguf:blk.13.attn_k.weight.lora_b,       torch.float32 --> F16, shape = {16, 2048}
+INFO:hf-to-gguf:blk.13.attn_output.weight.lora_a,  torch.float32 --> F16, shape = {4096, 16}
+INFO:hf-to-gguf:blk.13.attn_output.weight.lora_b,  torch.float32 --> F16, shape = {16, 2816}
+INFO:hf-to-gguf:blk.13.attn_q.weight.lora_a,       torch.float32 --> F16, shape = {2816, 16}
+INFO:hf-to-gguf:blk.13.attn_q.weight.lora_b,       torch.float32 --> F16, shape = {16, 4096}
+INFO:hf-to-gguf:blk.13.attn_v.weight.lora_a,       torch.float32 --> F16, shape = {2816, 16}
+INFO:hf-to-gguf:blk.13.attn_v.weight.lora_b,       torch.float32 --> F16, shape = {16, 2048}
+INFO:hf-to-gguf:blk.14.attn_k.weight.lora_a,       torch.float32 --> F16, shape = {2816, 16}
+INFO:hf-to-gguf:blk.14.attn_k.weight.lora_b,       torch.float32 --> F16, shape = {16, 2048}
+INFO:hf-to-gguf:blk.14.attn_output.weight.lora_a,  torch.float32 --> F16, shape = {4096, 16}
+INFO:hf-to-gguf:blk.14.attn_output.weight.lora_b,  torch.float32 --> F16, shape = {16, 2816}
+INFO:hf-to-gguf:blk.14.attn_q.weight.lora_a,       torch.float32 --> F16, shape = {2816, 16}
+INFO:hf-to-gguf:blk.14.attn_q.weight.lora_b,       torch.float32 --> F16, shape = {16, 4096}
+INFO:hf-to-gguf:blk.14.attn_v.weight.lora_a,       torch.float32 --> F16, shape = {2816, 16}
+INFO:hf-to-gguf:blk.14.attn_v.weight.lora_b,       torch.float32 --> F16, shape = {16, 2048}
+INFO:hf-to-gguf:blk.15.attn_k.weight.lora_a,       torch.float32 --> F16, shape = {2816, 16}
+INFO:hf-to-gguf:blk.15.attn_k.weight.lora_b,       torch.float32 --> F16, shape = {16, 2048}
+INFO:hf-to-gguf:blk.15.attn_output.weight.lora_a,  torch.float32 --> F16, shape = {4096, 16}
+INFO:hf-to-gguf:blk.15.attn_output.weight.lora_b,  torch.float32 --> F16, shape = {16, 2816}
+INFO:hf-to-gguf:blk.15.attn_q.weight.lora_a,       torch.float32 --> F16, shape = {2816, 16}
+INFO:hf-to-gguf:blk.15.attn_q.weight.lora_b,       torch.float32 --> F16, shape = {16, 4096}
+INFO:hf-to-gguf:blk.15.attn_v.weight.lora_a,       torch.float32 --> F16, shape = {2816, 16}
+INFO:hf-to-gguf:blk.15.attn_v.weight.lora_b,       torch.float32 --> F16, shape = {16, 2048}
+INFO:hf-to-gguf:blk.16.attn_k.weight.lora_a,       torch.float32 --> F16, shape = {2816, 16}
+INFO:hf-to-gguf:blk.16.attn_k.weight.lora_b,       torch.float32 --> F16, shape = {16, 2048}
+INFO:hf-to-gguf:blk.16.attn_output.weight.lora_a,  torch.float32 --> F16, shape = {4096, 16}
+INFO:hf-to-gguf:blk.16.attn_output.weight.lora_b,  torch.float32 --> F16, shape = {16, 2816}
+INFO:hf-to-gguf:blk.16.attn_q.weight.lora_a,       torch.float32 --> F16, shape = {2816, 16}
+INFO:hf-to-gguf:blk.16.attn_q.weight.lora_b,       torch.float32 --> F16, shape = {16, 4096}
+INFO:hf-to-gguf:blk.16.attn_v.weight.lora_a,       torch.float32 --> F16, shape = {2816, 16}
+INFO:hf-to-gguf:blk.16.attn_v.weight.lora_b,       torch.float32 --> F16, shape = {16, 2048}
+INFO:hf-to-gguf:blk.17.attn_k.weight.lora_a,       torch.float32 --> F16, shape = {2816, 16}
+INFO:hf-to-gguf:blk.17.attn_k.weight.lora_b,       torch.float32 --> F16, shape = {16, 1024}
+INFO:hf-to-gguf:blk.17.attn_output.weight.lora_a,  torch.float32 --> F16, shape = {8192, 16}
+INFO:hf-to-gguf:blk.17.attn_output.weight.lora_b,  torch.float32 --> F16, shape = {16, 2816}
+INFO:hf-to-gguf:blk.17.attn_q.weight.lora_a,       torch.float32 --> F16, shape = {2816, 16}
+INFO:hf-to-gguf:blk.17.attn_q.weight.lora_b,       torch.float32 --> F16, shape = {16, 8192}
+INFO:hf-to-gguf:blk.18.attn_k.weight.lora_a,       torch.float32 --> F16, shape = {2816, 16}
+INFO:hf-to-gguf:blk.18.attn_k.weight.lora_b,       torch.float32 --> F16, shape = {16, 2048}
+INFO:hf-to-gguf:blk.18.attn_output.weight.lora_a,  torch.float32 --> F16, shape = {4096, 16}
+INFO:hf-to-gguf:blk.18.attn_output.weight.lora_b,  torch.float32 --> F16, shape = {16, 2816}
+INFO:hf-to-gguf:blk.18.attn_q.weight.lora_a,       torch.float32 --> F16, shape = {2816, 16}
+INFO:hf-to-gguf:blk.18.attn_q.weight.lora_b,       torch.float32 --> F16, shape = {16, 4096}
+INFO:hf-to-gguf:blk.18.attn_v.weight.lora_a,       torch.float32 --> F16, shape = {2816, 16}
+INFO:hf-to-gguf:blk.18.attn_v.weight.lora_b,       torch.float32 --> F16, shape = {16, 2048}
+INFO:hf-to-gguf:blk.19.attn_k.weight.lora_a,       torch.float32 --> F16, shape = {2816, 16}
+INFO:hf-to-gguf:blk.19.attn_k.weight.lora_b,       torch.float32 --> F16, shape = {16, 2048}
+INFO:hf-to-gguf:blk.19.attn_output.weight.lora_a,  torch.float32 --> F16, shape = {4096, 16}
+INFO:hf-to-gguf:blk.19.attn_output.weight.lora_b,  torch.float32 --> F16, shape = {16, 2816}
+INFO:hf-to-gguf:blk.19.attn_q.weight.lora_a,       torch.float32 --> F16, shape = {2816, 16}
+INFO:hf-to-gguf:blk.19.attn_q.weight.lora_b,       torch.float32 --> F16, shape = {16, 4096}
+INFO:hf-to-gguf:blk.19.attn_v.weight.lora_a,       torch.float32 --> F16, shape = {2816, 16}
+INFO:hf-to-gguf:blk.19.attn_v.weight.lora_b,       torch.float32 --> F16, shape = {16, 2048}
+INFO:hf-to-gguf:blk.2.attn_k.weight.lora_a,        torch.float32 --> F16, shape = {2816, 16}
+INFO:hf-to-gguf:blk.2.attn_k.weight.lora_b,        torch.float32 --> F16, shape = {16, 2048}
+INFO:hf-to-gguf:blk.2.attn_output.weight.lora_a,   torch.float32 --> F16, shape = {4096, 16}
+INFO:hf-to-gguf:blk.2.attn_output.weight.lora_b,   torch.float32 --> F16, shape = {16, 2816}
+INFO:hf-to-gguf:blk.2.attn_q.weight.lora_a,        torch.float32 --> F16, shape = {2816, 16}
+INFO:hf-to-gguf:blk.2.attn_q.weight.lora_b,        torch.float32 --> F16, shape = {16, 4096}
+INFO:hf-to-gguf:blk.2.attn_v.weight.lora_a,        torch.float32 --> F16, shape = {2816, 16}
+INFO:hf-to-gguf:blk.2.attn_v.weight.lora_b,        torch.float32 --> F16, shape = {16, 2048}
+INFO:hf-to-gguf:blk.20.attn_k.weight.lora_a,       torch.float32 --> F16, shape = {2816, 16}
+INFO:hf-to-gguf:blk.20.attn_k.weight.lora_b,       torch.float32 --> F16, shape = {16, 2048}
+INFO:hf-to-gguf:blk.20.attn_output.weight.lora_a,  torch.float32 --> F16, shape = {4096, 16}
+INFO:hf-to-gguf:blk.20.attn_output.weight.lora_b,  torch.float32 --> F16, shape = {16, 2816}
+INFO:hf-to-gguf:blk.20.attn_q.weight.lora_a,       torch.float32 --> F16, shape = {2816, 16}
+INFO:hf-to-gguf:blk.20.attn_q.weight.lora_b,       torch.float32 --> F16, shape = {16, 4096}
+INFO:hf-to-gguf:blk.20.attn_v.weight.lora_a,       torch.float32 --> F16, shape = {2816, 16}
+INFO:hf-to-gguf:blk.20.attn_v.weight.lora_b,       torch.float32 --> F16, shape = {16, 2048}
+INFO:hf-to-gguf:blk.21.attn_k.weight.lora_a,       torch.float32 --> F16, shape = {2816, 16}
+INFO:hf-to-gguf:blk.21.attn_k.weight.lora_b,       torch.float32 --> F16, shape = {16, 2048}
+INFO:hf-to-gguf:blk.21.attn_output.weight.lora_a,  torch.float32 --> F16, shape = {4096, 16}
+INFO:hf-to-gguf:blk.21.attn_output.weight.lora_b,  torch.float32 --> F16, shape = {16, 2816}
+INFO:hf-to-gguf:blk.21.attn_q.weight.lora_a,       torch.float32 --> F16, shape = {2816, 16}
+INFO:hf-to-gguf:blk.21.attn_q.weight.lora_b,       torch.float32 --> F16, shape = {16, 4096}
+INFO:hf-to-gguf:blk.21.attn_v.weight.lora_a,       torch.float32 --> F16, shape = {2816, 16}
+INFO:hf-to-gguf:blk.21.attn_v.weight.lora_b,       torch.float32 --> F16, shape = {16, 2048}
+INFO:hf-to-gguf:blk.22.attn_k.weight.lora_a,       torch.float32 --> F16, shape = {2816, 16}
+INFO:hf-to-gguf:blk.22.attn_k.weight.lora_b,       torch.float32 --> F16, shape = {16, 2048}
+INFO:hf-to-gguf:blk.22.attn_output.weight.lora_a,  torch.float32 --> F16, shape = {4096, 16}
+INFO:hf-to-gguf:blk.22.attn_output.weight.lora_b,  torch.float32 --> F16, shape = {16, 2816}
+INFO:hf-to-gguf:blk.22.attn_q.weight.lora_a,       torch.float32 --> F16, shape = {2816, 16}
+INFO:hf-to-gguf:blk.22.attn_q.weight.lora_b,       torch.float32 --> F16, shape = {16, 4096}
+INFO:hf-to-gguf:blk.22.attn_v.weight.lora_a,       torch.float32 --> F16, shape = {2816, 16}
+INFO:hf-to-gguf:blk.22.attn_v.weight.lora_b,       torch.float32 --> F16, shape = {16, 2048}
+INFO:hf-to-gguf:blk.23.attn_k.weight.lora_a,       torch.float32 --> F16, shape = {2816, 16}
+INFO:hf-to-gguf:blk.23.attn_k.weight.lora_b,       torch.float32 --> F16, shape = {16, 1024}
+INFO:hf-to-gguf:blk.23.attn_output.weight.lora_a,  torch.float32 --> F16, shape = {8192, 16}
+INFO:hf-to-gguf:blk.23.attn_output.weight.lora_b,  torch.float32 --> F16, shape = {16, 2816}
+INFO:hf-to-gguf:blk.23.attn_q.weight.lora_a,       torch.float32 --> F16, shape = {2816, 16}
+INFO:hf-to-gguf:blk.23.attn_q.weight.lora_b,       torch.float32 --> F16, shape = {16, 8192}
+INFO:hf-to-gguf:blk.24.attn_k.weight.lora_a,       torch.float32 --> F16, shape = {2816, 16}
+INFO:hf-to-gguf:blk.24.attn_k.weight.lora_b,       torch.float32 --> F16, shape = {16, 2048}
+INFO:hf-to-gguf:blk.24.attn_output.weight.lora_a,  torch.float32 --> F16, shape = {4096, 16}
+INFO:hf-to-gguf:blk.24.attn_output.weight.lora_b,  torch.float32 --> F16, shape = {16, 2816}
+INFO:hf-to-gguf:blk.24.attn_q.weight.lora_a,       torch.float32 --> F16, shape = {2816, 16}
+INFO:hf-to-gguf:blk.24.attn_q.weight.lora_b,       torch.float32 --> F16, shape = {16, 4096}
+INFO:hf-to-gguf:blk.24.attn_v.weight.lora_a,       torch.float32 --> F16, shape = {2816, 16}
+INFO:hf-to-gguf:blk.24.attn_v.weight.lora_b,       torch.float32 --> F16, shape = {16, 2048}
+INFO:hf-to-gguf:blk.25.attn_k.weight.lora_a,       torch.float32 --> F16, shape = {2816, 16}
+INFO:hf-to-gguf:blk.25.attn_k.weight.lora_b,       torch.float32 --> F16, shape = {16, 2048}
+INFO:hf-to-gguf:blk.25.attn_output.weight.lora_a,  torch.float32 --> F16, shape = {4096, 16}
+INFO:hf-to-gguf:blk.25.attn_output.weight.lora_b,  torch.float32 --> F16, shape = {16, 2816}
+INFO:hf-to-gguf:blk.25.attn_q.weight.lora_a,       torch.float32 --> F16, shape = {2816, 16}
+INFO:hf-to-gguf:blk.25.attn_q.weight.lora_b,       torch.float32 --> F16, shape = {16, 4096}
+INFO:hf-to-gguf:blk.25.attn_v.weight.lora_a,       torch.float32 --> F16, shape = {2816, 16}
+INFO:hf-to-gguf:blk.25.attn_v.weight.lora_b,       torch.float32 --> F16, shape = {16, 2048}
+INFO:hf-to-gguf:blk.26.attn_k.weight.lora_a,       torch.float32 --> F16, shape = {2816, 16}
+INFO:hf-to-gguf:blk.26.attn_k.weight.lora_b,       torch.float32 --> F16, shape = {16, 2048}
+INFO:hf-to-gguf:blk.26.attn_output.weight.lora_a,  torch.float32 --> F16, shape = {4096, 16}
+INFO:hf-to-gguf:blk.26.attn_output.weight.lora_b,  torch.float32 --> F16, shape = {16, 2816}
+INFO:hf-to-gguf:blk.26.attn_q.weight.lora_a,       torch.float32 --> F16, shape = {2816, 16}
+INFO:hf-to-gguf:blk.26.attn_q.weight.lora_b,       torch.float32 --> F16, shape = {16, 4096}
+INFO:hf-to-gguf:blk.26.attn_v.weight.lora_a,       torch.float32 --> F16, shape = {2816, 16}
+INFO:hf-to-gguf:blk.26.attn_v.weight.lora_b,       torch.float32 --> F16, shape = {16, 2048}
+INFO:hf-to-gguf:blk.27.attn_k.weight.lora_a,       torch.float32 --> F16, shape = {2816, 16}
+INFO:hf-to-gguf:blk.27.attn_k.weight.lora_b,       torch.float32 --> F16, shape = {16, 2048}
+INFO:hf-to-gguf:blk.27.attn_output.weight.lora_a,  torch.float32 --> F16, shape = {4096, 16}
+INFO:hf-to-gguf:blk.27.attn_output.weight.lora_b,  torch.float32 --> F16, shape = {16, 2816}
+INFO:hf-to-gguf:blk.27.attn_q.weight.lora_a,       torch.float32 --> F16, shape = {2816, 16}
+INFO:hf-to-gguf:blk.27.attn_q.weight.lora_b,       torch.float32 --> F16, shape = {16, 4096}
+INFO:hf-to-gguf:blk.27.attn_v.weight.lora_a,       torch.float32 --> F16, shape = {2816, 16}
+INFO:hf-to-gguf:blk.27.attn_v.weight.lora_b,       torch.float32 --> F16, shape = {16, 2048}
+INFO:hf-to-gguf:blk.28.attn_k.weight.lora_a,       torch.float32 --> F16, shape = {2816, 16}
+INFO:hf-to-gguf:blk.28.attn_k.weight.lora_b,       torch.float32 --> F16, shape = {16, 2048}
+INFO:hf-to-gguf:blk.28.attn_output.weight.lora_a,  torch.float32 --> F16, shape = {4096, 16}
+INFO:hf-to-gguf:blk.28.attn_output.weight.lora_b,  torch.float32 --> F16, shape = {16, 2816}
+INFO:hf-to-gguf:blk.28.attn_q.weight.lora_a,       torch.float32 --> F16, shape = {2816, 16}
+INFO:hf-to-gguf:blk.28.attn_q.weight.lora_b,       torch.float32 --> F16, shape = {16, 4096}
+INFO:hf-to-gguf:blk.28.attn_v.weight.lora_a,       torch.float32 --> F16, shape = {2816, 16}
+INFO:hf-to-gguf:blk.28.attn_v.weight.lora_b,       torch.float32 --> F16, shape = {16, 2048}
+INFO:hf-to-gguf:blk.29.attn_k.weight.lora_a,       torch.float32 --> F16, shape = {2816, 16}
+INFO:hf-to-gguf:blk.29.attn_k.weight.lora_b,       torch.float32 --> F16, shape = {16, 1024}
+INFO:hf-to-gguf:blk.29.attn_output.weight.lora_a,  torch.float32 --> F16, shape = {8192, 16}
+INFO:hf-to-gguf:blk.29.attn_output.weight.lora_b,  torch.float32 --> F16, shape = {16, 2816}
+INFO:hf-to-gguf:blk.29.attn_q.weight.lora_a,       torch.float32 --> F16, shape = {2816, 16}
+INFO:hf-to-gguf:blk.29.attn_q.weight.lora_b,       torch.float32 --> F16, shape = {16, 8192}
+INFO:hf-to-gguf:blk.3.attn_k.weight.lora_a,        torch.float32 --> F16, shape = {2816, 16}
+INFO:hf-to-gguf:blk.3.attn_k.weight.lora_b,        torch.float32 --> F16, shape = {16, 2048}
+INFO:hf-to-gguf:blk.3.attn_output.weight.lora_a,   torch.float32 --> F16, shape = {4096, 16}
+INFO:hf-to-gguf:blk.3.attn_output.weight.lora_b,   torch.float32 --> F16, shape = {16, 2816}
+INFO:hf-to-gguf:blk.3.attn_q.weight.lora_a,        torch.float32 --> F16, shape = {2816, 16}
+INFO:hf-to-gguf:blk.3.attn_q.weight.lora_b,        torch.float32 --> F16, shape = {16, 4096}
+INFO:hf-to-gguf:blk.3.attn_v.weight.lora_a,        torch.float32 --> F16, shape = {2816, 16}
+INFO:hf-to-gguf:blk.3.attn_v.weight.lora_b,        torch.float32 --> F16, shape = {16, 2048}
+INFO:hf-to-gguf:blk.4.attn_k.weight.lora_a,        torch.float32 --> F16, shape = {2816, 16}
+INFO:hf-to-gguf:blk.4.attn_k.weight.lora_b,        torch.float32 --> F16, shape = {16, 2048}
+INFO:hf-to-gguf:blk.4.attn_output.weight.lora_a,   torch.float32 --> F16, shape = {4096, 16}
+INFO:hf-to-gguf:blk.4.attn_output.weight.lora_b,   torch.float32 --> F16, shape = {16, 2816}
+INFO:hf-to-gguf:blk.4.attn_q.weight.lora_a,        torch.float32 --> F16, shape = {2816, 16}
+INFO:hf-to-gguf:blk.4.attn_q.weight.lora_b,        torch.float32 --> F16, shape = {16, 4096}
+INFO:hf-to-gguf:blk.4.attn_v.weight.lora_a,        torch.float32 --> F16, shape = {2816, 16}
+INFO:hf-to-gguf:blk.4.attn_v.weight.lora_b,        torch.float32 --> F16, shape = {16, 2048}
+INFO:hf-to-gguf:blk.5.attn_k.weight.lora_a,        torch.float32 --> F16, shape = {2816, 16}
+INFO:hf-to-gguf:blk.5.attn_k.weight.lora_b,        torch.float32 --> F16, shape = {16, 1024}
+INFO:hf-to-gguf:blk.5.attn_output.weight.lora_a,   torch.float32 --> F16, shape = {8192, 16}
+INFO:hf-to-gguf:blk.5.attn_output.weight.lora_b,   torch.float32 --> F16, shape = {16, 2816}
+INFO:hf-to-gguf:blk.5.attn_q.weight.lora_a,        torch.float32 --> F16, shape = {2816, 16}
+INFO:hf-to-gguf:blk.5.attn_q.weight.lora_b,        torch.float32 --> F16, shape = {16, 8192}
+INFO:hf-to-gguf:blk.6.attn_k.weight.lora_a,        torch.float32 --> F16, shape = {2816, 16}
+INFO:hf-to-gguf:blk.6.attn_k.weight.lora_b,        torch.float32 --> F16, shape = {16, 2048}
+INFO:hf-to-gguf:blk.6.attn_output.weight.lora_a,   torch.float32 --> F16, shape = {4096, 16}
+INFO:hf-to-gguf:blk.6.attn_output.weight.lora_b,   torch.float32 --> F16, shape = {16, 2816}
+INFO:hf-to-gguf:blk.6.attn_q.weight.lora_a,        torch.float32 --> F16, shape = {2816, 16}
+INFO:hf-to-gguf:blk.6.attn_q.weight.lora_b,        torch.float32 --> F16, shape = {16, 4096}
+INFO:hf-to-gguf:blk.6.attn_v.weight.lora_a,        torch.float32 --> F16, shape = {2816, 16}
+INFO:hf-to-gguf:blk.6.attn_v.weight.lora_b,        torch.float32 --> F16, shape = {16, 2048}
+INFO:hf-to-gguf:blk.7.attn_k.weight.lora_a,        torch.float32 --> F16, shape = {2816, 16}
+INFO:hf-to-gguf:blk.7.attn_k.weight.lora_b,        torch.float32 --> F16, shape = {16, 2048}
+INFO:hf-to-gguf:blk.7.attn_output.weight.lora_a,   torch.float32 --> F16, shape = {4096, 16}
+INFO:hf-to-gguf:blk.7.attn_output.weight.lora_b,   torch.float32 --> F16, shape = {16, 2816}
+INFO:hf-to-gguf:blk.7.attn_q.weight.lora_a,        torch.float32 --> F16, shape = {2816, 16}
+INFO:hf-to-gguf:blk.7.attn_q.weight.lora_b,        torch.float32 --> F16, shape = {16, 4096}
+INFO:hf-to-gguf:blk.7.attn_v.weight.lora_a,        torch.float32 --> F16, shape = {2816, 16}
+INFO:hf-to-gguf:blk.7.attn_v.weight.lora_b,        torch.float32 --> F16, shape = {16, 2048}
+INFO:hf-to-gguf:blk.8.attn_k.weight.lora_a,        torch.float32 --> F16, shape = {2816, 16}
+INFO:hf-to-gguf:blk.8.attn_k.weight.lora_b,        torch.float32 --> F16, shape = {16, 2048}
+INFO:hf-to-gguf:blk.8.attn_output.weight.lora_a,   torch.float32 --> F16, shape = {4096, 16}
+INFO:hf-to-gguf:blk.8.attn_output.weight.lora_b,   torch.float32 --> F16, shape = {16, 2816}
+INFO:hf-to-gguf:blk.8.attn_q.weight.lora_a,        torch.float32 --> F16, shape = {2816, 16}
+INFO:hf-to-gguf:blk.8.attn_q.weight.lora_b,        torch.float32 --> F16, shape = {16, 4096}
+INFO:hf-to-gguf:blk.8.attn_v.weight.lora_a,        torch.float32 --> F16, shape = {2816, 16}
+INFO:hf-to-gguf:blk.8.attn_v.weight.lora_b,        torch.float32 --> F16, shape = {16, 2048}
+INFO:hf-to-gguf:blk.9.attn_k.weight.lora_a,        torch.float32 --> F16, shape = {2816, 16}
+INFO:hf-to-gguf:blk.9.attn_k.weight.lora_b,        torch.float32 --> F16, shape = {16, 2048}
+INFO:hf-to-gguf:blk.9.attn_output.weight.lora_a,   torch.float32 --> F16, shape = {4096, 16}
+INFO:hf-to-gguf:blk.9.attn_output.weight.lora_b,   torch.float32 --> F16, shape = {16, 2816}
+INFO:hf-to-gguf:blk.9.attn_q.weight.lora_a,        torch.float32 --> F16, shape = {2816, 16}
+INFO:hf-to-gguf:blk.9.attn_q.weight.lora_b,        torch.float32 --> F16, shape = {16, 4096}
+INFO:hf-to-gguf:blk.9.attn_v.weight.lora_a,        torch.float32 --> F16, shape = {2816, 16}
+INFO:hf-to-gguf:blk.9.attn_v.weight.lora_b,        torch.float32 --> F16, shape = {16, 2048}
+INFO:hf-to-gguf:Set meta model
+INFO:hf-to-gguf:Set model parameters
+INFO:hf-to-gguf:Set model quantization version
+INFO:hf-to-gguf:Set model tokenizer
+INFO:gguf.gguf_writer:Writing the following files:
+INFO:gguf.gguf_writer:/vol/out/marina-voice-f16.gguf: n_tensors = 230, total_size = 23.0M
+
+[1AWriting:   0%|          | 0.00/23.0M [00:00<?, ?byte/s]
+[1AWriting:  28%|██▊       | 6.39M/23.0M [00:00<00:00, 63.1Mbyte/s]
+[1AWriting:  60%|██████    | 13.8M/23.0M [00:00<00:00, 69.3Mbyte/s]
+[1AWriting:  93%|█████████▎| 21.4M/23.0M [00:00<00:00, 72.2Mbyte/s]
+[1AWriting: 100%|██████████| 23.0M/23.0M [00:00<00:00, 70.4Mbyte/s]
+INFO:lora-to-gguf:Model successfully exported to /vol/out/marina-voice-f16.gguf
+gguf: /vol/out/marina-voice-f16.gguf 21 MiB
+[modal-client] 2026-11-27T12:50:38+0000 Timed out waiting for final app logs.
+✓ App completed. View run at 
+https://modal.com/apps/jacobmatthews3478/main/ap-2fonPFw8lpqXLTiF9VOxXp

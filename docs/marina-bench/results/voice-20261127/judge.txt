@@ -1,0 +1,22 @@
+Judge browser: marina vs marina-voice, 30 chats, each judged in both orders
+(a side wins a chat only when both orders agree; otherwise tie)
+
+funnier       marina-voice  5  marina 12  tie 13   (orders agreed 63%)
+snarkier      marina-voice  5  marina 13  tie 12   (orders agreed 63%)
+charm         marina-voice  4  marina 12  tie 14   (orders agreed 53%)
+real_person   marina-voice  5  marina 13  tie 12   (orders agreed 60%)
+listener      marina-voice  5  marina 13  tie 12   (orders agreed 60%)
+in_character  marina-voice  5  marina 12  tie 13   (orders agreed 56%)
+overall       marina-voice  5  marina 12  tie 13   (orders agreed 56%)
+
+By scenario (overall):
+  are_you_real      marina-voice 1  marina 1  tie 1
+  coding_mate       marina-voice 1  marina 1  tie 1
+  drive_the_chat    marina-voice 0  marina 2  tie 1
+  good_morning      marina-voice 0  marina 2  tie 1
+  hackclub_news     marina-voice 0  marina 1  tie 2
+  home_life         marina-voice 1  marina 1  tie 1
+  low_mood          marina-voice 1  marina 1  tie 1
+  opinion_pushback  marina-voice 1  marina 2  tie 0
+  small_talk_loop   marina-voice 0  marina 1  tie 2
+  teasing           marina-voice 0  marina 0  tie 3
