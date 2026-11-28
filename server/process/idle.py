@@ -1,6 +1,8 @@
 """Decides when she says something without being asked. See `idle:` in
 character_config.yaml for the limits."""
+import difflib
 import random
+import re
 import threading
 import time
 from datetime import datetime
@@ -15,6 +17,11 @@ MAX_PER_HOUR = int(_idle.get("max_per_hour", 2))
 PROBABILITY = float(_idle.get("probability", 0.5))
 QUIET_FROM = int(_idle.get("quiet_from_hour", 23))
 QUIET_UNTIL = int(_idle.get("quiet_until_hour", 9))
+# Unanswered, she backs off: one opener, then another only after a long wait,
+# then nothing until they reply. Without this she messaged every 25 minutes
+# all day into silence, and each new one copied the pile above it.
+MAX_UNANSWERED = int(_idle.get("max_unanswered", 2))
+BACKOFF = float(_idle.get("unanswered_backoff_minutes", 120)) * 60
 
 OPENER_INSTRUCTION = (
     "\n\nNothing has been said for a while and the silence is yours to break. "
@@ -122,7 +129,32 @@ def may_notice(now=None):
     return not in_quiet_hours()
 
 
-def due(now=None, roll=None):
+def unanswered(history):
+    """How many times she has spoken up since they last said anything, not
+    counting her answer to that, and when she last spoke."""
+    trailing = 0
+    last_at = None
+    for m in reversed(history):
+        if m.get("role") == "user":
+            trailing -= 1          # her first message after theirs answered them
+            break
+        if m.get("role") == "assistant":
+            trailing += 1
+            if last_at is None:
+                last_at = _at(m)
+    return max(0, trailing), last_at
+
+
+def _at(message):
+    try:
+        return datetime.fromisoformat(message.get("at")).timestamp()
+    except (TypeError, ValueError, AttributeError):
+        return None
+
+
+def due(now=None, roll=None, history=None):
+    """`history` is the conversation, or a function returning it; it is only
+    read once the cheap checks have passed."""
     if not enabled():
         return False
     now = now or time.time()
@@ -135,4 +167,47 @@ def due(now=None, roll=None):
             return False
     if in_quiet_hours():
         return False
-    return (roll if roll is not None else random.random()) < PROBABILITY
+    if (roll if roll is not None else random.random()) >= PROBABILITY:
+        return False
+    if history is not None:
+        n, last_at = unanswered(history() if callable(history) else history)
+        if n >= MAX_UNANSWERED:
+            return False
+        if n and last_at and now - last_at < BACKOFF:
+            return False
+    return True
+
+
+def _plain(text):
+    text = re.sub(r"\*[^*\n]+\*", " ", text or "").lower()
+    return " ".join(re.findall(r"[a-z0-9']+", text))
+
+
+def too_similar(text, history, recent=12, ratio=0.6):
+    """Whether a message she is about to send repeats one of her recent ones:
+    the same opening words, or mostly the same text."""
+    new = _plain(text)
+    if not new:
+        return True
+    head = new.split()[:3]
+    for m in reversed([m for m in history if m.get("role") == "assistant"][-recent:]):
+        old = _plain(m.get("content") if isinstance(m.get("content"), str) else "")
+        if not old:
+            continue
+        if len(head) == 3 and old.split()[:3] == head:
+            return True
+        if difflib.SequenceMatcher(None, new, old).ratio() >= ratio:
+            return True
+    return False
+
+
+def avoid_note(history, recent=6):
+    """Her latest messages, quoted, for a second try at saying something new."""
+    said = [m.get("content") for m in history if m.get("role") == "assistant"
+            and isinstance(m.get("content"), str)][-recent:]
+    if not said:
+        return ""
+    lines = "\n".join(f'- "{s}"' for s in dict.fromkeys(_plain(s)[:120] for s in said))
+    return ("\n\nYou have already said these, so do not reuse their words, "
+            f"openings or ideas:\n{lines}\nSay something genuinely different, "
+            "starting with a different word.")

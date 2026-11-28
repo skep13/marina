@@ -2,6 +2,7 @@
 import json
 import re
 import threading
+import time
 from datetime import date, datetime, timedelta
 
 from process import backend
@@ -210,6 +211,14 @@ _EXPLICIT = [
     re.compile(r"\bkeep\s+in\s+mind\s*[:,]?\s*(?:that\s+)?(.+)", re.I),
 ]
 
+# "forget that I live in Cardiff", "please forget about my exam", "I moved,
+# forget that". Only at the start of a sentence or clause, so "don't forget",
+# "I always forget my keys" and "nvm forget it" don't count.
+_FORGET = re.compile(
+    r"(?:^|[.!?,;]\s*)(?:(?:please|pls|plz|can\s+you|could\s+you|you\s+can)\s+)?"
+    r"forget\s*[:,]?\s*(?:that\s+|about\s+)?(.+)", re.I)
+_VAGUE = {"that", "this", "it", "about it", "about that", "everything", "what i said"}
+
 _IRREGULAR = {"have": "has", "am": "is", "'m": "is", "do": "does", "go": "goes"}
 _VERBS = {
     "live", "work", "prefer", "use", "own", "need", "want", "run", "like",
@@ -258,6 +267,10 @@ def explicit_fact(user_text):
         if not m:
             continue
         fact = m.group(1).strip(" .!?,")
+        # "i switched to arch, remember that": the fact comes before it.
+        if fact.lower() in ("that", "this", "it"):
+            fact = re.sub(r"^(?:oh\s+)?(?:btw|by the way|also|and|so|anyway)\b[\s,]*", "",
+                          text[:m.start()].strip(" .!?,"), flags=re.I)
         if len(fact) < 3:
             continue
         fact = _to_third_person(fact)
@@ -265,7 +278,45 @@ def explicit_fact(user_text):
     return None
 
 
+def explicit_forget(user_text):
+    """What to forget from "forget that ...", or None. "I moved, forget that"
+    points back at the words before it."""
+    text = " ".join((user_text or "").split())
+    m = _FORGET.search(text)
+    if not m:
+        return None
+    what = re.split(r"[,;]|\s+(?:because|cos|cause|since|as)\s+", m.group(1))[0].strip(" .!?")
+    if what.lower() in ("it", "about it", "everything", "what i said"):
+        return None                        # "forget it" = never mind
+    if what.lower() in _VAGUE:
+        what = text[:m.start()].strip(" .!?,")
+        what = re.sub(r"^(?:oh\s+)?(?:btw|by the way|also|and|so|anyway|actually)\b[\s,]*", "",
+                      what, flags=re.I)
+        if len(what.split()) < 2:          # "ugh, forget it"
+            return None
+    return what if len(what) >= 3 else None
+
+
+def forget_explicit(user_text):
+    """Drop the remembered fact they asked her to forget, whether or not she
+    calls the forget tool. Returns the removed fact's text, or None."""
+    what = explicit_forget(user_text)
+    if not what:
+        return None
+    # She called the forget tool for it during this reply: done already, and
+    # a second pass would take out the next-closest fact.
+    if time.time() - store.last_removed < 120:
+        return None
+    found = store.find(what, min_score=0.5)
+    if not found or not store.remove(found["id"]):
+        print(f"[memory] asked to forget {what!r}, nothing close enough", flush=True)
+        return None
+    print(f"[memory] -{found['text']}", flush=True)
+    return found["text"]
+
+
 def remember_async(client, model, user_text, assistant_text):
+    forget_explicit(user_text)
     direct = explicit_fact(user_text)
     if direct:
         fact = store.add(direct, source="explicit")

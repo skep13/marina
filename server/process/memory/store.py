@@ -12,6 +12,7 @@ Three kinds of thing live here, told apart by `source`:
 import json
 import re
 import threading
+import time
 import uuid
 from datetime import date, datetime, timezone
 
@@ -250,9 +251,14 @@ def local_pin(fact_id):
     return False
 
 
+last_removed = 0.0     # time.time() of the last fact removed, any way
+
+
 def remove(fact_id):
+    global last_removed
     if state.rehearsing():
         return False
+    last_removed = time.time()
     if shared.enabled():
         out = shared.call("DELETE", f"/shared/memory/{fact_id}")
         if isinstance(out, dict):
@@ -269,7 +275,7 @@ def local_remove(fact_id):
         return len(data["facts"]) < before
 
 
-def find(description):
+def find(description, min_score=0.3):
     """The remembered fact or note that best matches `description`, or None."""
     want = " ".join((description or "").lower().split())
     if not want:
@@ -282,7 +288,7 @@ def find(description):
         s = 1.0 if want in text else _similar(f["text"], description)
         if s > score:
             best, score = f, s
-    return best if score >= 0.3 else None
+    return best if score >= min_score else None
 
 
 def clear():

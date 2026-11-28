@@ -242,10 +242,26 @@ def _rvc(wav):
         return wav
 
 
+# Kokoro spells little sounds out letter by letter: "mm" comes out as "M M",
+# "mhm" and "mm-hm" as "em em hum". Swap them for words it says as sounds
+# ("uh-huh", "hmm"). Checked by transcribing what Kokoro made, 2026-11-27.
+_FILLERS = [
+    (re.compile(r"\b(?:m+-?h+m+|m+h+m*|uh-?huh)\b", re.I), "uh-huh"),
+    (re.compile(r"\b(?:m{2,}|h+m+)\b", re.I), "hmm"),
+]
+
+
+def spoken_fillers(text):
+    for rx, word in _FILLERS:
+        text = rx.sub(lambda m, w=word: w.capitalize() if m.group(0)[0].isupper() else w, text)
+    return text
+
+
 def synthesize(text):
     """Return (wav_bytes, visemes). visemes is empty for sovits."""
     if not text or not text.strip():
         raise TTSError("Refusing to synthesize empty text.")
+    text = spoken_fillers(text)
 
     if PROVIDER == "kokoro":
         wav, visemes = _kokoro_gen(text)

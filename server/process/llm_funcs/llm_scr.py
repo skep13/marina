@@ -102,13 +102,35 @@ def _style_note():
     return f"\n\n{note}" if note else ""
 
 
+# What she remembers, frozen while a conversation is going. The memory list
+# sits before the tool definitions in the prompt, so a fact saved after a
+# reply (most replies) made the server reread ~4K tokens of tools: 15-40 s.
+# Anything learned mid-chat is in the chat itself; the list catches up after
+# a pause.
+MEMORY_REFRESH_GAP = 20 * 60
+_memory_snapshot = {"text": None, "used": 0.0}
+
+
+def _memory_block():
+    now = time.time()
+    if _memory_snapshot["text"] is None or now - _memory_snapshot["used"] > MEMORY_REFRESH_GAP:
+        _memory_snapshot["text"] = memory.as_prompt_block()
+    _memory_snapshot["used"] = now
+    return _memory_snapshot["text"]
+
+
+def refresh_memory_block():
+    """After an edit someone made on purpose (pin, delete, the memory page)."""
+    _memory_snapshot["text"] = None
+
+
 def system_message():
     return {
         "role": "system",
         "content": (config.system_prompt()
                     + persona.profile_block()
                     + persona.examples_block()
-                    + (memory.as_prompt_block() if _recall() else "")
+                    + (_memory_block() if _recall() else "")
                     + tools.prompt_addition()
                     + _stable_context()
                     + (ambient.NOTE_EXPLAINED if ambient.ENABLED else "")
@@ -310,6 +332,21 @@ def _for_backup(messages, kw):
     return messages, kw
 
 
+def _pin_slot(messages, kw):
+    """Her chat in llama.cpp slot 0, every side job (memory, episodes, work
+    helpers) in slot 1. Left to itself the server put a 4K-token side job in
+    the slot holding her 8K-token prompt, so each reply re-read it all from
+    scratch: 15-40 s instead of a few."""
+    if "id_slot" in (kw.get("extra_body") or {}):
+        return kw
+    first = messages[0] if messages else None
+    hers = bool(first and first.get("role") == "system"
+                and str(first.get("content", "")).startswith(config.system_prompt()[:2000]))
+    extra = dict(kw.get("extra_body") or {})
+    extra["id_slot"] = 0 if hers else 1
+    return {**kw, "extra_body": extra}
+
+
 def chat_completion(messages, **kw):
     """Call the selected backend. In auto mode, fall through to the next one
     whenever a backend can't be reached."""
@@ -320,6 +357,8 @@ def chat_completion(messages, **kw):
     order = _order()
     for i, which in enumerate(order):
         send, send_kw = _for_backup(messages, kw) if _is_backup(which) else (messages, kw)
+        if which == "server":
+            send_kw = _pin_slot(send, send_kw)   # llama.cpp on lab3
         try:
             # A route only ever moves work on lab3; the backup keeps its own model.
             model = (routed if (routed and which == "server")
