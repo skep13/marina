@@ -1,0 +1,70 @@
+{
+  "name": "marina-linux",
+  "productName": "Marina",
+  "version": "1.2.0",
+  "description": "Marina on Linux: her whole body, her voice and your mic, talking to her bridge on lab3",
+  "main": "main.js",
+  "author": "Jacob Matthews <jacob@localhost>",
+  "license": "MIT",
+  "homepage": "https://github.com/skep13/marina",
+  "scripts": {
+    "start": "electron .",
+    "dist": "./build.sh"
+  },
+  "devDependencies": {
+    "electron": "^44.2.0",
+    "electron-builder": "^26.15.3"
+  },
+  "build": {
+    "appId": "com.jacobmatthews.marina",
+    "productName": "Marina",
+    "executableName": "marina",
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "linux.css",
+      "renderer/**/*",
+      "models/model.vrm",
+      "models/mocap.bin",
+      "build/icon.png"
+    ],
+    "linux": {
+      "target": [
+        {
+          "target": "deb",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "AppImage",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "category": "Utility",
+      "icon": "build/icon.png",
+      "synopsis": "Marina, your companion",
+      "maintainer": "Jacob Matthews",
+      "desktop": {
+        "entry": {
+          "Name": "Marina",
+          "Comment": "Talk to Marina",
+          "StartupWMClass": "Marina"
+        }
+      },
+      "syncDesktopName": true
+    },
+    "deb": {
+      "depends": [
+        "pulseaudio-utils"
+      ]
+    }
+  },
+  "desktopName": "marina.desktop"
+}

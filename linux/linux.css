@@ -1,0 +1,9 @@
+/* The Linux app: a normal window, so no click-through or hover-to-reveal.
+   She stands in the same light as on the phone page. */
+html.linux, .linux body {
+  background: radial-gradient(ellipse at 50% 30%, #262b38 0%, #14161c 72%);
+}
+.linux #drag-strip, .linux #btn-model { display: none !important; }
+.linux #chrome, .linux #bar, .linux #status { opacity: 1; }
+.linux #bar { bottom: 34px; }
+.linux #status { bottom: 8px; }
