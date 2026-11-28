@@ -49,3 +49,18 @@ result.json
 .marina/
 server/agent/agent-keys.env
 appliance/rvc/warmup.wav
+
+# Mixamo clips (licence: use in the app, no redistribution of the raw files)
+app/mocap-src/
+app/models/*.bin
+
+# Avatar backups: like the avatar itself, not published
+app/models/*.bak
+
+# Voice tests rendered in character voices: kept local
+voice-preview/
+
+# LoRA data built from real chats with her: private
+docs/marina-lora/pairs-real.jsonl
+docs/marina-lora/picked.jsonl
+docs/marina-lora/prefs.jsonl
